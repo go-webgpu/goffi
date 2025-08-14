@@ -1,0 +1,56 @@
+version: "2"
+
+run:
+  timeout: 10m
+  concurrency: 4
+  modules-download-mode: readonly
+  build-tags:
+    - linux  #
+
+linters:
+  disable:
+    - gocyclo
+    - wsl
+    - dupl
+    - goconst
+    - gocritic
+    - gosec
+    - funlen
+
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - ineffassign
+
+  settings:
+    govet:
+      enable:
+        - shadow
+
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+      - path: gen/.*\.pb\.go
+        linters:
+          - revive
+          - govet
+          - staticcheck
+      - path: examples/.*
+        linters:
+          - revive
+      - path: internal/arch/stubs
+        linters:
+          - govet
+          - staticcheck
+          - errcheck
+          - ineffassign
+      - path: internal/arch/amd64/.*\.s
+        linters:
+          - govet
+
+issues:
+  max-issues-per-linter: 100
+  max-same-issues: 100
