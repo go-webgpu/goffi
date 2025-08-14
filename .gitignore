@@ -1,0 +1,50 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+
+# Test artifacts
+*.test
+*.out
+coverage.txt
+profile.cov
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# Development artifacts
+*.swp
+*.swo
+*~
+*.log
+
+# IDE configurations
+.idea/
+.vscode/
+*.code-workspace
+
+# Environment files
+.env
+.env.local
+
+# Build artifacts
+*.o
+*.a
+
+# Project-specific
+gops_config.yaml
+project_docs_*.md
+/docs
+/tmp
+/coverage
+
+# Go modules (don't ignore go.mod and go.sum)
+!go.mod
+!go.sum
