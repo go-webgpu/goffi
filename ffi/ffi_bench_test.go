@@ -12,6 +12,6 @@ func BenchmarkPrepCIF(b *testing.B) {
 	argtypes := []*types.TypeDescriptor{types.PointerTypeDescriptor}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		PrepareCallInterface(cif, types.UnixCallingConvention, 1, rtype, argtypes)
+		PrepareCallInterface(cif, types.UnixCallingConvention, rtype, argtypes)
 	}
 }

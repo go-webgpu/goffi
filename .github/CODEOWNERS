@@ -1,0 +1,55 @@
+# CODEOWNERS for goffi - Zero-CGO FFI for Go
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# This file defines individuals or teams responsible for code in this repository.
+# Code owners are automatically requested for review when someone opens a pull request
+# that modifies code they own.
+
+# Default owner for everything in the repo
+* @kolkov
+
+# Core FFI implementation - Critical low-level functionality
+/ffi/ @kolkov
+/types/ @kolkov
+
+# Internal architecture - Assembly, syscalls, runtime integration
+/internal/arch/ @kolkov
+/internal/syscall/ @kolkov
+/internal/runtime/ @kolkov
+/internal/fakecgo/ @kolkov
+/internal/dl/ @kolkov
+
+# Examples - Reference implementations
+/examples/ @kolkov
+
+# Experiments - Research and prototypes
+/experiments/ @kolkov
+
+# Documentation - Keep up to date with code changes
+*.md @kolkov
+/docs/ @kolkov
+
+# GitHub configuration and CI/CD
+/.github/ @kolkov
+
+# Code quality and linting configuration
+/.golangci.yml @kolkov
+/Makefile @kolkov
+
+# Tests - Ensure coverage and reliability
+*_test.go @kolkov
+
+# Release management - Version control and changelog
+/CHANGELOG.md @kolkov
+/ROADMAP.md @kolkov
+/API_TODO.md @kolkov
+
+# Contributing guidelines
+/CONTRIBUTING.md @kolkov
+
+# Go module files - Dependency management
+/go.mod @kolkov
+/go.sum @kolkov
+
+# License - Legal protection
+/LICENSE @kolkov

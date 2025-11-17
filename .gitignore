@@ -42,9 +42,26 @@ go.work
 gops_config.yaml
 project_docs_*.md
 project_structure.txt
-/docs
 /tmp
 /coverage
+docs/dev/
+/docs/build
+/docs/_site
+INDEX.md
+
+# AI specific (private development folders)
+.claude/
+.goda/
+.goco/
+
+# Private reference libraries (research materials)
+reference/
+
+# Development experiments and temporary files
+test_*
+experiments/
+QUICK_START*.md
+RESEARCH*.md
 
 # Go modules (don't ignore go.mod and go.sum)
 !go.mod
