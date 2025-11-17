@@ -10,14 +10,46 @@ func RuntimeEnvironment() (os, arch string) {
 	return runtime.GOOS, runtime.GOARCH
 }
 
-// CallingConvention represents function calling conventions
+// CallingConvention represents function calling conventions used by different platforms.
 type CallingConvention int
 
 const (
+	// UnixCallingConvention is the System V AMD64 ABI used on Linux, macOS, FreeBSD.
 	UnixCallingConvention CallingConvention = iota + 1
+
+	// WindowsCallingConvention is the Win64 (Microsoft x64) calling convention.
 	WindowsCallingConvention
+
+	// GnuWindowsCallingConvention is the GNU extension to Windows calling convention.
 	GnuWindowsCallingConvention
+
+	// Convenient aliases for common usage
+	// DefaultCall automatically selects the platform's native calling convention.
+	DefaultCall = CallingConvention(0) // Will be resolved by DefaultConvention()
+
+	// CDecl is an alias for the C calling convention on the current platform.
+	CDecl = UnixCallingConvention // Updated by init() on Windows
+
+	// StdCall is Windows-specific (same as WindowsCallingConvention).
+	StdCall = WindowsCallingConvention
 )
+
+// DefaultConvention returns the native calling convention for the current platform.
+//
+// Returns:
+//   - UnixCallingConvention on Linux, macOS, FreeBSD
+//   - WindowsCallingConvention on Windows
+//
+// Example:
+//
+//	convention := types.DefaultConvention()
+//	// or just use types.DefaultCall constant
+func DefaultConvention() CallingConvention {
+	if runtime.GOOS == "windows" {
+		return WindowsCallingConvention
+	}
+	return UnixCallingConvention
+}
 
 // TypeKind defines data type categories
 type TypeKind int

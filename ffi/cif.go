@@ -1,6 +1,9 @@
 package ffi
 
 import (
+	"fmt"
+	"runtime"
+
 	"github.com/go-webgpu/goffi/internal/arch"
 	"github.com/go-webgpu/goffi/types"
 )
@@ -13,9 +16,18 @@ func prepareCallInterfaceCore(
 	returnType *types.TypeDescriptor,
 	argTypes []*types.TypeDescriptor,
 ) error {
+	// Auto-resolve DefaultCall to platform-specific convention
+	if convention == types.DefaultCall {
+		convention = types.DefaultConvention()
+	}
+
 	// Validate input parameters
-	if convention <= types.UnixCallingConvention || convention >= types.GnuWindowsCallingConvention {
-		return types.ErrUnsupportedCallingConvention
+	if convention < types.UnixCallingConvention || convention > types.GnuWindowsCallingConvention {
+		return &CallingConventionError{
+			Convention: int(convention),
+			Platform:   fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+			Reason:     "value must be 1 (Unix), 2 (Windows), or 3 (GNU Windows)",
+		}
 	}
 
 	cif.Convention = convention
@@ -31,19 +43,19 @@ func prepareCallInterfaceCore(
 	}
 
 	if !isValidType(returnType) {
-		return types.ErrInvalidTypeDefinition
+		return newInvalidTypeError("returnType", int(returnType.Kind), "unsupported type kind")
 	}
 
 	// Calculate stack size
 	stackBytes := uintptr(0)
-	for _, t := range argTypes {
+	for i, t := range argTypes {
 		if t.Size == 0 && t.Kind == types.StructType {
 			if err := initializeCompositeType(t); err != nil {
-				return err
+				return fmt.Errorf("argument type at index %d: %w", i, err)
 			}
 		}
 		if !isValidType(t) {
-			return types.ErrInvalidTypeDefinition
+			return newInvalidTypeAtIndexError("argTypes", int(t.Kind), i, "unsupported type kind")
 		}
 		stackBytes = align(stackBytes, t.Alignment)
 		stackBytes += align(t.Size, 8)
@@ -83,21 +95,42 @@ func preparePlatformSpecific(cif *types.CallInterface) error {
 
 // initializeCompositeType initializes composite type
 func initializeCompositeType(t *types.TypeDescriptor) error {
-	if t == nil || t.Kind != types.StructType || t.Members == nil {
-		return types.ErrInvalidTypeDefinition
+	if t == nil {
+		return &TypeValidationError{
+			TypeName: "compositeType",
+			Kind:     0,
+			Reason:   "type descriptor is nil",
+			Index:    -1,
+		}
+	}
+	if t.Kind != types.StructType {
+		return &TypeValidationError{
+			TypeName: "compositeType",
+			Kind:     int(t.Kind),
+			Reason:   "expected StructType",
+			Index:    -1,
+		}
+	}
+	if t.Members == nil {
+		return &TypeValidationError{
+			TypeName: "compositeType",
+			Kind:     int(t.Kind),
+			Reason:   "struct has no members",
+			Index:    -1,
+		}
 	}
 
 	t.Size = 0
 	t.Alignment = 0
 
-	for _, member := range t.Members {
+	for i, member := range t.Members {
 		if member.Size == 0 && member.Kind == types.StructType {
 			if err := initializeCompositeType(member); err != nil {
-				return err
+				return fmt.Errorf("struct member at index %d: %w", i, err)
 			}
 		}
 		if !isValidType(member) {
-			return types.ErrInvalidTypeDefinition
+			return newInvalidTypeAtIndexError("structMember", int(member.Kind), i, "unsupported type kind")
 		}
 
 		t.Size = align(t.Size, member.Alignment)
