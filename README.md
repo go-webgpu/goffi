@@ -1,9 +1,12 @@
 # goffi - Zero-CGO FFI for Go
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/go-webgpu/goffi.svg)](https://pkg.go.dev/github.com/go-webgpu/goffi)
+[![CI](https://github.com/go-webgpu/goffi/actions/workflows/ci.yml/badge.svg)](https://github.com/go-webgpu/goffi/actions)
+[![Coverage](https://img.shields.io/badge/coverage-87.1%25-brightgreen)](https://github.com/go-webgpu/goffi)
 [![Go Report Card](https://goreportcard.com/badge/github.com/go-webgpu/goffi)](https://goreportcard.com/report/github.com/go-webgpu/goffi)
+[![GitHub release](https://img.shields.io/github/v/release/go-webgpu/goffi)](https://github.com/go-webgpu/goffi/releases)
+[![Go version](https://img.shields.io/github/go-mod/go-version/go-webgpu/goffi)](https://github.com/go-webgpu/goffi/blob/main/go.mod)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Coverage](https://img.shields.io/badge/coverage-89.1%25-brightgreen)](https://github.com/go-webgpu/goffi)
+[![Go Reference](https://pkg.go.dev/badge/github.com/go-webgpu/goffi.svg)](https://pkg.go.dev/github.com/go-webgpu/goffi)
 
 **Pure Go Foreign Function Interface (FFI)** for calling C libraries without CGO. Primary use case: **WebGPU bindings** for GPU computing in pure Go.
 
@@ -20,9 +23,9 @@ ffi.CallFunction(&cif, wgpuCreateInstance, &result, args)
 
 - **🚫 Zero CGO** - Pure Go, no C compiler needed
 - **⚡ Fast** - ~100ns FFI overhead ([benchmarks](#performance))
-- **🌐 Cross-platform** - Windows + Linux AMD64 (macOS + ARM64 planned)
+- **🌐 Cross-platform** - Windows + Linux + macOS AMD64 (ARM64 planned)
 - **🔒 Type-safe** - Runtime type validation with detailed errors
-- **📦 Production-ready** - 89.1% test coverage, comprehensive error handling
+- **📦 Production-ready** - 87.1% test coverage, comprehensive error handling
 - **🎯 WebGPU-optimized** - Designed for wgpu-native bindings
 
 ---
@@ -248,7 +251,6 @@ See [docs/dev/TECHNICAL_ARCHITECTURE.md](docs/dev/TECHNICAL_ARCHITECTURE.md) for
 
 ### v0.5.0 - Platform Expansion (Q3 2025)
 - ARM64 support (Linux + macOS AAPCS64 ABI)
-- macOS AMD64 validation
 - **Variadic function support** (printf, sprintf, etc.)
 - Callback support (C→Go calls)
 
@@ -287,8 +289,8 @@ go test -v ./ffi  # Auto-detects Windows/Linux
 |----------|--------------|--------|-------|
 | **Windows** | amd64 | ✅ v0.1.0 | Win64 ABI, full support |
 | **Linux** | amd64 | ✅ v0.1.0 | System V ABI, full support |
+| **macOS** | amd64 | ✅ v0.1.1 | System V ABI, full support |
 | **FreeBSD** | amd64 | ✅ v0.1.0 | System V ABI (untested) |
-| **macOS** | amd64 | 🟡 v0.5.0 | System V ABI (planned) |
 | **Linux** | arm64 | 🔴 v0.5.0 | AAPCS64 ABI (planned) |
 | **macOS** | arm64 | 🔴 v0.5.0 | AAPCS64 ABI (planned) |
 

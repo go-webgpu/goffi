@@ -50,6 +50,26 @@ linters:
       - path: internal/arch/amd64/.*\.s
         linters:
           - govet
+      # fakecgo: Go runtime code with assembly callbacks
+      - path: internal/fakecgo/
+        linters:
+          - unused        # Functions called from assembly
+          - govet         # Low-level runtime code
+          - staticcheck
+          - ineffassign
+      # dl: Dynamic library wrappers called from assembly
+      - path: internal/dl/
+        linters:
+          - unused        # Wrappers called from assembly
+          - staticcheck
+      # FFI code: unsafe.Pointer is fundamental
+      - path: ffi/dl_.*\.go
+        linters:
+          - govet         # unsafe.Pointer conversions are correct
+      - path: internal/arch/amd64/implementation\.go
+        linters:
+          - govet         # unsafe.Pointer for return values
+          - unused        # align() used for struct layout
 
 issues:
   max-issues-per-linter: 100

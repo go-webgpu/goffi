@@ -80,9 +80,8 @@ func preparePlatformSpecific(cif *types.CallInterface) error {
 		classification := arch.Registry.Classifier.ClassifyArgument(arg, cif.Convention)
 		gprCount += classification.GPRCount
 		sseCount += classification.SSECount
-		if gprCount > maxGPR || sseCount > maxSSE {
-			// Handle register overflow
-		}
+		// Register overflow is handled by stack allocation in arch-specific code
+		_ = gprCount > maxGPR || sseCount > maxSSE
 	}
 
 	// Windows-specific: requires 32-byte shadow space

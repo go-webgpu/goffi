@@ -1,6 +1,6 @@
-//go:build amd64 && linux
+//go:build amd64 && (linux || darwin)
 
-// Linux implementation using our own syscall6 based on purego's pattern.
+// Unix implementation using System V AMD64 ABI (Linux, macOS, FreeBSD, etc.)
 // This implementation closely follows purego's proven approach but is OUR OWN code.
 
 package amd64

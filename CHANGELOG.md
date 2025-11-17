@@ -13,7 +13,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.5.0: ARM64 support, variadic functions, callbacks
 - v1.0.0: LTS release with API stability guarantee
 
-## [0.1.0] - 2025-01-17
+## [0.1.1] - 2025-11-18
+
+### Added
+- **macOS AMD64 support** via System V ABI shared implementation
+  - Shared `call_unix.s` assembly for Linux and macOS (identical System V ABI)
+  - Platform-specific dynamic library constants (RTLD_GLOBAL: 0x8 on macOS vs 0x100 on Linux)
+  - Complete `dl_darwin.go` implementation with LoadLibrary/GetSymbol/FreeLibrary
+  - `internal/dl/` Unix implementation shared between platforms
+  - `fakecgo` support extended to macOS
+- **Thread safety documentation** in `ffi/ffi.go`
+  - Documented concurrent access patterns
+  - Clarified race detector limitation for zero-CGO libraries
+
+### Changed
+- **CI/CD improvements** for cross-platform testing
+  - Added `macos-13` runner (Intel AMD64) to test matrix
+  - Fixed coverage calculation (test specific packages instead of all files)
+  - Explicit `CGO_ENABLED=0` environment variable in all jobs
+  - Coverage restored from 28-56% (diluted) to **87.1%** (accurate)
+- **Architecture refactoring** for better code organization
+  - Renamed `call_linux.s` → `call_unix.s` with `(linux || darwin)` build tags
+  - Renamed `syscall_linux_amd64.*` → `syscall_unix_amd64.*` for shared Unix code
+  - Split platform-specific constants into `dl_linux.go` and `dl_darwin.go`
+  - Shared implementation in `dl_unix.go` for both Unix platforms
+
+### Fixed
+- Linter exclusions for assembly-called functions and FFI unsafe.Pointer usage
+- Build constraints compatibility with fakecgo `!cgo` tag across all platforms
+- CI coverage calculation methodology (test only main packages: `./ffi ./types`)
+
+### Platform Support
+- ✅ Linux AMD64 (System V ABI) - **FULLY SUPPORTED**
+- ✅ Windows AMD64 (Win64 ABI) - **FULLY SUPPORTED**
+- ✅ macOS AMD64 (System V ABI) - **NEWLY ADDED**
+- ⏳ ARM64 (AAPCS64 ABI) - Planned for v0.5.0
+
+### Infrastructure
+- All 3 platforms tested in CI/CD (ubuntu-latest, windows-latest, macos-13)
+- Quality gate: 70% minimum coverage threshold (current: 87.1%)
+- Benchmark validation: FFI overhead < 200ns threshold
+
+## [0.1.0] - 2025-11-17
 
 ### Added
 - **Professional typed error system** following Go 2025 best practices
@@ -76,31 +117,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Verdict**: ✅ **Excellent for WebGPU** (< 5% overhead for GPU operations)
 - **Comparison**: Competitive with CGO (~200-250ns) and purego (~150-200ns)
 
-## [0.0.1] - 2025-01-17
+---
 
-### Added
-- Initial zero-dependency FFI implementation for Linux AMD64
-- System V AMD64 ABI support (Linux, FreeBSD, macOS)
-- Win64 ABI support (Windows)
-- Four-layer architecture: Go → runtime.cgocall → Wrapper → JMP Stub → C
-- Dynamic library loading via `LoadLibrary` / `GetSymbol`
-- Function call preparation via `PrepareCallInterface`
-- Function execution via `CallFunction`
-- Type system with predefined descriptors for common types
-- Hand-optimized assembly for each platform calling convention
-- ~50-60ns overhead per call (negligible for WebGPU use case)
+## Migration Guide: v0.1.0 → v0.1.1
 
-### Platform Support
-- ✅ Linux AMD64 (System V ABI)
-- ✅ Windows AMD64 (Win64 ABI)
-- ⏳ macOS AMD64 (planned)
-- ⏳ ARM64 (planned)
+### No Breaking Changes
+
+Version 0.1.1 is fully backward compatible with 0.1.0. All existing code will continue to work without modifications.
+
+### What's New
+
+**macOS AMD64 Support** - If you were previously targeting only Linux/Windows, you can now add macOS to your build targets:
+
+```bash
+# Build for macOS
+GOOS=darwin GOARCH=amd64 go build ./...
+
+# Your existing code works unchanged
+handle, _ := ffi.LoadLibrary("libc.dylib")  # macOS system library
+```
+
+**Thread Safety Documentation** - Review new concurrency guidelines in package documentation.
 
 ---
 
-## Migration Guide: v0.0.1 → v0.1.0
+## Migration Guide: Earlier Versions → v0.1.0
 
-### Breaking Changes
+### Breaking Changes (from pre-v0.1.0)
 
 #### 1. PrepareCallInterface Signature Change
 
@@ -268,6 +311,7 @@ if errors.As(err, &icErr) {
 - **Cannot interrupt** C functions mid-execution (use `CallFunctionContext` for timeouts)
 - **Limited to amd64** architecture (ARM64 planned for v0.5.0)
 - **No bitfields** in structs (manual bit manipulation required)
+- **Race detector not supported** - Race detection requires CGO_ENABLED=1, which conflicts with our fakecgo (!cgo build tag). This is a fundamental limitation of zero-CGO libraries. Manual testing possible with real C runtime.
 
 **Performance** (BENCHMARKED in v0.1.0):
 - **Measured 88-114 ns/op** FFI overhead (better than estimated 230ns!)
@@ -318,6 +362,6 @@ See [API_TODO.md](docs/dev/API_TODO.md) for detailed roadmap to v1.0.
 
 ---
 
-[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/go-webgpu/goffi/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/go-webgpu/goffi/releases/tag/v0.1.0
-[0.0.1]: https://github.com/go-webgpu/goffi/releases/tag/v0.0.1

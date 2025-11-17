@@ -3,7 +3,7 @@
 > **Strategic Approach**: Build production-ready Zero-CGO FFI with benchmarked performance
 > **Philosophy**: Performance first, usability second, platform coverage third
 
-**Last Updated**: 2025-01-17 | **Current Version**: v0.1.0 | **Strategy**: Benchmarks → API → Platforms → v1.0 LTS | **Milestone**: v0.1.0 RELEASED! → v0.2.0 (Q2 2025) → v1.0.0 LTS (Q1 2026)
+**Last Updated**: 2025-11-18 | **Current Version**: v0.1.1 | **Strategy**: Benchmarks → API → Platforms → v1.0 LTS | **Milestone**: v0.1.1 RELEASED! → v0.2.0 (Q2 2025) → v1.0.0 LTS (Q1 2026)
 
 ---
 
@@ -40,7 +40,9 @@ Build a **production-ready, zero-CGO FFI library for Go** with:
 ### Philosophy: Performance → Usability → Coverage → Stable
 
 ```
-v0.1.0 (BENCHMARKS + QUALITY) ✅ RELEASED 2025-01-17
+v0.1.0 (BENCHMARKS + QUALITY) ✅ RELEASED 2025-11-17
+         ↓ (1 day - macOS completion)
+v0.1.1 (macOS SUPPORT) ✅ RELEASED 2025-11-18
          ↓ (3-4 months)
 v0.2.0 (USABILITY) → Q2 2025
          ↓ (2-3 months)
@@ -53,11 +55,17 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 
 ### Critical Milestones
 
-**v0.1.0** = Performance validated, production-ready for WebGPU ✅ RELEASED
+**v0.1.0** = Performance validated, production-ready for WebGPU ✅ RELEASED (2025-11-17)
 - **88-114 ns/op** FFI overhead (BETTER than estimated 230ns!)
 - 89.1% test coverage
 - 5 typed errors
 - Platform: Linux + Windows AMD64
+
+**v0.1.1** = macOS support completion ✅ RELEASED (2025-11-18)
+- **macOS AMD64** added to supported platforms
+- System V ABI shared implementation (Linux + macOS)
+- CI/CD coverage: 3 platforms (Linux, Windows, macOS)
+- Coverage: **87.1%** (accurate calculation)
 
 **v0.2.0** = Developer experience improvements (Q2 2025)
 - Builder pattern API
@@ -69,7 +77,6 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 - ARM64 support (Linux + macOS)
 - Variadic functions
 - Callback support (C→Go)
-- macOS AMD64 validation
 
 **v1.0.0** = Long-term support release (Q1 2026)
 - API stability guarantee

@@ -2,7 +2,6 @@ package ffi
 
 import (
 	"fmt"
-	"runtime"
 )
 
 // InvalidCallInterfaceError indicates CallInterface preparation failed due to
@@ -175,14 +174,6 @@ var (
 )
 
 // Helper functions for creating common errors
-
-// newUnsupportedPlatformError creates an error for the current platform.
-func newUnsupportedPlatformError() error {
-	return &UnsupportedPlatformError{
-		OS:   runtime.GOOS,
-		Arch: runtime.GOARCH,
-	}
-}
 
 // newInvalidTypeError creates a TypeValidationError for an invalid type kind.
 func newInvalidTypeError(typeName string, kind int, reason string) error {

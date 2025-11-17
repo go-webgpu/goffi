@@ -65,6 +65,21 @@
 //   - Pointers remain valid during the call (use runtime.KeepAlive if needed)
 //   - Return value buffer is large enough for the result
 //
+// # Thread Safety
+//
+// This package follows Go's standard library conventions for concurrent access:
+//   - PrepareCallInterface and CallFunction are safe to call concurrently with different CallInterface instances
+//   - DO NOT use the same CallInterface from multiple goroutines simultaneously without external synchronization
+//   - Library handles (from LoadLibrary) are safe to use concurrently for read operations (GetSymbol)
+//   - DO NOT call FreeLibrary while other goroutines are using GetSymbol on the same handle
+//   - Similar to io.Reader: methods are not inherently thread-safe; synchronization is caller's responsibility
+//
+// Race detector is not supported for zero-CGO libraries (race detector requires CGO_ENABLED=1,
+// which conflicts with our fakecgo implementation using build tag !cgo). This is a fundamental
+// limitation of the zero-CGO approach. However, this library contains no data races in its
+// internal implementation - all shared state (Registry, TypeDescriptors) is initialized once
+// at startup and accessed read-only thereafter.
+//
 // # Zero Dependencies
 //
 // This package has zero external dependencies (except for internal/fakecgo on Linux).

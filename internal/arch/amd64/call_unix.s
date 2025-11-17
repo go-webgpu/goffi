@@ -1,8 +1,9 @@
-//go:build amd64 && linux
+//go:build amd64 && (linux || darwin)
 
 #include "textflag.h"
 
 // func callUnix64(gpr []uint64, sse []float64, fn uintptr) uint64
+// System V AMD64 ABI calling convention (identical on Linux and macOS)
 // EXPERIMENT: Try direct call WITHOUT stack manipulation
 TEXT ·callUnix64(SB), NOSPLIT, $0-56
 	// Load arguments

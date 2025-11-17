@@ -1,5 +1,7 @@
-//go:build linux && amd64
+//go:build (linux || darwin) && amd64
 
+// System V AMD64 ABI syscall implementation (Linux, macOS, FreeBSD, etc.)
+// This calling convention is IDENTICAL on all Unix-like systems.
 package syscall
 
 import (

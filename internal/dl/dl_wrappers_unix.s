@@ -1,6 +1,13 @@
-//go:build linux && amd64
+//go:build (linux || darwin) && amd64
 
 #include "textflag.h"
+
+// Assembly wrappers for dlopen/dlsym/dlerror using System V AMD64 ABI
+// This calling convention is IDENTICAL on Linux and macOS, so we share
+// the same implementation for both platforms.
+//
+// Reference: System V AMD64 ABI specification
+// https://refspecs.linuxbase.org/elf/x86_64-abi-0.99.pdf
 
 // dlopen_wrapper calls dlopen(path, mode)
 //

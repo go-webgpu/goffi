@@ -1,9 +1,10 @@
-//go:build linux && amd64
+//go:build (linux || darwin) && amd64
 
 #include "textflag.h"
 #include "abi_amd64.h"
 
 // syscall6 calls a C function with up to 6 integer and 8 float arguments.
+// System V AMD64 ABI calling convention (identical on Linux, macOS, FreeBSD).
 // This implementation closely follows purego's syscall15X pattern, adapted for syscall6.
 //
 // syscall6 takes a pointer to syscall6Args struct:
