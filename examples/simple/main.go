@@ -12,17 +12,14 @@ import (
 func main() {
 	// Determine OS-specific configuration
 	var libName, funcName string
-	var convention types.CallingConvention
 
 	switch runtime.GOOS {
 	case "linux":
 		libName = "libc.so.6"
 		funcName = "puts"
-		convention = types.UnixCallingConvention
 	case "windows":
 		libName = "msvcrt.dll"
 		funcName = "printf"
-		convention = types.WindowsCallingConvention
 	default:
 		fmt.Println("Unsupported OS")
 		return
@@ -34,6 +31,7 @@ func main() {
 		fmt.Println("LoadLibrary error:", err)
 		return
 	}
+	defer ffi.FreeLibrary(handle) // Clean up when done
 
 	// Get function symbol
 	sym, err := ffi.GetSymbol(handle, funcName)
@@ -47,7 +45,7 @@ func main() {
 	rtype := types.VoidTypeDescriptor
 	argtypes := []*types.TypeDescriptor{types.PointerTypeDescriptor}
 
-	err = ffi.PrepareCallInterface(cif, convention, 1, rtype, argtypes)
+	err = ffi.PrepareCallInterface(cif, types.DefaultCall, rtype, argtypes)
 	if err != nil {
 		fmt.Println("PrepareCallInterface error:", err)
 		return

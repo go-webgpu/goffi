@@ -8,6 +8,30 @@ import (
 	"github.com/go-webgpu/goffi/types"
 )
 
+/*func TestFindLibrary(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Test requires Linux")
+	}
+
+	paths := []string{
+		"libc.so.6",
+		"/lib/x86_64-linux-gnu/libc.so.6",
+		"/lib64/libc.so.6",
+		"/usr/lib64/libc.so.6",
+		"/usr/lib/libc.so.6",
+	}
+
+	for _, path := range paths {
+		if _, err := findLibrary(path); err != nil {
+			t.Logf("Library not found: %s", path)
+		} else {
+			t.Logf("Library found: %s", path)
+			return
+		}
+	}
+	t.Error("No standard library paths found")
+}*/
+
 func TestPrepCIF(t *testing.T) {
 	cif := &types.CallInterface{}
 	rtype := types.VoidTypeDescriptor
@@ -20,7 +44,7 @@ func TestPrepCIF(t *testing.T) {
 		convention = types.UnixCallingConvention
 	}
 
-	err := PrepareCallInterface(cif, convention, 1, rtype, argtypes)
+	err := PrepareCallInterface(cif, convention, rtype, argtypes)
 	if err != nil {
 		t.Fatalf("PrepareCallInterface failed: %v", err)
 	}
@@ -33,10 +57,15 @@ func TestPrepCIF(t *testing.T) {
 }
 
 func TestCallPrintf(t *testing.T) {
+	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
+		t.Skip("Test requires Linux or Windows")
+	}
+
 	var libName, funcName string
 	var convention types.CallingConvention
 	switch runtime.GOOS {
 	case "linux":
+		// Используем базовое имя, поиск по путям сделает findLibrary
 		libName = "libc.so.6"
 		funcName = "puts"
 		convention = types.UnixCallingConvention
@@ -45,7 +74,7 @@ func TestCallPrintf(t *testing.T) {
 		funcName = "printf"
 		convention = types.WindowsCallingConvention
 	default:
-		t.Skip("Test requires Linux or Windows")
+		t.Skip("Unsupported OS")
 	}
 
 	handle, err := LoadLibrary(libName)
@@ -61,7 +90,7 @@ func TestCallPrintf(t *testing.T) {
 	rtype := types.SInt32TypeDescriptor
 	argtypes := []*types.TypeDescriptor{types.PointerTypeDescriptor}
 
-	err = PrepareCallInterface(cif, convention, 1, rtype, argtypes)
+	err = PrepareCallInterface(cif, convention, rtype, argtypes)
 	if err != nil {
 		t.Fatalf("PrepareCallInterface failed: %v", err)
 	}
