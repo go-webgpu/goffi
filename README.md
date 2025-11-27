@@ -125,6 +125,12 @@ See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for comprehensive analysis, optim
 
 ### Critical
 
+**Windows: C++ exceptions crash the program** ([Go issue #12516](https://github.com/golang/go/issues/12516))
+- Libraries using C++ exceptions (including Rust with `panic=unwind`) will crash
+- This is a **Go runtime limitation**, not goffi-specific - affects CGO too
+- Workaround: Build native libraries with `panic=abort` or use Linux/macOS
+- Fix planned: **Go 1.26** ([#58542](https://github.com/golang/go/issues/58542))
+
 **Variadic functions NOT supported** (`printf`, `sprintf`, etc.)
 - Workaround: Use non-variadic wrappers (`puts` instead of `printf`)
 - Planned: v0.5.0 (Q3 2025)
@@ -132,7 +138,7 @@ See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for comprehensive analysis, optim
 **Struct packing** follows System V ABI only
 - Windows `#pragma pack` directives NOT honored
 - Workaround: Manually specify `Size`/`Alignment` in `TypeDescriptor`
-- Planned: v0.2.0 (platform-specific rules)
+- Planned: v0.3.0 (platform-specific rules)
 
 ### Architectural
 

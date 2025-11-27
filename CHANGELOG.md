@@ -56,9 +56,18 @@ ffi.CallFunction(&cif, wgpuRequestAdapter, nil,
 ```
 
 ### Known Limitations
+
+**Callback-specific:**
 - Maximum 2000 callbacks per process (memory never released)
 - Complex types (string, slice, map, chan, interface) not supported as arguments
 - Callbacks must have at most one return value
+
+**Windows SEH (Go runtime limitation):**
+- C++ exceptions crash the program on Windows ([Go #12516](https://github.com/golang/go/issues/12516))
+- Affects Rust libraries with `panic=unwind` (default), including wgpu-native
+- **This is NOT goffi-specific** - CGO has the same issue
+- Workaround: Build native libraries with `panic=abort` or use Linux/macOS
+- Fix planned for **Go 1.26** ([#58542](https://github.com/golang/go/issues/58542))
 
 ## [0.1.1] - 2025-11-18
 
