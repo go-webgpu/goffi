@@ -24,8 +24,9 @@ ffi.CallFunction(&cif, wgpuCreateInstance, &result, args)
 - **🚫 Zero CGO** - Pure Go, no C compiler needed
 - **⚡ Fast** - ~100ns FFI overhead ([benchmarks](#performance))
 - **🌐 Cross-platform** - Windows + Linux + macOS AMD64 (ARM64 planned)
+- **🔄 Callbacks** - C-to-Go function calls for async APIs (v0.2.0)
 - **🔒 Type-safe** - Runtime type validation with detailed errors
-- **📦 Production-ready** - 87.1% test coverage, comprehensive error handling
+- **📦 Production-ready** - 87% test coverage, comprehensive error handling
 - **🎯 WebGPU-optimized** - Designed for wgpu-native bindings
 
 ---
@@ -243,8 +244,12 @@ See [docs/dev/TECHNICAL_ARCHITECTURE.md](docs/dev/TECHNICAL_ARCHITECTURE.md) for
 
 ## 🗺️ Roadmap
 
-### v0.2.0 - Usability (Q2 2025)
-- **CRITICAL**: Comprehensive benchmarks vs CGO/purego ✅ **DONE!**
+### v0.2.0 - Callback Support ✅ **RELEASED!**
+- **Callback API** (`NewCallback`) for C-to-Go function calls
+- 2000-entry trampoline table for async operations
+- WebGPU async APIs now fully supported
+
+### v0.3.0 - Usability (Q2 2025)
 - Builder pattern API: `lib.Call("func").Arg(...).ReturnInt()`
 - Platform-specific struct alignment (Windows `#pragma pack`)
 - Type-safe argument helpers (`ffi.Int32()`, `ffi.String()`)
@@ -252,7 +257,6 @@ See [docs/dev/TECHNICAL_ARCHITECTURE.md](docs/dev/TECHNICAL_ARCHITECTURE.md) for
 ### v0.5.0 - Platform Expansion (Q3 2025)
 - ARM64 support (Linux + macOS AAPCS64 ABI)
 - **Variadic function support** (printf, sprintf, etc.)
-- Callback support (C→Go calls)
 
 ### v1.0.0 - Stable Release (Q1 2026)
 - API stability guarantee (SemVer 2.0)

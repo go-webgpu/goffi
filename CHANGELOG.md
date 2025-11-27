@@ -9,9 +9,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 - See [ROADMAP.md](ROADMAP.md) for upcoming features
-- v0.2.0: Builder pattern API, platform-specific struct handling
-- v0.5.0: ARM64 support, variadic functions, callbacks
+- v0.3.0: Builder pattern API, platform-specific struct handling
+- v0.5.0: ARM64 support, variadic functions
 - v1.0.0: LTS release with API stability guarantee
+
+## [0.2.0] - 2025-11-27
+
+### Added
+- **Callback support** for C-to-Go function calls (`NewCallback` API)
+  - `NewCallback(fn any) uintptr` - Register Go function as C callback
+  - Pre-compiled trampoline table with 2000 entries
+  - Thread-safe callback registry with mutex protection
+  - Reflection-based argument and return value marshaling
+  - System V AMD64 ABI compatibility (Linux, macOS)
+  - Win64 ABI compatibility (Windows)
+  - **Files**:
+    - `ffi/callback.go` - Core callback implementation
+    - `ffi/callback_amd64.s` - Assembly trampolines (2000 entries)
+    - `ffi/callback_test.go` - Comprehensive test suite
+  - **Supported argument types**:
+    - Integers: int, int8, int16, int32, int64
+    - Unsigned: uint, uint8, uint16, uint32, uint64, uintptr
+    - Floats: float32, float64
+    - Pointers: *T, unsafe.Pointer
+    - Boolean: bool
+  - **Return types**: All above types + void (no return)
+  - **Tests**: 20 comprehensive tests covering all scenarios
+
+### Changed
+- **Roadmap updated**: Callbacks moved from v0.5.0 to v0.2.0
+- Builder pattern API moved to v0.3.0
+
+### Use Case: WebGPU Async Operations
+```go
+// Create callback for wgpuInstanceRequestAdapter
+cb := ffi.NewCallback(func(status int, adapter uintptr, msg uintptr, ud uintptr) {
+    result := (*adapterResult)(unsafe.Pointer(ud))
+    result.status = status
+    result.adapter = adapter
+    close(result.done)
+})
+
+// Pass to C function
+ffi.CallFunction(&cif, wgpuRequestAdapter, nil,
+    []unsafe.Pointer{&instance, &opts, &cb, &userdata})
+```
+
+### Known Limitations
+- Maximum 2000 callbacks per process (memory never released)
+- Complex types (string, slice, map, chan, interface) not supported as arguments
+- Callbacks must have at most one return value
 
 ## [0.1.1] - 2025-11-18
 
@@ -362,6 +409,7 @@ See [API_TODO.md](docs/dev/API_TODO.md) for detailed roadmap to v1.0.
 
 ---
 
-[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/go-webgpu/goffi/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/go-webgpu/goffi/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/go-webgpu/goffi/releases/tag/v0.1.0

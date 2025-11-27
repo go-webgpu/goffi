@@ -3,7 +3,7 @@
 > **Strategic Approach**: Build production-ready Zero-CGO FFI with benchmarked performance
 > **Philosophy**: Performance first, usability second, platform coverage third
 
-**Last Updated**: 2025-11-18 | **Current Version**: v0.1.1 | **Strategy**: Benchmarks → API → Platforms → v1.0 LTS | **Milestone**: v0.1.1 RELEASED! → v0.2.0 (Q2 2025) → v1.0.0 LTS (Q1 2026)
+**Last Updated**: 2025-11-27 | **Current Version**: v0.2.0 | **Strategy**: Benchmarks → Callbacks → API → Platforms → v1.0 LTS | **Milestone**: v0.2.0 RELEASED! → v0.3.0 (Q2 2025) → v1.0.0 LTS (Q1 2026)
 
 ---
 
@@ -43,8 +43,10 @@ Build a **production-ready, zero-CGO FFI library for Go** with:
 v0.1.0 (BENCHMARKS + QUALITY) ✅ RELEASED 2025-11-17
          ↓ (1 day - macOS completion)
 v0.1.1 (macOS SUPPORT) ✅ RELEASED 2025-11-18
+         ↓ (9 days - callback implementation)
+v0.2.0 (CALLBACKS) ✅ RELEASED 2025-11-27
          ↓ (3-4 months)
-v0.2.0 (USABILITY) → Q2 2025
+v0.3.0 (USABILITY) → Q2 2025
          ↓ (2-3 months)
 v0.5.0 (PLATFORM EXPANSION) → Q3 2025
          ↓ (2-3 months)
@@ -67,7 +69,14 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 - CI/CD coverage: 3 platforms (Linux, Windows, macOS)
 - Coverage: **87.1%** (accurate calculation)
 
-**v0.2.0** = Developer experience improvements (Q2 2025)
+**v0.2.0** = Callback support for async APIs ✅ RELEASED (2025-11-27)
+- **NewCallback API** for C-to-Go function calls
+- 2000-entry trampoline table
+- Thread-safe callback registry
+- WebGPU async operations now supported
+- Requested by: go-webgpu/webgpu project
+
+**v0.3.0** = Developer experience improvements (Q2 2025)
 - Builder pattern API
 - Platform-specific struct handling
 - Enhanced documentation
@@ -76,7 +85,6 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 **v0.5.0** = Platform expansion (Q3 2025)
 - ARM64 support (Linux + macOS)
 - Variadic functions
-- Callback support (C→Go)
 
 **v1.0.0** = Long-term support release (Q1 2026)
 - API stability guarantee
