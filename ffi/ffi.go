@@ -88,7 +88,6 @@ package ffi
 
 import (
 	"context"
-	_ "github.com/go-webgpu/goffi/internal/arch/amd64" // Register amd64 implementation
 	"unsafe"
 
 	"github.com/go-webgpu/goffi/types"

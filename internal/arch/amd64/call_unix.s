@@ -5,7 +5,7 @@
 // func callUnix64(gpr []uint64, sse []float64, fn uintptr) uint64
 // System V AMD64 ABI calling convention (identical on Linux and macOS)
 // EXPERIMENT: Try direct call WITHOUT stack manipulation
-TEXT ·callUnix64(SB), NOSPLIT, $0-56
+TEXT ·callUnix64(SB), NOSPLIT, $0-64
 	// Load arguments
 	MOVQ gpr+0(FP), AX   // GPR array pointer
 	MOVQ sse+24(FP), BX  // SSE array pointer

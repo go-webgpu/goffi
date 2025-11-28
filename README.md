@@ -1,7 +1,7 @@
 # goffi - Zero-CGO FFI for Go
 
 [![CI](https://github.com/go-webgpu/goffi/actions/workflows/ci.yml/badge.svg)](https://github.com/go-webgpu/goffi/actions)
-[![Coverage](https://img.shields.io/badge/coverage-87.1%25-brightgreen)](https://github.com/go-webgpu/goffi)
+[![Coverage](https://img.shields.io/badge/coverage-89.6%25-brightgreen)](https://github.com/go-webgpu/goffi)
 [![Go Report Card](https://goreportcard.com/badge/github.com/go-webgpu/goffi)](https://goreportcard.com/report/github.com/go-webgpu/goffi)
 [![GitHub release](https://img.shields.io/github/v/release/go-webgpu/goffi)](https://github.com/go-webgpu/goffi/releases)
 [![Go version](https://img.shields.io/github/go-mod/go-version/go-webgpu/goffi)](https://github.com/go-webgpu/goffi/blob/main/go.mod)
@@ -23,7 +23,7 @@ ffi.CallFunction(&cif, wgpuCreateInstance, &result, args)
 
 - **🚫 Zero CGO** - Pure Go, no C compiler needed
 - **⚡ Fast** - ~100ns FFI overhead ([benchmarks](#performance))
-- **🌐 Cross-platform** - Windows + Linux + macOS AMD64 (ARM64 planned)
+- **🌐 Cross-platform** - Windows + Linux + macOS AMD64; ARM64 in development
 - **🔄 Callbacks** - C-to-Go function calls for async APIs (v0.2.0)
 - **🔒 Type-safe** - Runtime type validation with detailed errors
 - **📦 Production-ready** - 87% test coverage, comprehensive error handling
@@ -133,18 +133,18 @@ See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for comprehensive analysis, optim
 
 **Variadic functions NOT supported** (`printf`, `sprintf`, etc.)
 - Workaround: Use non-variadic wrappers (`puts` instead of `printf`)
-- Planned: v0.5.0 (Q3 2025)
+- Planned: v0.5.0 (Q2 2025)
 
 **Struct packing** follows System V ABI only
 - Windows `#pragma pack` directives NOT honored
 - Workaround: Manually specify `Size`/`Alignment` in `TypeDescriptor`
-- Planned: v0.3.0 (platform-specific rules)
+- Planned: v0.5.0 (platform-specific rules)
 
 ### Architectural
 
 - **Composite types** (structs) require manual initialization
 - **Cannot interrupt** C functions mid-execution (use `CallFunctionContext` for timeouts)
-- **Limited to amd64** (ARM64 planned for v0.5.0)
+- **ARM64 in development** (v0.3.0, cross-compiles but untested on real hardware)
 - **No bitfields** in structs
 
 See [CHANGELOG.md](CHANGELOG.md#known-limitations) for full details.
@@ -255,14 +255,16 @@ See [docs/dev/TECHNICAL_ARCHITECTURE.md](docs/dev/TECHNICAL_ARCHITECTURE.md) for
 - 2000-entry trampoline table for async operations
 - WebGPU async APIs now fully supported
 
-### v0.3.0 - Usability (Q2 2025)
-- Builder pattern API: `lib.Call("func").Arg(...).ReturnInt()`
-- Platform-specific struct alignment (Windows `#pragma pack`)
-- Type-safe argument helpers (`ffi.Int32()`, `ffi.String()`)
+### v0.3.0 - ARM64 Support (Q1 2025)
+- **ARM64 support** (Linux + macOS AAPCS64 ABI) - in development
+- AAPCS64 calling convention with X0-X7, D0-D7 registers
+- 2000-entry callback trampolines for ARM64
 
-### v0.5.0 - Platform Expansion (Q3 2025)
-- ARM64 support (Linux + macOS AAPCS64 ABI)
+### v0.5.0 - Usability + Variadic (Q2 2025)
+- Builder pattern API: `lib.Call("func").Arg(...).ReturnInt()`
 - **Variadic function support** (printf, sprintf, etc.)
+- Platform-specific struct alignment (Windows `#pragma pack`)
+- Windows ARM64 (experimental)
 
 ### v1.0.0 - Stable Release (Q1 2026)
 - API stability guarantee (SemVer 2.0)
@@ -301,8 +303,8 @@ go test -v ./ffi  # Auto-detects Windows/Linux
 | **Linux** | amd64 | ✅ v0.1.0 | System V ABI, full support |
 | **macOS** | amd64 | ✅ v0.1.1 | System V ABI, full support |
 | **FreeBSD** | amd64 | ✅ v0.1.0 | System V ABI (untested) |
-| **Linux** | arm64 | 🔴 v0.5.0 | AAPCS64 ABI (planned) |
-| **macOS** | arm64 | 🔴 v0.5.0 | AAPCS64 ABI (planned) |
+| **Linux** | arm64 | 🟡 v0.3.0 | AAPCS64 ABI (in development) |
+| **macOS** | arm64 | 🟡 v0.3.0 | AAPCS64 ABI (in development) |
 
 ---
 
@@ -343,4 +345,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 **Made with ❤️ for GPU computing in pure Go**
 
-*Last updated: 2025-01-17 | goffi v0.1.0*
+*Last updated: 2025-11-28 | goffi v0.2.1*

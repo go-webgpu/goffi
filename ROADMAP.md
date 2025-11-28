@@ -3,7 +3,7 @@
 > **Strategic Approach**: Build production-ready Zero-CGO FFI with benchmarked performance
 > **Philosophy**: Performance first, usability second, platform coverage third
 
-**Last Updated**: 2025-11-27 | **Current Version**: v0.2.0 | **Strategy**: Benchmarks → Callbacks → API → Platforms → v1.0 LTS | **Milestone**: v0.2.0 RELEASED! → v0.3.0 (Q2 2025) → v1.0.0 LTS (Q1 2026)
+**Last Updated**: 2025-11-28 | **Current Version**: v0.2.1 | **Strategy**: Benchmarks → Callbacks → ARM64 → API → v1.0 LTS | **Milestone**: v0.2.1 RELEASED! → v0.3.0 ARM64 (Q1 2025) → v1.0.0 LTS (Q1 2026)
 
 ---
 
@@ -45,12 +45,14 @@ v0.1.0 (BENCHMARKS + QUALITY) ✅ RELEASED 2025-11-17
 v0.1.1 (macOS SUPPORT) ✅ RELEASED 2025-11-18
          ↓ (9 days - callback implementation)
 v0.2.0 (CALLBACKS) ✅ RELEASED 2025-11-27
-         ↓ (3-4 months)
-v0.3.0 (USABILITY) → Q2 2025
+         ↓ (1 day - Windows hotfix)
+v0.2.1 (WINDOWS HOTFIX) ✅ RELEASED 2025-11-27
+         ↓ (in progress - ARM64 implementation)
+v0.3.0 (ARM64 SUPPORT) → Q1 2025
          ↓ (2-3 months)
-v0.5.0 (PLATFORM EXPANSION) → Q3 2025
+v0.5.0 (USABILITY + VARIADIC) → Q2 2025
          ↓ (2-3 months)
-v0.8.0 (ADVANCED FEATURES) → Q4 2025
+v0.8.0 (ADVANCED FEATURES) → Q3 2025
          ↓ (community adoption + validation)
 v1.0.0 LTS → Long-term support release (Q1 2026)
 ```
@@ -76,15 +78,21 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 - WebGPU async operations now supported
 - Requested by: go-webgpu/webgpu project
 
-**v0.3.0** = Developer experience improvements (Q2 2025)
+**v0.2.1** = Windows callback hotfix ✅ RELEASED (2025-11-27)
+- Windows ABI fix using `syscall.NewCallback`
+- SEH exception limitation documented
+- Platform-specific callback implementations
+
+**v0.3.0** = ARM64 support 🟡 IN DEVELOPMENT
+- **ARM64 architecture support** (Linux + macOS AAPCS64 ABI)
+- Cross-compile verified, awaiting real hardware testing
+- Feature branch: `feature/arm64-support`
+- Requested by: go-webgpu project (Apple Silicon support)
+
+**v0.5.0** = Usability + Variadic (Q2 2025)
 - Builder pattern API
 - Platform-specific struct handling
-- Enhanced documentation
-- More examples
-
-**v0.5.0** = Platform expansion (Q3 2025)
-- ARM64 support (Linux + macOS)
-- Variadic functions
+- **Variadic function support** (printf, sprintf, etc.)
 
 **v1.0.0** = Long-term support release (Q1 2026)
 - API stability guarantee
@@ -119,8 +127,8 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 **Platform Support**:
 - ✅ Linux AMD64 (System V ABI)
 - ✅ Windows AMD64 (Win64 ABI)
-- ⏳ macOS AMD64 (planned v0.5.0)
-- ⏳ ARM64 (planned v0.5.0)
+- ✅ macOS AMD64 (System V ABI) - v0.1.1
+- 🟡 ARM64 Linux/macOS (AAPCS64 ABI) - in development for v0.3.0
 
 **Documentation**:
 - ✅ README.md with real benchmarks
@@ -134,100 +142,67 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 
 ## 📅 What's Next
 
-### **v0.2.0 - Usability Improvements** (Q2 2025)
+### **v0.3.0 - ARM64 Support** (Q1 2025) 🟡 IN DEVELOPMENT
 
-**Goal**: Make FFI easier to use without sacrificing performance
+**Goal**: Full ARM64 platform support for Apple Silicon and Linux ARM64
 
-**Duration**: 3-4 months (Q2 2025)
+**Status**: Cross-compile verified, awaiting real hardware testing
 
-**Critical Features**:
+**Completed**:
+- ✅ `internal/arch/arm64/` - Implementation, classification, call_unix
+- ✅ `internal/syscall/arm64` - Call8Float wrapper and assembly
+- ✅ `internal/dl/arm64` - Dynamic loader stubs and wrappers
+- ✅ `ffi/callback_arm64` - 2000-entry trampoline table
+- ✅ Cross-compile: `GOOS=linux GOARCH=arm64` builds
+- ✅ Cross-compile: `GOOS=darwin GOARCH=arm64` builds (Apple Silicon)
+
+**Pending**:
+- [ ] Real ARM64 hardware testing (Linux ARM64 / macOS M1+)
+- [ ] CI/CD ARM64 runners (GitHub Actions `macos-latest`)
+- [ ] Performance benchmarks on ARM64
+- [ ] Documentation updates
+
+**ARM64 AAPCS64 ABI Implementation**:
+- X0-X7: 8 integer/pointer registers
+- D0-D7: 8 floating-point registers
+- X8: Indirect result location
+- Homogeneous Floating-point Aggregate (HFA) support
+- 2000 callback trampolines
+
+---
+
+### **v0.5.0 - Usability + Variadic** (Q2 2025)
+
+**Goal**: Improve developer experience and add variadic function support
+
+**Duration**: 2-3 months (Q2 2025)
+
+**Features**:
 1. **Builder Pattern API** (HIGH PRIORITY)
    ```go
-   // Current (verbose)
-   cif := &types.CallInterface{}
-   ffi.PrepareCallInterface(cif, types.DefaultCall, returnType, argTypes)
-   ffi.CallFunction(cif, funcPtr, &result, args)
-
-   // Future (fluent)
    lib.Call("wgpuCreateInstance").
        Arg(nil).
        ReturnPointer(&instance)
    ```
 
-2. **Platform-Specific Struct Handling** (HIGH PRIORITY)
+2. **Variadic Function Support** (HIGH PRIORITY)
+   - System V: AL register = SSE argument count
+   - Win64: Float→GP register duplication
+   - Examples: printf, sprintf, scanf
+
+3. **Platform-Specific Struct Handling** (MEDIUM PRIORITY)
    - Windows `#pragma pack` support
    - MSVC vs GCC alignment differences
-   - Automatic platform detection
-   - Manual override options
 
-3. **Type-Safe Argument Helpers** (MEDIUM PRIORITY)
+4. **Type-Safe Argument Helpers** (MEDIUM PRIORITY)
    ```go
-   // Current
-   arg := int32(42)
-   args := []unsafe.Pointer{unsafe.Pointer(&arg)}
-
-   // Future
    args := ffi.Args(ffi.Int32(42), ffi.String("hello"))
-   ```
-
-4. **Enhanced Documentation** (MEDIUM PRIORITY)
-   - API reference (pkg.go.dev)
-   - Tutorial series
-   - 15+ real-world examples
-   - Video guides (YouTube)
-
-5. **Performance Profiling Tools** (LOW PRIORITY)
-   ```go
-   ffi.EnableProfiling() // Track call frequency and duration
-   stats := ffi.GetStatistics() // Hotspot detection
    ```
 
 **Quality Targets**:
 - Maintain 80%+ test coverage
 - 0 linter issues
-- API stability (no breaking changes after v0.2.0)
-
----
-
-### **v0.5.0 - Platform Expansion** (Q3 2025)
-
-**Goal**: Support all major platforms and ABIs
-
-**Duration**: 2-3 months (Q3 2025)
-
-**Platform Features**:
-1. **ARM64 Support** (CRITICAL)
-   - Linux ARM64 (AAPCS64 ABI)
-   - macOS Apple Silicon (AAPCS64 + Apple extensions)
-   - Assembly implementation for ARM64
-   - CI/CD on ARM64 runners
-
-2. **macOS AMD64 Validation** (HIGH PRIORITY)
-   - Validate System V ABI on macOS
-   - Test with macOS system libraries
-   - CI/CD on macOS runners
-
-3. **Variadic Function Support** (HIGH PRIORITY)
-   - System V: AL register = SSE argument count
-   - Win64: Float→GP register duplication
-   - Examples: printf, sprintf, scanf
-   - Type-safe variadic helpers
-
-4. **Callback Support** (MEDIUM PRIORITY)
-   - C→Go function calls
-   - Trampoline generation
-   - Thread-safe callback registry
-   - Example: GUI event handlers
-
-5. **Windows ARM64** (LOW PRIORITY)
-   - Experimental support
-   - Windows ARM64 ABI
-   - Limited testing (no CI yet)
-
-**Quality Targets**:
-- All platforms CI/CD tested
-- Benchmarks on all platforms
-- Cross-platform examples
+- API stability (no breaking changes)
 
 ---
 
@@ -386,5 +361,5 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 
 ---
 
-*Version 1.0 (Updated 2025-01-17)*
-*Current: v0.1.0 (Performance Validated) | Phase: Production Ready | Next: v0.2.0 (Usability) | Target: v1.0.0 LTS (Q1 2026)*
+*Version 1.1 (Updated 2025-11-28)*
+*Current: v0.2.1 (Callbacks + Windows Hotfix) | Phase: ARM64 Development | Next: v0.3.0 (ARM64) | Target: v1.0.0 LTS (Q1 2026)*
