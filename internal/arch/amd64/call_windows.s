@@ -3,7 +3,7 @@
 #include "textflag.h"
 
 // func callWin64(gpr []uint64, sse []float64, fn unsafe.Pointer) uint64
-TEXT ·callWin64(SB), NOSPLIT, $32-56  // 32-byte shadow space
+TEXT ·callWin64(SB), NOSPLIT, $32-64  // 32-byte shadow space, 64-byte args+ret
     // Load Go arguments
     MOVQ gpr+0(FP), AX
     MOVQ sse+24(FP), BX
