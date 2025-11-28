@@ -45,6 +45,7 @@ project_structure.txt
 /tmp
 /coverage
 docs/dev/
+docs/feature-requests/
 /docs/build
 /docs/_site
 INDEX.md
