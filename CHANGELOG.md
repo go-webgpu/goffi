@@ -12,6 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.5.0: Builder pattern API, variadic functions
 - v1.0.0: LTS release with API stability guarantee
 
+## [0.3.1] - 2025-11-28
+
+### Fixed
+- **ARM64 build constraints** for dynamic library loading functions
+  - `dl_unix.go`: Added ARM64 support (`linux && (amd64 || arm64)`)
+  - `dl_darwin.go`: Added ARM64 support (`darwin && (amd64 || arm64)`)
+  - `stubs/caller.go`: Exclude ARM64 from stubs (`!amd64 && !arm64`)
+  - Fixes `undefined: ffi.LoadLibrary` on ARM64 platforms
+  - Reported by go-webgpu project
+
 ## [0.3.0] - 2025-11-28
 
 ### Added
@@ -451,7 +461,8 @@ See [API_TODO.md](docs/dev/API_TODO.md) for detailed roadmap to v1.0.
 
 ---
 
-[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/go-webgpu/goffi/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/go-webgpu/goffi/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/go-webgpu/goffi/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/go-webgpu/goffi/compare/v0.1.1...v0.2.0
