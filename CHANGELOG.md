@@ -7,11 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (v0.3.0 - ARM64 Support)
+- **ARM64 architecture support** (AAPCS64 ABI for Linux and macOS)
+  - `internal/arch/arm64/` - Complete ARM64 implementation
+  - `internal/syscall/syscall_unix_arm64.s` - ARM64 assembly for FFI calls
+  - `ffi/callback_arm64.go` + `ffi/callback_arm64.s` - 2000-entry callback trampolines
+  - X0-X7 integer registers, D0-D7 floating-point registers
+  - Homogeneous Floating-point Aggregate (HFA) detection
+  - Cross-compile verified: `GOOS=linux/darwin GOARCH=arm64`
+- **Pre-release script improvements** for ARM64 and cross-platform builds
+
 ### Planned
 - See [ROADMAP.md](ROADMAP.md) for upcoming features
-- v0.3.0: Builder pattern API, platform-specific struct handling
-- v0.5.0: ARM64 support, variadic functions
+- v0.3.0: ARM64 support (current development)
+- v0.5.0: Builder pattern API, variadic functions
 - v1.0.0: LTS release with API stability guarantee
+
+## [0.2.1] - 2025-11-27
+
+### Fixed
+- **Windows callback ABI**: Use `syscall.NewCallback` for proper Win64 ABI compliance
+  - Windows callbacks now use the official Go syscall mechanism
+  - Resolves ABI mismatch issues with native Windows calling convention
+
+### Documentation
+- **SEH limitation documented**: C++ exceptions crash the program on Windows
+  - This is a Go runtime limitation ([#12516](https://github.com/golang/go/issues/12516))
+  - Affects both CGO and goffi equally
+  - Fix planned for Go 1.26 ([#58542](https://github.com/golang/go/issues/58542))
 
 ## [0.2.0] - 2025-11-27
 
@@ -103,7 +126,7 @@ ffi.CallFunction(&cif, wgpuRequestAdapter, nil,
 - ✅ Linux AMD64 (System V ABI) - **FULLY SUPPORTED**
 - ✅ Windows AMD64 (Win64 ABI) - **FULLY SUPPORTED**
 - ✅ macOS AMD64 (System V ABI) - **NEWLY ADDED**
-- ⏳ ARM64 (AAPCS64 ABI) - Planned for v0.5.0
+- 🟡 ARM64 (AAPCS64 ABI) - In development for v0.3.0
 
 ### Infrastructure
 - All 3 platforms tested in CI/CD (ubuntu-latest, windows-latest, macos-13)
@@ -365,7 +388,7 @@ if errors.As(err, &icErr) {
 **Architectural**:
 - **Composite types** (structs) require manual initialization via `PrepareCallInterface`
 - **Cannot interrupt** C functions mid-execution (use `CallFunctionContext` for timeouts)
-- **Limited to amd64** architecture (ARM64 planned for v0.5.0)
+- **Limited to amd64** architecture (ARM64 in development for v0.3.0)
 - **No bitfields** in structs (manual bit manipulation required)
 - **Race detector not supported** - Race detection requires CGO_ENABLED=1, which conflicts with our fakecgo (!cgo build tag). This is a fundamental limitation of zero-CGO libraries. Manual testing possible with real C runtime.
 
@@ -380,23 +403,21 @@ if errors.As(err, &icErr) {
 
 See [API_TODO.md](docs/dev/API_TODO.md) for detailed roadmap to v1.0.
 
-**v0.2.0** (Usability) - Q2 2025
-- **CRITICAL**: Comprehensive benchmarks (vs CGO/purego)
+**v0.3.0** (ARM64 Support) - Q1 2025
+- ARM64 support (Linux + macOS AAPCS64 ABI)
+- AAPCS64 calling convention implementation
+- 2000-entry callback trampolines for ARM64
+- Cross-compile verified, real hardware testing pending
+
+**v0.5.0** (Usability + Variadic) - Q2 2025
 - Builder pattern for CallInterface
   ```go
   lib.Call("func").Arg(...).ReturnInt()
   ```
 - Platform-specific struct alignment (Windows `#pragma pack`)
-- Type-safe argument helpers (`ffi.Int32()`, `ffi.String()`)
-- More examples (15+ real-world use cases)
-
-**v0.5.0** (Platform Expansion) - Q3 2025
-- ARM64 support (Linux + macOS AAPCS64 ABI)
-- macOS AMD64 testing/validation
 - **Variadic function support** (printf, sprintf, etc.)
   - AL register handling (System V)
   - Float→GP duplication (Win64)
-- Callback support (C→Go calls)
 - Windows ARM64 (experimental)
 
 **v0.8.0** (Advanced Features) - Q4 2025
@@ -418,7 +439,8 @@ See [API_TODO.md](docs/dev/API_TODO.md) for detailed roadmap to v1.0.
 
 ---
 
-[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/go-webgpu/goffi/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/go-webgpu/goffi/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/go-webgpu/goffi/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/go-webgpu/goffi/releases/tag/v0.1.0

@@ -133,12 +133,12 @@ See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for comprehensive analysis, optim
 
 **Variadic functions NOT supported** (`printf`, `sprintf`, etc.)
 - Workaround: Use non-variadic wrappers (`puts` instead of `printf`)
-- Planned: v0.5.0 (Q3 2025)
+- Planned: v0.5.0 (Q2 2025)
 
 **Struct packing** follows System V ABI only
 - Windows `#pragma pack` directives NOT honored
 - Workaround: Manually specify `Size`/`Alignment` in `TypeDescriptor`
-- Planned: v0.3.0 (platform-specific rules)
+- Planned: v0.5.0 (platform-specific rules)
 
 ### Architectural
 
@@ -255,13 +255,15 @@ See [docs/dev/TECHNICAL_ARCHITECTURE.md](docs/dev/TECHNICAL_ARCHITECTURE.md) for
 - 2000-entry trampoline table for async operations
 - WebGPU async APIs now fully supported
 
-### v0.3.0 - ARM64 + Usability (Q1 2025)
+### v0.3.0 - ARM64 Support (Q1 2025)
 - **ARM64 support** (Linux + macOS AAPCS64 ABI) - in development
-- Builder pattern API: `lib.Call("func").Arg(...).ReturnInt()`
-- Platform-specific struct alignment (Windows `#pragma pack`)
+- AAPCS64 calling convention with X0-X7, D0-D7 registers
+- 2000-entry callback trampolines for ARM64
 
-### v0.5.0 - Platform Expansion (Q3 2025)
+### v0.5.0 - Usability + Variadic (Q2 2025)
+- Builder pattern API: `lib.Call("func").Arg(...).ReturnInt()`
 - **Variadic function support** (printf, sprintf, etc.)
+- Platform-specific struct alignment (Windows `#pragma pack`)
 - Windows ARM64 (experimental)
 
 ### v1.0.0 - Stable Release (Q1 2026)
