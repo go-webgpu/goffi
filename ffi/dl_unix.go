@@ -1,4 +1,4 @@
-//go:build linux && amd64
+//go:build linux && (amd64 || arm64)
 
 // Linux library loading - OUR OWN implementation (NO dependencies!)
 //

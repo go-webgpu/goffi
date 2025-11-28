@@ -1,4 +1,4 @@
-//go:build darwin && amd64
+//go:build darwin && (amd64 || arm64)
 
 // macOS library loading - OUR OWN implementation (NO dependencies!)
 //
