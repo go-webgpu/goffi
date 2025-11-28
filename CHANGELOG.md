@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added (v0.3.0 - ARM64 Support)
+### Planned
+- See [ROADMAP.md](ROADMAP.md) for upcoming features
+- v0.5.0: Builder pattern API, variadic functions
+- v1.0.0: LTS release with API stability guarantee
+
+## [0.3.0] - 2025-11-28
+
+### Added
 - **ARM64 architecture support** (AAPCS64 ABI for Linux and macOS)
   - `internal/arch/arm64/` - Complete ARM64 implementation
   - `internal/syscall/syscall_unix_arm64.s` - ARM64 assembly for FFI calls
@@ -17,11 +24,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Cross-compile verified: `GOOS=linux/darwin GOARCH=arm64`
 - **Pre-release script improvements** for ARM64 and cross-platform builds
 
-### Planned
-- See [ROADMAP.md](ROADMAP.md) for upcoming features
-- v0.3.0: ARM64 support (current development)
-- v0.5.0: Builder pattern API, variadic functions
-- v1.0.0: LTS release with API stability guarantee
+### Platform Support
+- ✅ Linux AMD64 (System V ABI)
+- ✅ Windows AMD64 (Win64 ABI)
+- ✅ macOS AMD64 (System V ABI)
+- 🟡 Linux ARM64 (AAPCS64 ABI) - cross-compile verified, hardware testing pending
+- 🟡 macOS ARM64 (AAPCS64 ABI) - cross-compile verified, hardware testing pending
+
+### Note
+ARM64 support is feature-complete but awaiting real hardware testing. Cross-compilation
+verified on all platforms. Use with caution on production ARM64 systems until v0.3.1.
 
 ## [0.2.1] - 2025-11-27
 
@@ -439,7 +451,8 @@ See [API_TODO.md](docs/dev/API_TODO.md) for detailed roadmap to v1.0.
 
 ---
 
-[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/go-webgpu/goffi/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/go-webgpu/goffi/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/go-webgpu/goffi/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/go-webgpu/goffi/compare/v0.1.0...v0.1.1
