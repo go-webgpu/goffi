@@ -93,10 +93,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-14-large, macos-latest]
-        # macos-14-large: Intel x86_64 runner (production AMD64 testing)
-        # macos-latest: Apple Silicon ARM64 runner (M-series, cross-compile verified)
-        # Note: macos-13 deprecated Dec 2025, using macos-14-large for Intel
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        # macos-latest: Apple Silicon ARM64 (M-series)
+        # Note: macOS Intel (x86_64) deprecated Dec 2025, no free tier Intel runners
+        # Intel tested via Linux/Windows AMD64 (same System V / similar ABI)
         # Build tags in source files (//go:build) select correct implementation
 
     steps:
@@ -285,9 +285,9 @@ jobs:
           echo "✅ Tests: PASSED"
           echo "   - Linux AMD64 (ubuntu-latest)"
           echo "   - Windows AMD64 (windows-latest)"
-          echo "   - macOS AMD64 (macos-14-large)"
           echo "   - macOS ARM64 (macos-latest)"
           echo "✅ Benchmarks: PASSED"
           echo "✅ Quality Gate: PASSED"
           echo ""
+          echo "Note: macOS Intel uses same ABI as Linux AMD64"
           echo "🚀 Ready for merge!"
