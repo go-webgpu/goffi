@@ -345,4 +345,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 **Made with ❤️ for GPU computing in pure Go**
 
-*Last updated: 2025-11-28 | goffi v0.2.1*
+*Last updated: 2025-12-23 | goffi v0.3.2*

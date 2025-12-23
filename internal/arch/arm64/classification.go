@@ -60,18 +60,20 @@ func classifyArgumentARM64(t *types.TypeDescriptor, abi types.CallingConvention)
 	case types.StructType:
 		// AAPCS64: Composite types
 		// - HFA (Homogeneous Floating-point Aggregate): up to 4 floats/doubles in FP regs
-		// - Other composites: in GP registers or stack
-		if t.Size > 16 {
-			// Passed by reference
+		// - Other composites <= 16 bytes: in GP registers
+		// - Larger composites: passed by reference
+		//
+		// IMPORTANT: Check HFA FIRST - HFAs use FP registers regardless of size.
+		// Example: NSRect (4 x float64 = 32 bytes) is HFA, passed in D0-D3.
+		isHFA, hfaCount := isHomogeneousFloatAggregate(t)
+		if isHFA && hfaCount <= 4 {
+			res.FPRCount = hfaCount
+		} else if t.Size > 16 {
+			// Non-HFA larger than 16 bytes: passed by reference
 			res.GPRCount = 1
 		} else {
-			// Check if it's an HFA
-			isHFA, hfaCount := isHomogeneousFloatAggregate(t)
-			if isHFA && hfaCount <= 4 {
-				res.FPRCount = hfaCount
-			} else {
-				res.GPRCount = int(math.Ceil(float64(t.Size) / 8))
-			}
+			// Non-HFA up to 16 bytes: in GP registers
+			res.GPRCount = int(math.Ceil(float64(t.Size) / 8))
 		}
 	default:
 		// Integer/pointer types use GP registers (X0-X7)

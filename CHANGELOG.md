@@ -12,6 +12,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.5.0: Builder pattern API, variadic functions
 - v1.0.0: LTS release with API stability guarantee
 
+## [0.3.2] - 2025-12-23
+
+### Fixed
+- **ARM64 HFA (Homogeneous Floating-point Aggregate) classification bug**
+  - HFA structs (e.g., NSRect with 4 doubles) were incorrectly passed by reference
+  - Now correctly passed in floating-point registers D0-D7 per AAPCS64 ABI
+  - Fix: Check HFA status before struct size in `classifyArgumentARM64()`
+  - Reported via go-webgpu/webgpu macOS ARM64 testing
+
+### Technical Details
+- AAPCS64 requires HFA detection before size-based classification
+- Example: `NSRect` (4 × float64 = 32 bytes) is HFA → uses D0-D3, not reference
+- Affects Objective-C runtime calls on Apple Silicon (M1/M2/M3/M4)
+
 ## [0.3.1] - 2025-11-28
 
 ### Fixed
