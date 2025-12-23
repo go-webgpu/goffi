@@ -93,9 +93,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-13, macos-latest]
-        # macos-13: Intel AMD64 runner
+        os: [ubuntu-latest, windows-latest, macos-latest]
         # macos-latest: Apple Silicon ARM64 runner (M-series)
+        # Note: macos-13 (Intel) deprecated Dec 2025, Intel via macos-15-large if needed
         # Build tags in source files (//go:build) select correct implementation
 
     steps:
