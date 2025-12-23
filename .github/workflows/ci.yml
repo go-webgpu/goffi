@@ -93,9 +93,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-13]
-        # Note: macos-13 is last Intel runner (AMD64)
-        # macos-latest is now ARM64 (Apple Silicon) - ARM64 support planned for v0.5.0
+        os: [ubuntu-latest, windows-latest, macos-13, macos-latest]
+        # macos-13: Intel AMD64 runner
+        # macos-latest: Apple Silicon ARM64 runner (M-series)
         # Build tags in source files (//go:build) select correct implementation
 
     steps:
