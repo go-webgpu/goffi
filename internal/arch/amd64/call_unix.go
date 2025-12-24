@@ -44,7 +44,17 @@ func (i *Implementation) Execute(
 			}
 		case types.PointerType:
 			if gprIdx < 6 {
-				gpr[gprIdx] = uintptr(avalue[idx])
+				gpr[gprIdx] = *(*uintptr)(avalue[idx])
+				gprIdx++
+			}
+		case types.SInt8Type, types.UInt8Type:
+			if gprIdx < 6 {
+				gpr[gprIdx] = uintptr(*(*uint8)(avalue[idx]))
+				gprIdx++
+			}
+		case types.SInt16Type, types.UInt16Type:
+			if gprIdx < 6 {
+				gpr[gprIdx] = uintptr(*(*uint16)(avalue[idx]))
 				gprIdx++
 			}
 		case types.SInt32Type, types.UInt32Type:
