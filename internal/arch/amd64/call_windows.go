@@ -26,13 +26,32 @@ func (i *Implementation) Execute(
 		classification := i.ClassifyArgument(argType, cif.Convention)
 
 		if classification.GPRCount > 0 && gprIndex < len(gprRegs) {
-			gprRegs[gprIndex] = uint64(uintptr(avalue[idx]))
+			// Dereference based on type - avalue[idx] points TO the value
+			switch argType.Kind {
+			case types.PointerType:
+				gprRegs[gprIndex] = uint64(*(*uintptr)(avalue[idx]))
+			case types.SInt8Type, types.UInt8Type:
+				gprRegs[gprIndex] = uint64(*(*uint8)(avalue[idx]))
+			case types.SInt16Type, types.UInt16Type:
+				gprRegs[gprIndex] = uint64(*(*uint16)(avalue[idx]))
+			case types.SInt32Type, types.UInt32Type:
+				gprRegs[gprIndex] = uint64(*(*uint32)(avalue[idx]))
+			case types.SInt64Type, types.UInt64Type:
+				gprRegs[gprIndex] = uint64(*(*uint64)(avalue[idx]))
+			default:
+				// For unknown types, treat as pointer to value
+				gprRegs[gprIndex] = uint64(uintptr(avalue[idx]))
+			}
 			gprIndex++
 			continue
 		}
 
 		if classification.SSECount > 0 && sseIndex < len(sseRegs) {
-			sseRegs[sseIndex] = *(*float64)(avalue[idx])
+			if argType.Kind == types.FloatType {
+				sseRegs[sseIndex] = float64(*(*float32)(avalue[idx]))
+			} else {
+				sseRegs[sseIndex] = *(*float64)(avalue[idx])
+			}
 			sseIndex++
 			continue
 		}

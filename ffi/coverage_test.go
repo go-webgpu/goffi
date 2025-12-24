@@ -81,7 +81,8 @@ func TestCallFunctionContext(t *testing.T) {
 		var retVal int32
 
 		ctx := context.Background()
-		err := CallFunctionContext(ctx, cif, sym, unsafe.Pointer(&retVal), []unsafe.Pointer{arg})
+		// IMPORTANT: avalue contains pointers TO the argument values
+		err := CallFunctionContext(ctx, cif, sym, unsafe.Pointer(&retVal), []unsafe.Pointer{unsafe.Pointer(&arg)})
 		if err != nil {
 			t.Errorf("CallFunctionContext failed: %v", err)
 		}
@@ -95,7 +96,7 @@ func TestCallFunctionContext(t *testing.T) {
 		arg := unsafe.Pointer(unsafe.StringData(str))
 		var retVal int32
 
-		err := CallFunctionContext(ctx, cif, sym, unsafe.Pointer(&retVal), []unsafe.Pointer{arg})
+		err := CallFunctionContext(ctx, cif, sym, unsafe.Pointer(&retVal), []unsafe.Pointer{unsafe.Pointer(&arg)})
 		if err != context.Canceled {
 			t.Errorf("Expected context.Canceled, got %v", err)
 		}
@@ -110,7 +111,7 @@ func TestCallFunctionContext(t *testing.T) {
 		arg := unsafe.Pointer(unsafe.StringData(str))
 		var retVal int32
 
-		err := CallFunctionContext(ctx, cif, sym, unsafe.Pointer(&retVal), []unsafe.Pointer{arg})
+		err := CallFunctionContext(ctx, cif, sym, unsafe.Pointer(&retVal), []unsafe.Pointer{unsafe.Pointer(&arg)})
 		if err != context.DeadlineExceeded {
 			t.Errorf("Expected context.DeadlineExceeded, got %v", err)
 		}

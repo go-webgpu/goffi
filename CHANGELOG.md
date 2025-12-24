@@ -12,6 +12,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.5.0: Builder pattern API, variadic functions
 - v1.0.0: LTS release with API stability guarantee
 
+## [0.3.3] - 2025-12-24
+
+### Fixed
+- **PointerType argument passing bug** ([#4](https://github.com/go-webgpu/goffi/issues/4))
+  - PointerType was passing address instead of value
+  - Now correctly dereferences: `*(*uintptr)(avalue[idx])` instead of `uintptr(avalue[idx])`
+  - Fixed in all three Execute implementations:
+    - `internal/arch/arm64/call_unix.go`
+    - `internal/arch/amd64/call_unix.go`
+    - `internal/arch/amd64/call_windows.go`
+  - Added missing SInt8/UInt8/SInt16/UInt16 type handling in AMD64 Unix
+  - Fixed float32 handling in Windows (was treating as float64)
+  - Reported by go-webgpu project via GitHub Issue #4
+
+### Added
+- **Regression tests** for argument passing
+  - `TestPointerArgumentPassing` - strlen-based test for PointerType (Issue #4)
+  - `TestIntegerArgumentTypes` - abs-based test for integer types
+  - Both tests use documented API pattern: `[]unsafe.Pointer{unsafe.Pointer(&arg)}`
+
+### Technical Details
+- API contract (ffi.go line 43): `avalue` contains pointers TO argument values
+- For PointerType: pass `unsafe.Pointer(&ptr)`, not `ptr` directly
+- Tests now correctly use documented pattern, preventing future regressions
+
 ## [0.3.2] - 2025-12-23
 
 ### Fixed
@@ -475,7 +500,9 @@ See [API_TODO.md](docs/dev/API_TODO.md) for detailed roadmap to v1.0.
 
 ---
 
-[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/go-webgpu/goffi/compare/v0.3.2...v0.3.3
+[0.3.2]: https://github.com/go-webgpu/goffi/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/go-webgpu/goffi/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/go-webgpu/goffi/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/go-webgpu/goffi/compare/v0.2.0...v0.2.1
