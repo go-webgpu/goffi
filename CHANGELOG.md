@@ -12,6 +12,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.5.0: Builder pattern API, variadic functions
 - v1.0.0: LTS release with API stability guarantee
 
+## [0.3.4] - 2025-12-27
+
+### Fixed
+- **Windows stack overflow on Vulkan API calls** (Critical)
+  - `callWin64` assembly used `NOSPLIT, $32` which prevented stack growth
+  - When calling C functions needing significant stack (Vulkan drivers), caused `STACK_OVERFLOW` (Exception 0xc00000fd)
+  - Solution: Replace direct assembly with `syscall.SyscallN` (Go runtime's asmstdcall)
+  - This matches purego's proven approach for Windows FFI
+  - Reported via go-webgpu/wgpu project
+
+### Changed
+- **Windows FFI architecture** - Enterprise-grade refactoring
+  - Removed: `internal/arch/amd64/call_windows.s` (direct assembly)
+  - Added: `internal/syscall/syscall_windows_amd64.go` (SyscallN wrapper)
+  - Uses Go runtime's built-in stack management via `syscall.SyscallN`
+  - Proper shadow space and stack alignment handled by Go runtime
+
+### Technical Details
+- Win64 ABI: First 4 args in RCX/RDX/R8/R9 (or XMM0-3 for floats)
+- `syscall.SyscallN` internally uses `cgocall(asmstdcallAddr, ...)`
+- Go runtime allocates proper stack and handles preemption/GC
+- Float return values not captured (known limitation, matches purego)
+
 ## [0.3.3] - 2025-12-24
 
 ### Fixed
@@ -500,7 +523,8 @@ See [API_TODO.md](docs/dev/API_TODO.md) for detailed roadmap to v1.0.
 
 ---
 
-[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/go-webgpu/goffi/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/go-webgpu/goffi/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/go-webgpu/goffi/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/go-webgpu/goffi/compare/v0.3.0...v0.3.1

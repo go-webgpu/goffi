@@ -5,6 +5,7 @@ package amd64
 import (
 	"unsafe"
 
+	"github.com/go-webgpu/goffi/internal/syscall"
 	"github.com/go-webgpu/goffi/types"
 )
 
@@ -14,9 +15,9 @@ func (i *Implementation) Execute(
 	rvalue unsafe.Pointer,
 	avalue []unsafe.Pointer,
 ) error {
-	// Prepare registers
-	gprRegs := make([]uint64, 4)  // RCX, RDX, R8, R9
-	sseRegs := make([]float64, 4) // XMM0-3
+	// Prepare registers - Win64 ABI: 4 GPR (RCX, RDX, R8, R9), 4 SSE (XMM0-3)
+	var gpr [4]uintptr
+	var sse [4]float64
 
 	gprIndex, sseIndex := 0, 0
 
@@ -25,32 +26,32 @@ func (i *Implementation) Execute(
 		argType := cif.ArgTypes[idx]
 		classification := i.ClassifyArgument(argType, cif.Convention)
 
-		if classification.GPRCount > 0 && gprIndex < len(gprRegs) {
+		if classification.GPRCount > 0 && gprIndex < len(gpr) {
 			// Dereference based on type - avalue[idx] points TO the value
 			switch argType.Kind {
 			case types.PointerType:
-				gprRegs[gprIndex] = uint64(*(*uintptr)(avalue[idx]))
+				gpr[gprIndex] = *(*uintptr)(avalue[idx])
 			case types.SInt8Type, types.UInt8Type:
-				gprRegs[gprIndex] = uint64(*(*uint8)(avalue[idx]))
+				gpr[gprIndex] = uintptr(*(*uint8)(avalue[idx]))
 			case types.SInt16Type, types.UInt16Type:
-				gprRegs[gprIndex] = uint64(*(*uint16)(avalue[idx]))
+				gpr[gprIndex] = uintptr(*(*uint16)(avalue[idx]))
 			case types.SInt32Type, types.UInt32Type:
-				gprRegs[gprIndex] = uint64(*(*uint32)(avalue[idx]))
+				gpr[gprIndex] = uintptr(*(*uint32)(avalue[idx]))
 			case types.SInt64Type, types.UInt64Type:
-				gprRegs[gprIndex] = uint64(*(*uint64)(avalue[idx]))
+				gpr[gprIndex] = uintptr(*(*uint64)(avalue[idx]))
 			default:
 				// For unknown types, treat as pointer to value
-				gprRegs[gprIndex] = uint64(uintptr(avalue[idx]))
+				gpr[gprIndex] = uintptr(avalue[idx])
 			}
 			gprIndex++
 			continue
 		}
 
-		if classification.SSECount > 0 && sseIndex < len(sseRegs) {
+		if classification.SSECount > 0 && sseIndex < len(sse) {
 			if argType.Kind == types.FloatType {
-				sseRegs[sseIndex] = float64(*(*float32)(avalue[idx]))
+				sse[sseIndex] = float64(*(*float32)(avalue[idx]))
 			} else {
-				sseRegs[sseIndex] = *(*float64)(avalue[idx])
+				sse[sseIndex] = *(*float64)(avalue[idx])
 			}
 			sseIndex++
 			continue
@@ -59,11 +60,16 @@ func (i *Implementation) Execute(
 		panic("stack arguments not implemented")
 	}
 
-	// Call via assembly
-	retVal := callWin64(gprRegs, sseRegs, fn)
+	// Call via syscall with proper cgocall stack handling
+	ret, fret := syscall.CallWin64(uintptr(fn), gpr, sse)
 
-	// Handle return value
+	// Handle return value based on type
+	retVal := uint64(ret)
+
+	// For float returns, use the float value
+	if cif.ReturnType.Kind == types.FloatType || cif.ReturnType.Kind == types.DoubleType {
+		retVal = *(*uint64)(unsafe.Pointer(&fret))
+	}
+
 	return i.handleReturn(cif, rvalue, retVal)
 }
-
-func callWin64(gpr []uint64, sse []float64, fn unsafe.Pointer) uint64
