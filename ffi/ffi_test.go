@@ -641,3 +641,230 @@ func TestWindowsStackArgumentsFileIO(t *testing.T) {
 	t.Log("  - ReadFile (5 args: 4 reg + 1 stack)")
 	t.Log("  - Data integrity verified: written == read")
 }
+
+// TestWindowsStackArguments10Args tests CreateProcessA which has 10 arguments.
+// This is the ultimate stress test for stack argument passing:
+//   - Args 1-4: registers (RCX, RDX, R8, R9)
+//   - Args 5-10: stack (6 stack arguments!)
+//
+// CreateProcessA signature:
+//
+//	BOOL CreateProcessA(
+//	    LPCSTR lpApplicationName,         // arg1  - RCX
+//	    LPSTR lpCommandLine,              // arg2  - RDX
+//	    LPSECURITY_ATTRIBUTES lpProcAttr, // arg3  - R8
+//	    LPSECURITY_ATTRIBUTES lpThrdAttr, // arg4  - R9
+//	    BOOL bInheritHandles,             // arg5  - STACK
+//	    DWORD dwCreationFlags,            // arg6  - STACK
+//	    LPVOID lpEnvironment,             // arg7  - STACK
+//	    LPCSTR lpCurrentDirectory,        // arg8  - STACK
+//	    LPSTARTUPINFOA lpStartupInfo,     // arg9  - STACK
+//	    LPPROCESS_INFORMATION lpProcInfo  // arg10 - STACK
+//	)
+func TestWindowsStackArguments10Args(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Test requires Windows")
+	}
+
+	kernel32, err := LoadLibrary("kernel32.dll")
+	if err != nil {
+		t.Fatalf("LoadLibrary failed: %v", err)
+	}
+	defer FreeLibrary(kernel32)
+
+	createProcessA, err := GetSymbol(kernel32, "CreateProcessA")
+	if err != nil {
+		t.Fatalf("GetSymbol(CreateProcessA) failed: %v", err)
+	}
+
+	waitForSingleObject, err := GetSymbol(kernel32, "WaitForSingleObject")
+	if err != nil {
+		t.Fatalf("GetSymbol(WaitForSingleObject) failed: %v", err)
+	}
+
+	getExitCodeProcess, err := GetSymbol(kernel32, "GetExitCodeProcess")
+	if err != nil {
+		t.Fatalf("GetSymbol(GetExitCodeProcess) failed: %v", err)
+	}
+
+	closeHandle, err := GetSymbol(kernel32, "CloseHandle")
+	if err != nil {
+		t.Fatalf("GetSymbol(CloseHandle) failed: %v", err)
+	}
+
+	// STARTUPINFOA structure (68 bytes on x64)
+	type STARTUPINFOA struct {
+		cb              uint32
+		lpReserved      uintptr
+		lpDesktop       uintptr
+		lpTitle         uintptr
+		dwX             uint32
+		dwY             uint32
+		dwXSize         uint32
+		dwYSize         uint32
+		dwXCountChars   uint32
+		dwYCountChars   uint32
+		dwFillAttribute uint32
+		dwFlags         uint32
+		wShowWindow     uint16
+		cbReserved2     uint16
+		lpReserved2     uintptr
+		hStdInput       uintptr
+		hStdOutput      uintptr
+		hStdError       uintptr
+	}
+
+	// PROCESS_INFORMATION structure (24 bytes on x64)
+	type PROCESS_INFORMATION struct {
+		hProcess    uintptr
+		hThread     uintptr
+		dwProcessId uint32
+		dwThreadId  uint32
+	}
+
+	const (
+		CREATE_NO_WINDOW = 0x08000000
+		INFINITE         = 0xFFFFFFFF
+	)
+
+	// Run: cmd.exe /c exit 42
+	// This returns exit code 42, which we can verify
+	cmdLine := "cmd.exe /c exit 42\x00"
+	cmdLinePtr := unsafe.Pointer(unsafe.StringData(cmdLine))
+
+	var si STARTUPINFOA
+	si.cb = uint32(unsafe.Sizeof(si))
+
+	var pi PROCESS_INFORMATION
+
+	// Prepare CIF for CreateProcessA (10 arguments!)
+	t.Log("Testing CreateProcessA with 10 arguments (4 register + 6 stack)")
+
+	cifCreate := &types.CallInterface{}
+	err = PrepareCallInterface(cifCreate, types.WindowsCallingConvention, types.SInt32TypeDescriptor, []*types.TypeDescriptor{
+		types.PointerTypeDescriptor, // lpApplicationName (arg1 - RCX)
+		types.PointerTypeDescriptor, // lpCommandLine (arg2 - RDX)
+		types.PointerTypeDescriptor, // lpProcessAttributes (arg3 - R8)
+		types.PointerTypeDescriptor, // lpThreadAttributes (arg4 - R9)
+		types.SInt32TypeDescriptor,  // bInheritHandles (arg5 - STACK!)
+		types.UInt32TypeDescriptor,  // dwCreationFlags (arg6 - STACK!)
+		types.PointerTypeDescriptor, // lpEnvironment (arg7 - STACK!)
+		types.PointerTypeDescriptor, // lpCurrentDirectory (arg8 - STACK!)
+		types.PointerTypeDescriptor, // lpStartupInfo (arg9 - STACK!)
+		types.PointerTypeDescriptor, // lpProcessInformation (arg10 - STACK!)
+	})
+	if err != nil {
+		t.Fatalf("PrepareCallInterface for CreateProcessA failed: %v", err)
+	}
+
+	arg1 := uintptr(0)                    // lpApplicationName = NULL
+	arg2 := cmdLinePtr                    // lpCommandLine
+	arg3 := uintptr(0)                    // lpProcessAttributes = NULL
+	arg4 := uintptr(0)                    // lpThreadAttributes = NULL
+	arg5 := int32(0)                      // bInheritHandles = FALSE (STACK arg 5!)
+	arg6 := uint32(CREATE_NO_WINDOW)      // dwCreationFlags (STACK arg 6!)
+	arg7 := uintptr(0)                    // lpEnvironment = NULL (STACK arg 7!)
+	arg8 := uintptr(0)                    // lpCurrentDirectory = NULL (STACK arg 8!)
+	arg9 := unsafe.Pointer(&si)           // lpStartupInfo (STACK arg 9!)
+	arg10 := unsafe.Pointer(&pi)          // lpProcessInformation (STACK arg 10!)
+
+	var createResult int32
+	err = CallFunction(cifCreate, createProcessA, unsafe.Pointer(&createResult), []unsafe.Pointer{
+		unsafe.Pointer(&arg1),
+		unsafe.Pointer(&arg2),
+		unsafe.Pointer(&arg3),
+		unsafe.Pointer(&arg4),
+		unsafe.Pointer(&arg5),
+		unsafe.Pointer(&arg6),
+		unsafe.Pointer(&arg7),
+		unsafe.Pointer(&arg8),
+		unsafe.Pointer(&arg9),
+		unsafe.Pointer(&arg10),
+	})
+	if err != nil {
+		t.Fatalf("CreateProcessA call failed: %v", err)
+	}
+
+	if createResult == 0 {
+		t.Fatal("CreateProcessA returned FALSE - process creation failed")
+	}
+
+	t.Logf("  CreateProcessA succeeded:")
+	t.Logf("    Process ID: %d", pi.dwProcessId)
+	t.Logf("    Thread ID: %d", pi.dwThreadId)
+	t.Logf("    Process Handle: %v", pi.hProcess)
+
+	// Wait for process to complete
+	cifWait := &types.CallInterface{}
+	err = PrepareCallInterface(cifWait, types.WindowsCallingConvention, types.UInt32TypeDescriptor, []*types.TypeDescriptor{
+		types.PointerTypeDescriptor, // hHandle
+		types.UInt32TypeDescriptor,  // dwMilliseconds
+	})
+	if err != nil {
+		t.Fatalf("PrepareCallInterface for WaitForSingleObject failed: %v", err)
+	}
+
+	wArg1 := pi.hProcess
+	wArg2 := uint32(INFINITE)
+	var waitResult uint32
+	err = CallFunction(cifWait, waitForSingleObject, unsafe.Pointer(&waitResult), []unsafe.Pointer{
+		unsafe.Pointer(&wArg1),
+		unsafe.Pointer(&wArg2),
+	})
+	if err != nil {
+		t.Fatalf("WaitForSingleObject call failed: %v", err)
+	}
+	t.Log("  Process completed")
+
+	// Get exit code
+	cifGetExit := &types.CallInterface{}
+	err = PrepareCallInterface(cifGetExit, types.WindowsCallingConvention, types.SInt32TypeDescriptor, []*types.TypeDescriptor{
+		types.PointerTypeDescriptor, // hProcess
+		types.PointerTypeDescriptor, // lpExitCode
+	})
+	if err != nil {
+		t.Fatalf("PrepareCallInterface for GetExitCodeProcess failed: %v", err)
+	}
+
+	var exitCode uint32
+	eArg1 := pi.hProcess
+	eArg2 := unsafe.Pointer(&exitCode)
+	var exitResult int32
+	err = CallFunction(cifGetExit, getExitCodeProcess, unsafe.Pointer(&exitResult), []unsafe.Pointer{
+		unsafe.Pointer(&eArg1),
+		unsafe.Pointer(&eArg2),
+	})
+	if err != nil {
+		t.Fatalf("GetExitCodeProcess call failed: %v", err)
+	}
+
+	t.Logf("  Exit code: %d", exitCode)
+
+	// Cleanup handles
+	cifClose := &types.CallInterface{}
+	_ = PrepareCallInterface(cifClose, types.WindowsCallingConvention, types.SInt32TypeDescriptor, []*types.TypeDescriptor{
+		types.PointerTypeDescriptor,
+	})
+
+	cArg := pi.hProcess
+	var closeResult int32
+	_ = CallFunction(cifClose, closeHandle, unsafe.Pointer(&closeResult), []unsafe.Pointer{
+		unsafe.Pointer(&cArg),
+	})
+
+	cArg = pi.hThread
+	_ = CallFunction(cifClose, closeHandle, unsafe.Pointer(&closeResult), []unsafe.Pointer{
+		unsafe.Pointer(&cArg),
+	})
+
+	// Verify exit code is 42 (proves all 10 args were passed correctly)
+	if exitCode != 42 {
+		t.Fatalf("Exit code mismatch: got %d, expected 42", exitCode)
+	}
+
+	t.Log("=== SUCCESS ===")
+	t.Log("CreateProcessA with 10 arguments works correctly:")
+	t.Log("  - 4 register args (RCX, RDX, R8, R9)")
+	t.Log("  - 6 stack args (args 5-10)")
+	t.Log("  - Exit code 42 verified (proves correct arg passing)")
+}
