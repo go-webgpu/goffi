@@ -373,3 +373,271 @@ func TestWindowsStackArguments(t *testing.T) {
 		t.Log("This confirms 7 arguments (4 register + 3 stack) are passed correctly")
 	}
 }
+
+// TestWindowsStackArgumentsFileIO is a comprehensive test that creates a file,
+// writes data, reads it back, and verifies correctness. This test exercises:
+//   - CreateFileA: 7 arguments (4 register + 3 stack)
+//   - WriteFile: 5 arguments (4 register + 1 stack)
+//   - ReadFile: 5 arguments (4 register + 1 stack)
+//   - CloseHandle: 1 argument
+//   - DeleteFileA: 1 argument
+//
+// This provides strong verification that stack arguments are passed correctly.
+func TestWindowsStackArgumentsFileIO(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Test requires Windows")
+	}
+
+	kernel32, err := LoadLibrary("kernel32.dll")
+	if err != nil {
+		t.Fatalf("LoadLibrary failed: %v", err)
+	}
+	defer FreeLibrary(kernel32)
+
+	// Get all required symbols
+	createFileA, err := GetSymbol(kernel32, "CreateFileA")
+	if err != nil {
+		t.Fatalf("GetSymbol(CreateFileA) failed: %v", err)
+	}
+	writeFile, err := GetSymbol(kernel32, "WriteFile")
+	if err != nil {
+		t.Fatalf("GetSymbol(WriteFile) failed: %v", err)
+	}
+	readFile, err := GetSymbol(kernel32, "ReadFile")
+	if err != nil {
+		t.Fatalf("GetSymbol(ReadFile) failed: %v", err)
+	}
+	closeHandle, err := GetSymbol(kernel32, "CloseHandle")
+	if err != nil {
+		t.Fatalf("GetSymbol(CloseHandle) failed: %v", err)
+	}
+	deleteFileA, err := GetSymbol(kernel32, "DeleteFileA")
+	if err != nil {
+		t.Fatalf("GetSymbol(DeleteFileA) failed: %v", err)
+	}
+
+	// Windows constants
+	const (
+		GENERIC_READ          = 0x80000000
+		GENERIC_WRITE         = 0x40000000
+		FILE_SHARE_READ       = 0x00000001
+		CREATE_ALWAYS         = 2
+		OPEN_EXISTING         = 3
+		FILE_ATTRIBUTE_NORMAL = 0x80
+		INVALID_HANDLE_VALUE  = ^uintptr(0)
+	)
+
+	// Test data - use recognizable pattern to verify correct transmission
+	testData := "goffi-stack-args-test-data-12345-ABCDE"
+	tempFile := "C:\\Windows\\Temp\\goffi_stack_args_test.tmp\x00"
+	tempFilePtr := unsafe.Pointer(unsafe.StringData(tempFile))
+
+	// === Step 1: Create file with CreateFileA (7 args) ===
+	t.Log("Step 1: Creating file with CreateFileA (7 args: 4 register + 3 stack)")
+
+	cifCreate := &types.CallInterface{}
+	err = PrepareCallInterface(cifCreate, types.WindowsCallingConvention, types.PointerTypeDescriptor, []*types.TypeDescriptor{
+		types.PointerTypeDescriptor, // lpFileName
+		types.UInt32TypeDescriptor,  // dwDesiredAccess
+		types.UInt32TypeDescriptor,  // dwShareMode
+		types.PointerTypeDescriptor, // lpSecurityAttributes
+		types.UInt32TypeDescriptor,  // dwCreationDisposition (STACK)
+		types.UInt32TypeDescriptor,  // dwFlagsAndAttributes (STACK)
+		types.PointerTypeDescriptor, // hTemplateFile (STACK)
+	})
+	if err != nil {
+		t.Fatalf("PrepareCallInterface for CreateFileA failed: %v", err)
+	}
+
+	arg1 := tempFilePtr
+	arg2 := uint32(GENERIC_READ | GENERIC_WRITE)
+	arg3 := uint32(0)
+	arg4 := uintptr(0)
+	arg5 := uint32(CREATE_ALWAYS)
+	arg6 := uint32(FILE_ATTRIBUTE_NORMAL)
+	arg7 := uintptr(0)
+
+	var fileHandle uintptr
+	err = CallFunction(cifCreate, createFileA, unsafe.Pointer(&fileHandle), []unsafe.Pointer{
+		unsafe.Pointer(&arg1),
+		unsafe.Pointer(&arg2),
+		unsafe.Pointer(&arg3),
+		unsafe.Pointer(&arg4),
+		unsafe.Pointer(&arg5),
+		unsafe.Pointer(&arg6),
+		unsafe.Pointer(&arg7),
+	})
+	if err != nil {
+		t.Fatalf("CreateFileA call failed: %v", err)
+	}
+
+	if fileHandle == INVALID_HANDLE_VALUE {
+		t.Fatal("CreateFileA returned INVALID_HANDLE_VALUE - cannot create test file")
+	}
+	t.Logf("  CreateFileA succeeded, handle: %v", fileHandle)
+
+	// === Step 2: Write data with WriteFile (5 args) ===
+	t.Log("Step 2: Writing data with WriteFile (5 args: 4 register + 1 stack)")
+
+	cifWrite := &types.CallInterface{}
+	err = PrepareCallInterface(cifWrite, types.WindowsCallingConvention, types.SInt32TypeDescriptor, []*types.TypeDescriptor{
+		types.PointerTypeDescriptor, // hFile
+		types.PointerTypeDescriptor, // lpBuffer
+		types.UInt32TypeDescriptor,  // nNumberOfBytesToWrite
+		types.PointerTypeDescriptor, // lpNumberOfBytesWritten
+		types.PointerTypeDescriptor, // lpOverlapped (STACK!)
+	})
+	if err != nil {
+		t.Fatalf("PrepareCallInterface for WriteFile failed: %v", err)
+	}
+
+	dataBytes := []byte(testData)
+	var bytesWritten uint32
+	wArg1 := fileHandle
+	wArg2 := unsafe.Pointer(&dataBytes[0])
+	wArg3 := uint32(len(dataBytes))
+	wArg4 := unsafe.Pointer(&bytesWritten)
+	wArg5 := uintptr(0) // lpOverlapped - STACK ARGUMENT!
+
+	var writeResult int32
+	err = CallFunction(cifWrite, writeFile, unsafe.Pointer(&writeResult), []unsafe.Pointer{
+		unsafe.Pointer(&wArg1),
+		unsafe.Pointer(&wArg2),
+		unsafe.Pointer(&wArg3),
+		unsafe.Pointer(&wArg4),
+		unsafe.Pointer(&wArg5),
+	})
+	if err != nil {
+		t.Fatalf("WriteFile call failed: %v", err)
+	}
+
+	if writeResult == 0 {
+		t.Fatal("WriteFile returned FALSE - write failed")
+	}
+	if bytesWritten != uint32(len(dataBytes)) {
+		t.Fatalf("WriteFile wrote %d bytes, expected %d", bytesWritten, len(dataBytes))
+	}
+	t.Logf("  WriteFile succeeded, wrote %d bytes", bytesWritten)
+
+	// === Step 3: Close file ===
+	t.Log("Step 3: Closing file with CloseHandle")
+
+	cifClose := &types.CallInterface{}
+	err = PrepareCallInterface(cifClose, types.WindowsCallingConvention, types.SInt32TypeDescriptor, []*types.TypeDescriptor{
+		types.PointerTypeDescriptor,
+	})
+	if err != nil {
+		t.Fatalf("PrepareCallInterface for CloseHandle failed: %v", err)
+	}
+
+	cArg1 := fileHandle
+	var closeResult int32
+	err = CallFunction(cifClose, closeHandle, unsafe.Pointer(&closeResult), []unsafe.Pointer{
+		unsafe.Pointer(&cArg1),
+	})
+	if err != nil {
+		t.Fatalf("CloseHandle call failed: %v", err)
+	}
+	t.Log("  CloseHandle succeeded")
+
+	// === Step 4: Reopen and read file (5 args) ===
+	t.Log("Step 4: Reopening file with CreateFileA (7 args)")
+
+	arg2 = uint32(GENERIC_READ)
+	arg5 = uint32(OPEN_EXISTING)
+	err = CallFunction(cifCreate, createFileA, unsafe.Pointer(&fileHandle), []unsafe.Pointer{
+		unsafe.Pointer(&arg1),
+		unsafe.Pointer(&arg2),
+		unsafe.Pointer(&arg3),
+		unsafe.Pointer(&arg4),
+		unsafe.Pointer(&arg5),
+		unsafe.Pointer(&arg6),
+		unsafe.Pointer(&arg7),
+	})
+	if err != nil {
+		t.Fatalf("CreateFileA (reopen) call failed: %v", err)
+	}
+	if fileHandle == INVALID_HANDLE_VALUE {
+		t.Fatal("CreateFileA (reopen) returned INVALID_HANDLE_VALUE")
+	}
+	t.Logf("  CreateFileA (reopen) succeeded, handle: %v", fileHandle)
+
+	// Read data back
+	t.Log("Step 5: Reading data with ReadFile (5 args: 4 register + 1 stack)")
+
+	cifRead := &types.CallInterface{}
+	err = PrepareCallInterface(cifRead, types.WindowsCallingConvention, types.SInt32TypeDescriptor, []*types.TypeDescriptor{
+		types.PointerTypeDescriptor, // hFile
+		types.PointerTypeDescriptor, // lpBuffer
+		types.UInt32TypeDescriptor,  // nNumberOfBytesToRead
+		types.PointerTypeDescriptor, // lpNumberOfBytesRead
+		types.PointerTypeDescriptor, // lpOverlapped (STACK!)
+	})
+	if err != nil {
+		t.Fatalf("PrepareCallInterface for ReadFile failed: %v", err)
+	}
+
+	readBuffer := make([]byte, len(dataBytes)+10)
+	var bytesRead uint32
+	rArg1 := fileHandle
+	rArg2 := unsafe.Pointer(&readBuffer[0])
+	rArg3 := uint32(len(readBuffer))
+	rArg4 := unsafe.Pointer(&bytesRead)
+	rArg5 := uintptr(0) // lpOverlapped - STACK ARGUMENT!
+
+	var readResult int32
+	err = CallFunction(cifRead, readFile, unsafe.Pointer(&readResult), []unsafe.Pointer{
+		unsafe.Pointer(&rArg1),
+		unsafe.Pointer(&rArg2),
+		unsafe.Pointer(&rArg3),
+		unsafe.Pointer(&rArg4),
+		unsafe.Pointer(&rArg5),
+	})
+	if err != nil {
+		t.Fatalf("ReadFile call failed: %v", err)
+	}
+
+	if readResult == 0 {
+		t.Fatal("ReadFile returned FALSE - read failed")
+	}
+	t.Logf("  ReadFile succeeded, read %d bytes", bytesRead)
+
+	// === Step 6: Verify data ===
+	t.Log("Step 6: Verifying data integrity")
+
+	readData := string(readBuffer[:bytesRead])
+	if readData != testData {
+		t.Fatalf("Data mismatch!\n  Written: %q\n  Read:    %q", testData, readData)
+	}
+	t.Logf("  Data verified: %q", readData)
+
+	// === Step 7: Cleanup ===
+	t.Log("Step 7: Cleanup")
+
+	cArg1 = fileHandle
+	err = CallFunction(cifClose, closeHandle, unsafe.Pointer(&closeResult), []unsafe.Pointer{
+		unsafe.Pointer(&cArg1),
+	})
+	if err != nil {
+		t.Logf("  CloseHandle (cleanup) failed: %v", err)
+	}
+
+	cifDelete := &types.CallInterface{}
+	err = PrepareCallInterface(cifDelete, types.WindowsCallingConvention, types.SInt32TypeDescriptor, []*types.TypeDescriptor{
+		types.PointerTypeDescriptor,
+	})
+	if err == nil {
+		dArg1 := tempFilePtr
+		var deleteResult int32
+		_ = CallFunction(cifDelete, deleteFileA, unsafe.Pointer(&deleteResult), []unsafe.Pointer{
+			unsafe.Pointer(&dArg1),
+		})
+	}
+
+	t.Log("=== SUCCESS ===")
+	t.Log("All stack argument tests passed:")
+	t.Log("  - CreateFileA (7 args: 4 reg + 3 stack)")
+	t.Log("  - WriteFile (5 args: 4 reg + 1 stack)")
+	t.Log("  - ReadFile (5 args: 4 reg + 1 stack)")
+	t.Log("  - Data integrity verified: written == read")
+}
