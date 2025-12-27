@@ -12,6 +12,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.5.0: Builder pattern API, variadic functions
 - v1.0.0: LTS release with API stability guarantee
 
+## [0.3.5] - 2025-12-27
+
+### Fixed
+- **Windows stack arguments not implemented** (Critical)
+  - Functions with >4 arguments caused `panic: stack arguments not implemented`
+  - Win64 ABI: first 4 args in registers (RCX/RDX/R8/R9), args 5+ on stack
+  - Solution: Use `syscall.SyscallN` with variadic args for unlimited argument support
+  - Affected Vulkan functions: `vkCreateGraphicsPipelines` (6 args), `vkCmdBindVertexBuffers` (5 args), etc.
+  - Reported via go-webgpu/wgpu project
+
+### Changed
+- **Simplified Windows FFI** - removed intermediate syscall wrapper
+  - Removed: `internal/syscall/syscall_windows_amd64.go` (no longer needed)
+  - `call_windows.go` now calls `syscall.SyscallN` directly with `args...`
+  - Cleaner code, fewer indirections
+
+### Technical Details
+- `syscall.SyscallN(fn, args...)` supports up to 15+ arguments
+- Handles both register (1-4) and stack (5+) arguments automatically
+- Same approach used by purego for Windows FFI
+
 ## [0.3.4] - 2025-12-27
 
 ### Fixed
