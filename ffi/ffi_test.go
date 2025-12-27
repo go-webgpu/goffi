@@ -312,13 +312,13 @@ func TestWindowsStackArguments(t *testing.T) {
 	// Prepare CIF with 7 arguments (4 register + 3 stack)
 	cif := &types.CallInterface{}
 	argTypes := []*types.TypeDescriptor{
-		types.PointerTypeDescriptor,  // lpFileName
-		types.UInt32TypeDescriptor,   // dwDesiredAccess
-		types.UInt32TypeDescriptor,   // dwShareMode
-		types.PointerTypeDescriptor,  // lpSecurityAttributes
-		types.UInt32TypeDescriptor,   // dwCreationDisposition
-		types.UInt32TypeDescriptor,   // dwFlagsAndAttributes
-		types.PointerTypeDescriptor,  // hTemplateFile
+		types.PointerTypeDescriptor, // lpFileName
+		types.UInt32TypeDescriptor,  // dwDesiredAccess
+		types.UInt32TypeDescriptor,  // dwShareMode
+		types.PointerTypeDescriptor, // lpSecurityAttributes
+		types.UInt32TypeDescriptor,  // dwCreationDisposition
+		types.UInt32TypeDescriptor,  // dwFlagsAndAttributes
+		types.PointerTypeDescriptor, // hTemplateFile
 	}
 
 	err = PrepareCallInterface(cif, types.WindowsCallingConvention, types.PointerTypeDescriptor, argTypes)
@@ -757,16 +757,16 @@ func TestWindowsStackArguments10Args(t *testing.T) {
 		t.Fatalf("PrepareCallInterface for CreateProcessA failed: %v", err)
 	}
 
-	arg1 := uintptr(0)                    // lpApplicationName = NULL
-	arg2 := cmdLinePtr                    // lpCommandLine
-	arg3 := uintptr(0)                    // lpProcessAttributes = NULL
-	arg4 := uintptr(0)                    // lpThreadAttributes = NULL
-	arg5 := int32(0)                      // bInheritHandles = FALSE (STACK arg 5!)
-	arg6 := uint32(CREATE_NO_WINDOW)      // dwCreationFlags (STACK arg 6!)
-	arg7 := uintptr(0)                    // lpEnvironment = NULL (STACK arg 7!)
-	arg8 := uintptr(0)                    // lpCurrentDirectory = NULL (STACK arg 8!)
-	arg9 := unsafe.Pointer(&si)           // lpStartupInfo (STACK arg 9!)
-	arg10 := unsafe.Pointer(&pi)          // lpProcessInformation (STACK arg 10!)
+	arg1 := uintptr(0)               // lpApplicationName = NULL
+	arg2 := cmdLinePtr               // lpCommandLine
+	arg3 := uintptr(0)               // lpProcessAttributes = NULL
+	arg4 := uintptr(0)               // lpThreadAttributes = NULL
+	arg5 := int32(0)                 // bInheritHandles = FALSE (STACK arg 5!)
+	arg6 := uint32(CREATE_NO_WINDOW) // dwCreationFlags (STACK arg 6!)
+	arg7 := uintptr(0)               // lpEnvironment = NULL (STACK arg 7!)
+	arg8 := uintptr(0)               // lpCurrentDirectory = NULL (STACK arg 8!)
+	arg9 := unsafe.Pointer(&si)      // lpStartupInfo (STACK arg 9!)
+	arg10 := unsafe.Pointer(&pi)     // lpProcessInformation (STACK arg 10!)
 
 	var createResult int32
 	err = CallFunction(cifCreate, createProcessA, unsafe.Pointer(&createResult), []unsafe.Pointer{
