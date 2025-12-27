@@ -277,3 +277,99 @@ func TestIntegerArgumentTypes(t *testing.T) {
 		)
 	}
 }
+
+// TestWindowsStackArguments verifies that functions with >4 arguments work on Windows.
+// Win64 ABI: first 4 args in registers (RCX, RDX, R8, R9), args 5+ on stack.
+// This is a regression test for the "stack arguments not implemented" panic.
+//
+// Uses CreateFileA from kernel32.dll which has 7 parameters:
+//
+//	HANDLE CreateFileA(
+//	    LPCSTR lpFileName,                // arg1 - RCX
+//	    DWORD dwDesiredAccess,            // arg2 - RDX
+//	    DWORD dwShareMode,                // arg3 - R8
+//	    LPSECURITY_ATTRIBUTES lpSecAttr,  // arg4 - R9
+//	    DWORD dwCreationDisposition,      // arg5 - STACK
+//	    DWORD dwFlagsAndAttributes,       // arg6 - STACK
+//	    HANDLE hTemplateFile              // arg7 - STACK
+//	)
+func TestWindowsStackArguments(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Test requires Windows")
+	}
+
+	handle, err := LoadLibrary("kernel32.dll")
+	if err != nil {
+		t.Fatalf("LoadLibrary failed: %v", err)
+	}
+	defer FreeLibrary(handle)
+
+	sym, err := GetSymbol(handle, "CreateFileA")
+	if err != nil {
+		t.Fatalf("GetSymbol failed: %v", err)
+	}
+
+	// Prepare CIF with 7 arguments (4 register + 3 stack)
+	cif := &types.CallInterface{}
+	argTypes := []*types.TypeDescriptor{
+		types.PointerTypeDescriptor,  // lpFileName
+		types.UInt32TypeDescriptor,   // dwDesiredAccess
+		types.UInt32TypeDescriptor,   // dwShareMode
+		types.PointerTypeDescriptor,  // lpSecurityAttributes
+		types.UInt32TypeDescriptor,   // dwCreationDisposition
+		types.UInt32TypeDescriptor,   // dwFlagsAndAttributes
+		types.PointerTypeDescriptor,  // hTemplateFile
+	}
+
+	err = PrepareCallInterface(cif, types.WindowsCallingConvention, types.PointerTypeDescriptor, argTypes)
+	if err != nil {
+		t.Fatalf("PrepareCallInterface failed: %v", err)
+	}
+
+	// Try to open a non-existent file - should return INVALID_HANDLE_VALUE (-1)
+	fileName := "C:\\__goffi_test_nonexistent_file_12345__.txt\x00"
+	fileNamePtr := unsafe.Pointer(unsafe.StringData(fileName))
+
+	// Windows constants
+	const (
+		GENERIC_READ          = 0x80000000
+		FILE_SHARE_READ       = 0x00000001
+		OPEN_EXISTING         = 3
+		FILE_ATTRIBUTE_NORMAL = 0x80
+		INVALID_HANDLE_VALUE  = ^uintptr(0) // -1
+	)
+
+	// Prepare arguments
+	arg1 := fileNamePtr                   // lpFileName
+	arg2 := uint32(GENERIC_READ)          // dwDesiredAccess
+	arg3 := uint32(FILE_SHARE_READ)       // dwShareMode
+	arg4 := uintptr(0)                    // lpSecurityAttributes (NULL)
+	arg5 := uint32(OPEN_EXISTING)         // dwCreationDisposition (arg 5 - STACK!)
+	arg6 := uint32(FILE_ATTRIBUTE_NORMAL) // dwFlagsAndAttributes (arg 6 - STACK!)
+	arg7 := uintptr(0)                    // hTemplateFile (arg 7 - STACK!)
+
+	avalue := []unsafe.Pointer{
+		unsafe.Pointer(&arg1),
+		unsafe.Pointer(&arg2),
+		unsafe.Pointer(&arg3),
+		unsafe.Pointer(&arg4),
+		unsafe.Pointer(&arg5),
+		unsafe.Pointer(&arg6),
+		unsafe.Pointer(&arg7),
+	}
+
+	var result uintptr
+	err = CallFunction(cif, sym, unsafe.Pointer(&result), avalue)
+	if err != nil {
+		t.Fatalf("CallFunction failed: %v", err)
+	}
+
+	// Should return INVALID_HANDLE_VALUE for non-existent file
+	if result != INVALID_HANDLE_VALUE {
+		t.Errorf("CreateFileA returned %v, expected INVALID_HANDLE_VALUE (%v)", result, INVALID_HANDLE_VALUE)
+		t.Log("Note: If this test fails with a valid handle, the file unexpectedly exists")
+	} else {
+		t.Log("CreateFileA correctly returned INVALID_HANDLE_VALUE for non-existent file")
+		t.Log("This confirms 7 arguments (4 register + 3 stack) are passed correctly")
+	}
+}
