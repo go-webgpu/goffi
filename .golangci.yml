@@ -70,6 +70,15 @@ linters:
         linters:
           - govet         # unsafe.Pointer for return values
           - unused        # align() used for struct layout
+      # ARM64 implementation: unsafe.Pointer for return values
+      - path: internal/arch/arm64/implementation\.go
+        linters:
+          - govet         # unsafe.Pointer for return values
+          - unused        # align() used for struct layout
+      # ARM64 callbacks: functions called from assembly trampolines
+      - path: ffi/callback_arm64\.go
+        linters:
+          - unused        # Callback functions called from assembly
 
 issues:
   max-issues-per-linter: 100

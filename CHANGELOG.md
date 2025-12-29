@@ -12,6 +12,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.5.0: Builder pattern API, variadic functions
 - v1.0.0: LTS release with API stability guarantee
 
+## [0.3.6] - 2025-12-29
+
+### Fixed
+- **ARM64 HFA (Homogeneous Floating-point Aggregate) returns** (Critical)
+  - NSRect (4 × float64) returned zeros on Apple Silicon ([gogpu#24](https://github.com/gogpu/gogpu/issues/24))
+  - Root cause: Assembly only saved D0-D1, HFA needs D0-D3
+  - Solution: Save all 4 float registers (D0-D3) for HFA returns
+  - Affects Objective-C runtime calls on macOS ARM64 (Apple Silicon M1/M2/M3/M4)
+
+- **ARM64 large struct return via X8 (sret)** (Critical)
+  - Non-HFA structs >16 bytes returned via implicit pointer in X8
+  - Root cause: X8 register never loaded before function call
+  - Solution: Load rvalue pointer into X8 for sret calls
+
+### Added
+- `ReturnHFA2`, `ReturnHFA3`, `ReturnHFA4` return flag constants
+- `handleHFAReturn` function for processing HFA struct returns
+- `classifyReturnARM64` now detects HFA structs (1-4 floats/doubles)
+- Unit tests for ARM64 HFA classification
+
+### Changed
+- `internal/syscall/syscall_unix_arm64.go`
+  - Added fr1-fr4 fields for D0-D3 float returns
+  - Added r8 field for X8 sret pointer
+  - Updated `Call8Float` signature: accepts r8, returns [4]float64
+
+- `internal/syscall/syscall_unix_arm64.s`
+  - Load X8 from r8 field (offset 184) before function call
+  - Save D0-D3 to fr1-fr4 (offsets 152-176) after call
+  - Fixed offsets: was incorrectly saving to input arg offsets
+
+- `internal/arch/arm64/implementation.go`
+  - `handleReturn` now accepts fret [4]float64 for HFA
+  - Fixed sret handling: do nothing (callee writes directly via X8)
+
+- `internal/arch/arm64/call_unix.go`
+  - Pass rvalue as r8 for ReturnViaPointer calls
+  - Pass full fret [4]float64 to handleReturn
+
+### Technical Details
+- AAPCS64 (ARM64 ABI): HFA structs with 1-4 same-type floats return in D0-D3
+- AAPCS64: Large non-HFA structs (>16 bytes) return via hidden pointer in X8
+- NSRect = CGRect = 4 × float64 = 32 bytes = HFA (returns in D0-D3)
+- Fixes blank window issue on macOS ARM64 (GPU window size was 0×0)
+
 ## [0.3.5] - 2025-12-27
 
 ### Fixed

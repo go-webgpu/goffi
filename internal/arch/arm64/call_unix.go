@@ -78,16 +78,16 @@ func (i *Implementation) Execute(
 		}
 	}
 
-	// Call via our ARM64 syscall wrapper
-	ret, fret := gosyscall.Call8Float(uintptr(fn), gpr, fpr)
-
-	// Handle return value based on type
-	retVal := uint64(ret)
-
-	// For float returns, use the float value
-	if cif.ReturnType.Kind == types.FloatType || cif.ReturnType.Kind == types.DoubleType {
-		retVal = *(*uint64)(unsafe.Pointer(&fret))
+	// Determine if we need to pass r8 for large struct return (sret)
+	var r8 uintptr
+	if cif.Flags&types.ReturnViaPointer != 0 && rvalue != nil {
+		// For sret, pass rvalue pointer in X8 - callee writes directly to it
+		r8 = uintptr(rvalue)
 	}
 
-	return i.handleReturn(cif, rvalue, retVal)
+	// Call via our ARM64 syscall wrapper
+	ret, fret := gosyscall.Call8Float(uintptr(fn), gpr, fpr, r8)
+
+	// Handle return value based on type
+	return i.handleReturn(cif, rvalue, uint64(ret), fret)
 }
