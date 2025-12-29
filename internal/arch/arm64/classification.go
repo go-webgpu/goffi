@@ -16,8 +16,8 @@ type classification struct {
 // classifyReturnARM64 determines how a return value is passed according to AAPCS64.
 // Return values:
 //   - X0-X1: Integer/pointer returns (up to 16 bytes)
-//   - D0-D3: Floating-point returns
-//   - X8: Indirect result location (for larger returns)
+//   - D0-D3: Floating-point returns (including HFA with 1-4 floats/doubles)
+//   - X8: Indirect result location (for larger non-HFA returns)
 func classifyReturnARM64(t *types.TypeDescriptor, abi types.CallingConvention) int {
 	switch t.Kind {
 	case types.VoidType:
@@ -27,8 +27,29 @@ func classifyReturnARM64(t *types.TypeDescriptor, abi types.CallingConvention) i
 	case types.DoubleType:
 		return types.ReturnInXMM64 // Uses D0 on ARM64
 	case types.StructType:
-		// AAPCS64: Composite types <= 16 bytes are returned in X0-X1
-		// Larger types are returned via X8 (indirect)
+		// AAPCS64: Check HFA first - HFAs are returned in D0-D3 regardless of size.
+		// Example: NSRect (4 x float64 = 32 bytes) is HFA, returned in D0-D3.
+		isHFA, hfaCount := isHomogeneousFloatAggregate(t)
+		if isHFA && hfaCount <= 4 {
+			// Determine element type (float32 or float64)
+			elemType := types.ReturnInXMM64 // default to double
+			if t.Members[0].Kind == types.FloatType {
+				elemType = types.ReturnInXMM32
+			}
+
+			switch hfaCount {
+			case 1:
+				return elemType // Single element in D0
+			case 2:
+				return types.ReturnHFA2 | elemType
+			case 3:
+				return types.ReturnHFA3 | elemType
+			case 4:
+				return types.ReturnHFA4 | elemType
+			}
+		}
+
+		// Non-HFA composites: <= 16 bytes in X0-X1, larger via X8 (indirect)
 		switch {
 		case t.Size <= 8:
 			return types.ReturnInt64

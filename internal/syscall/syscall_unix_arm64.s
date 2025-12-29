@@ -17,16 +17,21 @@
 //	a6    uintptr  // offset 48  (X5)
 //	a7    uintptr  // offset 56  (X6)
 //	a8    uintptr  // offset 64  (X7)
-//	f1    uintptr  // offset 72  (D0)
-//	f2    uintptr  // offset 80  (D1)
-//	f3    uintptr  // offset 88  (D2)
-//	f4    uintptr  // offset 96  (D3)
-//	f5    uintptr  // offset 104 (D4)
-//	f6    uintptr  // offset 112 (D5)
-//	f7    uintptr  // offset 120 (D6)
-//	f8    uintptr  // offset 128 (D7)
+//	f1    uintptr  // offset 72  (D0 input)
+//	f2    uintptr  // offset 80  (D1 input)
+//	f3    uintptr  // offset 88  (D2 input)
+//	f4    uintptr  // offset 96  (D3 input)
+//	f5    uintptr  // offset 104 (D4 input)
+//	f6    uintptr  // offset 112 (D5 input)
+//	f7    uintptr  // offset 120 (D6 input)
+//	f8    uintptr  // offset 128 (D7 input)
 //	r1    uintptr  // offset 136 (return X0)
 //	r2    uintptr  // offset 144 (return X1)
+//	fr1   uintptr  // offset 152 (return D0 for HFA)
+//	fr2   uintptr  // offset 160 (return D1 for HFA)
+//	fr3   uintptr  // offset 168 (return D2 for HFA)
+//	fr4   uintptr  // offset 176 (return D3 for HFA)
+//	r8    uintptr  // offset 184 (X8 - large struct return pointer)
 // }
 //
 // syscall8 must be called on the g0 stack with runtime.cgocall.
@@ -55,6 +60,9 @@ TEXT syscall8(SB), NOSPLIT|NOFRAME, $0
 	FMOVD 120(R9), F6  // f7 -> D6
 	FMOVD 128(R9), F7  // f8 -> D7
 
+	// Load X8 for large struct return pointer (AAPCS64: X8 holds return address for >16 byte structs)
+	MOVD 184(R9), R8  // r8 -> X8 (large struct return pointer)
+
 	// Load integer arguments into X0-X7 (offsets 8-64)
 	MOVD 8(R9), R0    // a1 -> X0
 	MOVD 16(R9), R1   // a2 -> X1
@@ -75,8 +83,10 @@ TEXT syscall8(SB), NOSPLIT|NOFRAME, $0
 	// Save return values
 	MOVD  R0, 136(R9)  // r1: integer return in X0
 	MOVD  R1, 144(R9)  // r2: second integer return in X1
-	FMOVD F0, 72(R9)   // f1: float return in D0
-	FMOVD F1, 80(R9)   // f2: second float return in D1
+	FMOVD F0, 152(R9)  // fr1: D0 return for HFA
+	FMOVD F1, 160(R9)  // fr2: D1 return for HFA
+	FMOVD F2, 168(R9)  // fr3: D2 return for HFA
+	FMOVD F3, 176(R9)  // fr4: D3 return for HFA
 
 	// Restore frame and return
 	MOVD 8(RSP), R30             // Restore LR

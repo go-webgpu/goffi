@@ -119,6 +119,12 @@ const (
 	ReturnInXMM32    = 8
 	ReturnInXMM64    = 9
 	ReturnViaPointer = 1 << 10
+	// ARM64 HFA (Homogeneous Floating-point Aggregate) return flags.
+	// HFA structs with 2-4 float/double members are returned in D0-D3.
+	// Use with ReturnInXMM32 (float) or ReturnInXMM64 (double) to indicate element type.
+	ReturnHFA2 = 1 << 11 // 2 elements in D0-D1
+	ReturnHFA3 = 1 << 12 // 3 elements in D0-D2
+	ReturnHFA4 = 1 << 13 // 4 elements in D0-D3
 )
 
 // Error constants
