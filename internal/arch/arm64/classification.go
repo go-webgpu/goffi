@@ -28,6 +28,54 @@ func alignOffset(value, alignment uintptr) uintptr {
 	return (value + alignment - 1) &^ (alignment - 1)
 }
 
+func ensureStructLayout(desc *types.TypeDescriptor) (size, align uintptr) {
+	if desc == nil {
+		return 0, 1
+	}
+	if desc.Kind != types.StructType {
+		if desc.Alignment == 0 {
+			if desc.Size != 0 {
+				desc.Alignment = desc.Size
+			} else {
+				desc.Alignment = 1
+			}
+		}
+		return desc.Size, desc.Alignment
+	}
+
+	if desc.Size != 0 && desc.Alignment != 0 {
+		return desc.Size, desc.Alignment
+	}
+
+	var (
+		offset   uintptr
+		maxAlign uintptr = 1
+	)
+	for _, member := range desc.Members {
+		if member == nil {
+			continue
+		}
+		mSize, mAlign := ensureStructLayout(member)
+		if mAlign == 0 {
+			mAlign = 1
+		}
+		offset = alignOffset(offset, mAlign)
+		offset += mSize
+		if mAlign > maxAlign {
+			maxAlign = mAlign
+		}
+	}
+
+	size = alignOffset(offset, maxAlign)
+	if desc.Size == 0 {
+		desc.Size = size
+	}
+	if desc.Alignment == 0 {
+		desc.Alignment = maxAlign
+	}
+	return desc.Size, desc.Alignment
+}
+
 // classifyReturnARM64 determines how a return value is passed according to AAPCS64.
 // Return values:
 //   - X0-X1: Integer/pointer returns (up to 16 bytes)
@@ -42,6 +90,7 @@ func classifyReturnARM64(t *types.TypeDescriptor, abi types.CallingConvention) i
 	case types.DoubleType:
 		return types.ReturnInXMM64 // Uses D0 on ARM64
 	case types.StructType:
+		ensureStructLayout(t)
 		// AAPCS64: Check HFA first - HFAs are returned in D0-D3 regardless of size.
 		// Example: NSRect (4 x float64 = 32 bytes) is HFA, returned in D0-D3.
 		isHFA, hfaCount, elemKind := isHomogeneousFloatAggregate(t)
@@ -94,6 +143,7 @@ func classifyArgumentARM64(t *types.TypeDescriptor, abi types.CallingConvention)
 		// Floating-point arguments use FP registers (D0-D7)
 		res.FPRCount = 1
 	case types.StructType:
+		ensureStructLayout(t)
 		// AAPCS64: Composite types
 		// - HFA (Homogeneous Floating-point Aggregate): up to 4 floats/doubles in FP regs
 		// - Other composites <= 16 bytes: in GP registers
@@ -123,6 +173,7 @@ func countStructRegUsage(desc *types.TypeDescriptor) (intCount, floatCount int) 
 	if desc == nil || desc.Kind != types.StructType {
 		return 0, 0
 	}
+	ensureStructLayout(desc)
 
 	var (
 		shift uint

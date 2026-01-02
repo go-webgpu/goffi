@@ -225,9 +225,7 @@ func (i *Implementation) Execute(
 			// - HFA (1-4 floats/doubles): passed in D registers
 			// - <=16 bytes non-HFA: passed in X registers (1 or 2 registers)
 			// - >16 bytes: passed by reference
-			if argType.Size == 0 {
-				break
-			}
+			ensureStructLayout(argType)
 
 			isHFA, hfaCount, _ := isHomogeneousFloatAggregate(argType)
 			if isHFA && hfaCount > 0 && hfaCount <= 4 && fprIdx+hfaCount <= 8 {
