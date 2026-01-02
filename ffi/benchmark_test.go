@@ -146,7 +146,7 @@ func BenchmarkGoffiStringOutput(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = CallFunction(cif, sym, unsafe.Pointer(&result), []unsafe.Pointer{strPtr})
+		_ = CallFunction(cif, sym, unsafe.Pointer(&result), []unsafe.Pointer{unsafe.Pointer(&strPtr)})
 	}
 }
 
