@@ -3,6 +3,7 @@
 package arm64
 
 import (
+	"math"
 	"unsafe"
 
 	"github.com/go-webgpu/goffi/internal/arch"
@@ -38,12 +39,13 @@ func (i *Implementation) ClassifyArgument(
 }
 
 // Return value handling for ARM64 (AAPCS64)
-// fret contains D0-D3 float register values (for HFA returns).
+// fret contains raw D0-D3 bit patterns (for float and HFA returns).
 func (i *Implementation) handleReturn(
 	cif *types.CallInterface,
 	rvalue unsafe.Pointer,
-	retVal uint64,
-	fret [4]float64,
+	retLo uint64,
+	retHi uint64,
+	fret [4]uint64,
 ) error {
 	if rvalue == nil || cif.ReturnType.Kind == types.VoidType {
 		return nil
@@ -63,34 +65,33 @@ func (i *Implementation) handleReturn(
 
 	switch cif.ReturnType.Kind {
 	case types.FloatType:
-		// Single float in D0
-		*(*float32)(rvalue) = float32(fret[0])
+		// Single float in S0 (low 32 bits of D0)
+		*(*float32)(rvalue) = math.Float32frombits(uint32(fret[0]))
 	case types.DoubleType:
 		// Single double in D0
-		*(*float64)(rvalue) = fret[0]
+		*(*float64)(rvalue) = math.Float64frombits(fret[0])
 	case types.UInt8Type:
-		*(*uint8)(rvalue) = uint8(retVal)
+		*(*uint8)(rvalue) = uint8(retLo)
 	case types.SInt8Type:
-		*(*int8)(rvalue) = int8(retVal)
+		*(*int8)(rvalue) = int8(retLo)
 	case types.UInt16Type:
-		*(*uint16)(rvalue) = uint16(retVal)
+		*(*uint16)(rvalue) = uint16(retLo)
 	case types.SInt16Type:
-		*(*int16)(rvalue) = int16(retVal)
+		*(*int16)(rvalue) = int16(retLo)
 	case types.UInt32Type:
-		*(*uint32)(rvalue) = uint32(retVal)
+		*(*uint32)(rvalue) = uint32(retLo)
 	case types.SInt32Type:
-		*(*int32)(rvalue) = int32(retVal)
+		*(*int32)(rvalue) = int32(retLo)
 	case types.UInt64Type, types.SInt64Type, types.PointerType:
-		*(*uint64)(rvalue) = retVal
+		*(*uint64)(rvalue) = retLo
 	case types.StructType:
 		if cif.ReturnType.Size <= 8 {
-			*(*uint64)(rvalue) = retVal
+			*(*uint64)(rvalue) = retLo
 		} else if cif.ReturnType.Size <= 16 {
 			// 9-16 byte struct returned in X0-X1
 			dest := (*[2]uint64)(rvalue)
-			dest[0] = retVal
-			// X1 is not returned by our current syscall, so this is partial
-			// TODO: Support X1 return value if needed
+			dest[0] = retLo
+			dest[1] = retHi
 		} else {
 			return types.ErrUnsupportedReturnType
 		}
@@ -106,7 +107,7 @@ func (i *Implementation) handleReturn(
 func (i *Implementation) handleHFAReturn(
 	cif *types.CallInterface,
 	rvalue unsafe.Pointer,
-	fret [4]float64,
+	fret [4]uint64,
 ) error {
 	// Determine HFA count from flags
 	var hfaCount int
@@ -121,22 +122,27 @@ func (i *Implementation) handleHFAReturn(
 		hfaCount = 1
 	}
 
-	// Determine element type (float32 or float64)
-	isFloat32 := cif.Flags&types.ReturnInXMM32 != 0
-
-	if isFloat32 {
-		// HFA with float32 elements
-		dest := (*[4]float32)(rvalue)
-		for idx := 0; idx < hfaCount; idx++ {
-			dest[idx] = float32(fret[idx])
-		}
-	} else {
-		// HFA with float64 elements (e.g., NSRect = 4 x float64)
-		dest := (*[4]float64)(rvalue)
-		for idx := 0; idx < hfaCount; idx++ {
-			dest[idx] = fret[idx]
+	// Determine element type (float32 or float64) from the return descriptor.
+	// Return flags overlap (ReturnInXMM64 includes ReturnInXMM32 bit), so rely on HFA metadata.
+	elemKind := types.DoubleType
+	if cif.ReturnType != nil && cif.ReturnType.Kind == types.StructType {
+		if isHFA, _, kind := isHomogeneousFloatAggregate(cif.ReturnType); isHFA {
+			elemKind = kind
 		}
 	}
+	isFloat32 := elemKind == types.FloatType
 
+	if isFloat32 {
+		dest := (*[4]float32)(rvalue)
+		for idx := 0; idx < hfaCount; idx++ {
+			dest[idx] = math.Float32frombits(uint32(fret[idx]))
+		}
+		return nil
+	}
+
+	dest := (*[4]float64)(rvalue)
+	for idx := 0; idx < hfaCount; idx++ {
+		dest[idx] = math.Float64frombits(fret[idx])
+	}
 	return nil
 }

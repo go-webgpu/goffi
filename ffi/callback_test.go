@@ -1,4 +1,4 @@
-//go:build (linux || darwin) && amd64
+//go:build (linux || darwin) && (amd64 || arm64)
 
 package ffi
 
@@ -8,6 +8,35 @@ import (
 	"testing"
 	"unsafe"
 )
+
+const callbackFloatRegCount = 8
+
+func callbackEntrySize() uintptr {
+	return callbackasmAddr(1) - callbackasmAddr(0)
+}
+
+func callbackIndex(ptr uintptr) uintptr {
+	entrySize := callbackEntrySize()
+	if entrySize == 0 {
+		return 0
+	}
+	return (ptr - callbackasmABI0) / entrySize
+}
+
+func callbackIntRegCount() int {
+	if runtime.GOARCH == "arm64" {
+		return 8
+	}
+	return 6
+}
+
+func callbackIntRegIndex(i int) int {
+	return callbackFloatRegCount + i
+}
+
+func callbackStackIndex(i int) int {
+	return callbackFloatRegCount + callbackIntRegCount() + i
+}
 
 // Test basic callback registration.
 func TestNewCallback_BasicRegistration(t *testing.T) {
@@ -22,8 +51,9 @@ func TestNewCallback_BasicRegistration(t *testing.T) {
 	}
 
 	// Verify pointer is within expected range
+	entrySize := callbackEntrySize()
 	baseAddr := callbackasmABI0
-	maxAddr := callbackasmABI0 + uintptr(maxCallbacks*5)
+	maxAddr := callbackasmABI0 + uintptr(maxCallbacks)*entrySize
 
 	if ptr < baseAddr || ptr >= maxAddr {
 		t.Errorf("Callback pointer %x outside expected range [%x, %x)", ptr, baseAddr, maxAddr)
@@ -44,13 +74,13 @@ func TestCallback_IntegerArgs(t *testing.T) {
 
 	// Simulate C calling the callback
 	// We'll invoke callbackWrap directly to test argument marshaling
-	idx := (ptr - callbackasmABI0) / 5
+	idx := callbackIndex(ptr)
 
 	// Create argument frame (System V AMD64 ABI)
 	// Layout: [XMM0-7][RDI,RSI,RDX,RCX,R8,R9][stack...]
 	var frame [128]uintptr
-	frame[8] = 10 // RDI (first int arg)
-	frame[9] = 20 // RSI (second int arg)
+	frame[callbackIntRegIndex(0)] = 10 // first int arg
+	frame[callbackIntRegIndex(1)] = 20 // second int arg
 
 	args := &callbackArgs{
 		index: idx,
@@ -71,11 +101,11 @@ func TestCallback_IntegerReturn(t *testing.T) {
 	}
 
 	ptr := NewCallback(callback)
-	idx := (ptr - callbackasmABI0) / 5
+	idx := callbackIndex(ptr)
 
 	var frame [128]uintptr
-	frame[8] = 7 // RDI
-	frame[9] = 6 // RSI
+	frame[callbackIntRegIndex(0)] = 7 // first int arg
+	frame[callbackIntRegIndex(1)] = 6 // second int arg
 
 	args := &callbackArgs{
 		index:  idx,
@@ -98,7 +128,7 @@ func TestCallback_FloatArgs(t *testing.T) {
 	}
 
 	ptr := NewCallback(callback)
-	idx := (ptr - callbackasmABI0) / 5
+	idx := callbackIndex(ptr)
 
 	var frame [128]uintptr
 	// Float args go in XMM0-7
@@ -129,7 +159,7 @@ func TestCallback_Float32Args(t *testing.T) {
 	}
 
 	ptr := NewCallback(callback)
-	idx := (ptr - callbackasmABI0) / 5
+	idx := callbackIndex(ptr)
 
 	var frame [128]uintptr
 	// Float32 args go in XMM registers (as float64)
@@ -164,12 +194,12 @@ func TestCallback_MixedArgs(t *testing.T) {
 	}
 
 	ptr := NewCallback(callback)
-	idx := (ptr - callbackasmABI0) / 5
+	idx := callbackIndex(ptr)
 
 	var frame [128]uintptr
 	// count (int) -> RDI (integer register)
 	// multiplier (float64) -> XMM0 (float register)
-	frame[8] = 5 // RDI = 5
+	frame[callbackIntRegIndex(0)] = 5 // first int arg
 
 	mult := 2.5
 	frame[0] = *(*uintptr)(unsafe.Pointer(&mult)) // XMM0 = 2.5
@@ -204,10 +234,10 @@ func TestCallback_PointerArg(t *testing.T) {
 	}
 
 	cbPtr := NewCallback(callback)
-	idx := (cbPtr - callbackasmABI0) / 5
+	idx := callbackIndex(cbPtr)
 
 	var frame [128]uintptr
-	frame[8] = uintptr(unsafe.Pointer(&original)) // RDI = pointer to int
+	frame[callbackIntRegIndex(0)] = uintptr(unsafe.Pointer(&original)) // first int arg
 
 	args := &callbackArgs{
 		index: idx,
@@ -233,10 +263,10 @@ func TestCallback_BoolArg(t *testing.T) {
 	}
 
 	ptr := NewCallback(callback)
-	idx := (ptr - callbackasmABI0) / 5
+	idx := callbackIndex(ptr)
 
 	var frame [128]uintptr
-	frame[8] = 1 // RDI = true
+	frame[callbackIntRegIndex(0)] = 1 // first int arg
 
 	args := &callbackArgs{
 		index: idx,
@@ -257,10 +287,10 @@ func TestCallback_BoolReturn(t *testing.T) {
 	}
 
 	ptr := NewCallback(callback)
-	idx := (ptr - callbackasmABI0) / 5
+	idx := callbackIndex(ptr)
 
 	var frame [128]uintptr
-	frame[8] = 42 // RDI = 42
+	frame[callbackIntRegIndex(0)] = 42 // first int arg
 
 	args := &callbackArgs{
 		index:  idx,
@@ -275,7 +305,7 @@ func TestCallback_BoolReturn(t *testing.T) {
 	}
 
 	// Test false case
-	frame[8] = 0
+	frame[callbackIntRegIndex(0)] = 0
 	args.result = 0
 	callbackWrap(args)
 
@@ -291,12 +321,12 @@ func TestCallback_UintTypes(t *testing.T) {
 	}
 
 	ptr := NewCallback(callback)
-	idx := (ptr - callbackasmABI0) / 5
+	idx := callbackIndex(ptr)
 
 	var frame [128]uintptr
-	frame[8] = 10  // RDI = uint(10)
-	frame[9] = 20  // RSI = uint32(20)
-	frame[10] = 30 // RDX = uint64(30)
+	frame[callbackIntRegIndex(0)] = 10 // first int arg
+	frame[callbackIntRegIndex(1)] = 20 // second int arg
+	frame[callbackIntRegIndex(2)] = 30 // third int arg
 
 	args := &callbackArgs{
 		index:  idx,
@@ -313,25 +343,35 @@ func TestCallback_UintTypes(t *testing.T) {
 
 // Test callback with many arguments (exceeds register count, uses stack).
 func TestCallback_StackArgs(t *testing.T) {
-	// System V AMD64 has 6 integer registers and 8 float registers
-	// This test uses 7 int args to force stack usage
-	callback := func(a, b, c, d, e, f, g int) int {
-		return a + b + c + d + e + f + g
-	}
-
-	ptr := NewCallback(callback)
-	idx := (ptr - callbackasmABI0) / 5
-
 	var frame [128]uintptr
-	// First 6 in registers (RDI, RSI, RDX, RCX, R8, R9)
-	frame[8] = 1  // RDI
-	frame[9] = 2  // RSI
-	frame[10] = 3 // RDX
-	frame[11] = 4 // RCX
-	frame[12] = 5 // R8
-	frame[13] = 6 // R9
-	// 7th arg goes on stack (position 14 = 8 floats + 6 ints)
-	frame[14] = 7
+	var ptr uintptr
+	var idx uintptr
+	var expected uintptr
+	if runtime.GOARCH == "arm64" {
+		callback := func(a, b, c, d, e, f, g, h, i int) int {
+			return a + b + c + d + e + f + g + h + i
+		}
+		ptr = NewCallback(callback)
+		idx = callbackIndex(ptr)
+
+		for i := 0; i < 8; i++ {
+			frame[callbackIntRegIndex(i)] = uintptr(i + 1)
+		}
+		frame[callbackStackIndex(0)] = 9
+		expected = uintptr(45)
+	} else {
+		callback := func(a, b, c, d, e, f, g int) int {
+			return a + b + c + d + e + f + g
+		}
+		ptr = NewCallback(callback)
+		idx = callbackIndex(ptr)
+
+		for i := 0; i < 6; i++ {
+			frame[callbackIntRegIndex(i)] = uintptr(i + 1)
+		}
+		frame[callbackStackIndex(0)] = 7
+		expected = uintptr(28)
+	}
 
 	args := &callbackArgs{
 		index:  idx,
@@ -341,7 +381,6 @@ func TestCallback_StackArgs(t *testing.T) {
 
 	callbackWrap(args)
 
-	expected := uintptr(1 + 2 + 3 + 4 + 5 + 6 + 7)
 	if args.result != expected {
 		t.Errorf("Expected result %d, got %d", expected, args.result)
 	}
@@ -355,7 +394,7 @@ func TestCallback_StackFloatArgs(t *testing.T) {
 	}
 
 	ptr := NewCallback(callback)
-	idx := (ptr - callbackasmABI0) / 5
+	idx := callbackIndex(ptr)
 
 	var frame [128]uintptr
 	// First 8 in XMM0-7 (positions 0-7)
@@ -363,9 +402,8 @@ func TestCallback_StackFloatArgs(t *testing.T) {
 		val := float64(i + 1)
 		frame[i] = *(*uintptr)(unsafe.Pointer(&val))
 	}
-	// 9th float goes on stack (position 14 = 8 XMM + 6 int registers)
 	val9 := float64(9)
-	frame[14] = *(*uintptr)(unsafe.Pointer(&val9))
+	frame[callbackStackIndex(0)] = *(*uintptr)(unsafe.Pointer(&val9))
 
 	args := &callbackArgs{
 		index:  idx,
@@ -412,10 +450,10 @@ func TestCallback_MultipleRegistrations(t *testing.T) {
 
 	// Invoke each callback
 	for i, ptr := range callbacks {
-		idx := (ptr - callbackasmABI0) / 5
+		idx := callbackIndex(ptr)
 
 		var frame [128]uintptr
-		frame[8] = 10 // RDI = 10
+		frame[callbackIntRegIndex(0)] = 10 // first int arg
 
 		args := &callbackArgs{
 			index:  idx,
@@ -601,10 +639,10 @@ func TestCallback_NoGarbageCollection(t *testing.T) {
 	runtime.GC()
 
 	// Callback should still be callable
-	idx := (ptr - callbackasmABI0) / 5
+	idx := callbackIndex(ptr)
 
 	var frame [128]uintptr
-	frame[8] = 99
+	frame[callbackIntRegIndex(0)] = 99
 
 	args := &callbackArgs{
 		index: idx,
@@ -650,11 +688,11 @@ func BenchmarkCallbackInvoke(b *testing.B) {
 	}
 
 	ptr := NewCallback(callback)
-	idx := (ptr - callbackasmABI0) / 5
+	idx := callbackIndex(ptr)
 
 	var frame [128]uintptr
-	frame[8] = 10
-	frame[9] = 20
+	frame[callbackIntRegIndex(0)] = 10
+	frame[callbackIntRegIndex(1)] = 20
 
 	args := &callbackArgs{
 		index:  idx,
@@ -676,7 +714,7 @@ func BenchmarkCallbackFloat(b *testing.B) {
 	}
 
 	ptr := NewCallback(callback)
-	idx := (ptr - callbackasmABI0) / 5
+	idx := callbackIndex(ptr)
 
 	var frame [128]uintptr
 	f1 := 3.14

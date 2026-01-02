@@ -20,6 +20,9 @@ func main() {
 	case "windows":
 		libName = "msvcrt.dll"
 		funcName = "printf"
+	case "darwin":
+		libName = "libSystem.B.dylib"
+		funcName = "puts"
 	default:
 		fmt.Println("Unsupported OS")
 		return
@@ -42,7 +45,12 @@ func main() {
 
 	// Prepare call interface
 	cif := &types.CallInterface{}
-	rtype := types.VoidTypeDescriptor
+	var rtype *types.TypeDescriptor
+	if runtime.GOOS == "darwin" {
+		rtype = types.SInt32TypeDescriptor
+	} else {
+		rtype = types.VoidTypeDescriptor
+	}
 	argtypes := []*types.TypeDescriptor{types.PointerTypeDescriptor}
 
 	err = ffi.PrepareCallInterface(cif, types.DefaultCall, rtype, argtypes)
@@ -53,12 +61,26 @@ func main() {
 
 	// Prepare arguments
 	str := "Hello, WebGPU!\n\x00"
-	arg := unsafe.Pointer(unsafe.StringData(str))
-	args := []unsafe.Pointer{arg}
+	if runtime.GOOS == "darwin" {
+		cstr := unsafe.Pointer(unsafe.StringData(str))
 
-	// Execute function call
-	err = ffi.CallFunction(cif, sym, nil, args)
-	if err != nil {
-		fmt.Println("CallFunction error:", err)
+		// IMPORTANT: args contains pointers to argument *storage*
+		args := []unsafe.Pointer{unsafe.Pointer(&cstr)}
+
+		var ret int32
+		if err := ffi.CallFunction(cif, sym, unsafe.Pointer(&ret), args); err != nil {
+			fmt.Println("CallFunction error:", err)
+			return
+		}
+
+	} else {
+		arg := unsafe.Pointer(unsafe.StringData(str))
+		args := []unsafe.Pointer{arg}
+
+		// Execute function call
+		err = ffi.CallFunction(cif, sym, nil, args)
+		if err != nil {
+			fmt.Println("CallFunction error:", err)
+		}
 	}
 }
