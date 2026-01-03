@@ -23,7 +23,7 @@ ffi.CallFunction(&cif, wgpuCreateInstance, &result, args)
 
 - **🚫 Zero CGO** - Pure Go, no C compiler needed
 - **⚡ Fast** - ~100ns FFI overhead ([benchmarks](#performance))
-- **🌐 Cross-platform** - Windows + Linux + macOS AMD64; ARM64 in development
+- **🌐 Cross-platform** - Windows + Linux + macOS (AMD64 + ARM64)
 - **🔄 Callbacks** - C-to-Go function calls for async APIs (v0.2.0)
 - **🔒 Type-safe** - Runtime type validation with detailed errors
 - **📦 Production-ready** - 87% test coverage, comprehensive error handling
@@ -144,7 +144,7 @@ See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for comprehensive analysis, optim
 
 - **Composite types** (structs) require manual initialization
 - **Cannot interrupt** C functions mid-execution (use `CallFunctionContext` for timeouts)
-- **ARM64 in development** (v0.3.0, cross-compiles but untested on real hardware)
+- **ARM64** - Tested on Apple Silicon (M3 Pro), Linux ARM64 cross-compile verified
 - **No bitfields** in structs
 
 See [CHANGELOG.md](CHANGELOG.md#known-limitations) for full details.
@@ -255,10 +255,13 @@ See [docs/dev/TECHNICAL_ARCHITECTURE.md](docs/dev/TECHNICAL_ARCHITECTURE.md) for
 - 2000-entry trampoline table for async operations
 - WebGPU async APIs now fully supported
 
-### v0.3.0 - ARM64 Support (Q1 2025)
-- **ARM64 support** (Linux + macOS AAPCS64 ABI) - in development
+### v0.3.x - ARM64 Support ✅ **RELEASED!**
+- **ARM64 support** (Linux + macOS AAPCS64 ABI)
 - AAPCS64 calling convention with X0-X7, D0-D7 registers
+- HFA (Homogeneous Floating-point Aggregate) returns
+- Nested struct and mixed int/float struct support
 - 2000-entry callback trampolines for ARM64
+- Tested on Apple Silicon M3 Pro
 
 ### v0.5.0 - Usability + Variadic (Q2 2025)
 - Builder pattern API: `lib.Call("func").Arg(...).ReturnInt()`
@@ -303,8 +306,8 @@ go test -v ./ffi  # Auto-detects Windows/Linux
 | **Linux** | amd64 | ✅ v0.1.0 | System V ABI, full support |
 | **macOS** | amd64 | ✅ v0.1.1 | System V ABI, full support |
 | **FreeBSD** | amd64 | ✅ v0.1.0 | System V ABI (untested) |
-| **Linux** | arm64 | 🟡 v0.3.0 | AAPCS64 ABI (in development) |
-| **macOS** | arm64 | 🟡 v0.3.0 | AAPCS64 ABI (in development) |
+| **Linux** | arm64 | ✅ v0.3.0 | AAPCS64 ABI, cross-compile verified |
+| **macOS** | arm64 | ✅ v0.3.7 | AAPCS64 ABI, tested on M3 Pro |
 
 ---
 
@@ -345,4 +348,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 **Made with ❤️ for GPU computing in pure Go**
 
-*Last updated: 2025-12-23 | goffi v0.3.2*
+*Last updated: 2026-01-03 | goffi v0.3.7*

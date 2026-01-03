@@ -12,6 +12,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.5.0: Builder pattern API, variadic functions
 - v1.0.0: LTS release with API stability guarantee
 
+## [0.3.7] - 2026-01-03
+
+### Added
+- **ARM64 Darwin comprehensive support** (PR #9 by @ppoage)
+  - Tested on Apple Silicon M3 Pro (64 ns/op benchmark)
+  - Nested struct handling via `placeStructRegisters()`
+  - Mixed int/float struct support via `countStructRegUsage()`
+  - `ensureStructLayout()` for auto-computing size/alignment
+  - Assembly shim (`abi_capture_test.s`) for ABI verification
+  - Comprehensive darwin ObjC tests (747 lines)
+  - Struct argument tests (537 lines)
+
+- **r2 (X1) return for 9-16 byte struct returns**
+  - `Call8Float` now returns both X0 and X1
+  - Fixes struct returns between 9-16 bytes on ARM64
+
+- **uint64 bit patterns for float registers**
+  - Cleaner handling of mixed float32/float64 arguments
+  - `fpr [8]uint64` instead of `fpr [8]float64`
+
+### Fixed
+- **BenchmarkGoffiStringOutput segfault on darwin**
+  - Pointer argument now correctly passed as `unsafe.Pointer(&strPtr)`
+  - Follows documented API: args contains pointers to argument storage
+
+### Changed
+- `internal/syscall/syscall_unix_arm64.go`
+  - `Call8Float` signature: `(r1, r2 uintptr, fret [4]uint64)`
+  - Float registers now use raw bit patterns (uint64)
+
+- `internal/arch/arm64/classification.go`
+  - `isHomogeneousFloatAggregate` now walks nested structs
+  - Returns element kind for proper HFA detection
+
+- `internal/arch/arm64/implementation.go`
+  - `handleReturn` accepts both retLo and retHi
+  - `handleHFAReturn` uses bit patterns for correct float32/float64
+
+### Contributors
+- @ppoage - ARM64 Darwin fixes, ObjC tests, assembly shim
+
 ## [0.3.6] - 2025-12-29
 
 ### Fixed
