@@ -57,8 +57,8 @@ func TestPrepCIF(t *testing.T) {
 }
 
 func TestCallPrintf(t *testing.T) {
-	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
-		t.Skip("Test requires Linux or Windows")
+	if runtime.GOOS != "linux" && runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		t.Skip("Test requires Linux, Windows, or macOS")
 	}
 
 	var libName, funcName string
@@ -67,6 +67,10 @@ func TestCallPrintf(t *testing.T) {
 	case "linux":
 		// Используем базовое имя, поиск по путям сделает findLibrary
 		libName = "libc.so.6"
+		funcName = "puts"
+		convention = types.UnixCallingConvention
+	case "darwin":
+		libName = "libSystem.B.dylib"
 		funcName = "puts"
 		convention = types.UnixCallingConvention
 	case "windows":
@@ -133,8 +137,8 @@ func TestCallPrintf(t *testing.T) {
 // The API contract (ffi.go line 43) specifies: []unsafe.Pointer{unsafe.Pointer(&arg)}
 // This means avalue[idx] points TO the argument value, so dereference is required.
 func TestPointerArgumentPassing(t *testing.T) {
-	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
-		t.Skip("Test requires Linux or Windows")
+	if runtime.GOOS != "linux" && runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		t.Skip("Test requires Linux, Windows, or macOS")
 	}
 
 	// Test using strlen which takes a pointer and returns its length
@@ -144,6 +148,10 @@ func TestPointerArgumentPassing(t *testing.T) {
 	switch runtime.GOOS {
 	case "linux":
 		libName = "libc.so.6"
+		funcName = "strlen"
+		convention = types.UnixCallingConvention
+	case "darwin":
+		libName = "libSystem.B.dylib"
 		funcName = "strlen"
 		convention = types.UnixCallingConvention
 	case "windows":
@@ -207,8 +215,8 @@ func TestPointerArgumentPassing(t *testing.T) {
 // TestIntegerArgumentTypes verifies all integer types are correctly handled.
 // This is a regression test to ensure consistent dereference pattern across types.
 func TestIntegerArgumentTypes(t *testing.T) {
-	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
-		t.Skip("Test requires Linux or Windows")
+	if runtime.GOOS != "linux" && runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		t.Skip("Test requires Linux, Windows, or macOS")
 	}
 
 	// Use abs() for int32 testing
@@ -218,6 +226,10 @@ func TestIntegerArgumentTypes(t *testing.T) {
 	switch runtime.GOOS {
 	case "linux":
 		libName = "libc.so.6"
+		funcName = "abs"
+		convention = types.UnixCallingConvention
+	case "darwin":
+		libName = "libSystem.B.dylib"
 		funcName = "abs"
 		convention = types.UnixCallingConvention
 	case "windows":

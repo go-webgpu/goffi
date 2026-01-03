@@ -37,6 +37,7 @@ go.work
 # Build artifacts
 *.o
 *.a
+.gocache/
 
 # Project-specific
 gops_config.yaml

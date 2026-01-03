@@ -69,6 +69,33 @@ func TestClassifyReturnHFA(t *testing.T) {
 			expected: types.ReturnHFA4 | types.ReturnInXMM64,
 		},
 		{
+			name: "nested HFA 4 doubles (CGRect)",
+			typ: &types.TypeDescriptor{
+				Kind:      types.StructType,
+				Size:      32,
+				Alignment: 8,
+				Members: []*types.TypeDescriptor{
+					{
+						Kind:      types.StructType,
+						Alignment: 8,
+						Members: []*types.TypeDescriptor{
+							types.DoubleTypeDescriptor,
+							types.DoubleTypeDescriptor,
+						},
+					},
+					{
+						Kind:      types.StructType,
+						Alignment: 8,
+						Members: []*types.TypeDescriptor{
+							types.DoubleTypeDescriptor,
+							types.DoubleTypeDescriptor,
+						},
+					},
+				},
+			},
+			expected: types.ReturnHFA4 | types.ReturnInXMM64,
+		},
+		{
 			name: "HFA 4 floats (CGRect float)",
 			typ: &types.TypeDescriptor{
 				Kind:      types.StructType,
@@ -180,12 +207,70 @@ func TestIsHomogeneousFloatAggregate(t *testing.T) {
 			hfaCount: 2,
 		},
 		{
+			name: "nested 2 doubles (CGSize)",
+			typ: &types.TypeDescriptor{
+				Kind: types.StructType,
+				Members: []*types.TypeDescriptor{
+					{
+						Kind: types.StructType,
+						Members: []*types.TypeDescriptor{
+							types.DoubleTypeDescriptor,
+							types.DoubleTypeDescriptor,
+						},
+					},
+				},
+			},
+			isHFA:    true,
+			hfaCount: 2,
+		},
+		{
+			name: "nested 4 doubles (CGRect)",
+			typ: &types.TypeDescriptor{
+				Kind: types.StructType,
+				Members: []*types.TypeDescriptor{
+					{
+						Kind: types.StructType,
+						Members: []*types.TypeDescriptor{
+							types.DoubleTypeDescriptor,
+							types.DoubleTypeDescriptor,
+						},
+					},
+					{
+						Kind: types.StructType,
+						Members: []*types.TypeDescriptor{
+							types.DoubleTypeDescriptor,
+							types.DoubleTypeDescriptor,
+						},
+					},
+				},
+			},
+			isHFA:    true,
+			hfaCount: 4,
+		},
+		{
 			name: "mixed types (not HFA)",
 			typ: &types.TypeDescriptor{
 				Kind: types.StructType,
 				Members: []*types.TypeDescriptor{
 					types.DoubleTypeDescriptor,
 					types.UInt64TypeDescriptor,
+				},
+			},
+			isHFA:    false,
+			hfaCount: 0,
+		},
+		{
+			name: "nested mixed types (not HFA)",
+			typ: &types.TypeDescriptor{
+				Kind: types.StructType,
+				Members: []*types.TypeDescriptor{
+					{
+						Kind: types.StructType,
+						Members: []*types.TypeDescriptor{
+							types.DoubleTypeDescriptor,
+							types.UInt64TypeDescriptor,
+						},
+					},
 				},
 			},
 			isHFA:    false,
@@ -225,7 +310,7 @@ func TestIsHomogeneousFloatAggregate(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			isHFA, hfaCount := isHomogeneousFloatAggregate(tc.typ)
+			isHFA, hfaCount, _ := isHomogeneousFloatAggregate(tc.typ)
 			if isHFA != tc.isHFA || hfaCount != tc.hfaCount {
 				t.Errorf("isHomogeneousFloatAggregate(%s) = (%v, %d), want (%v, %d)",
 					tc.name, isHFA, hfaCount, tc.isHFA, tc.hfaCount)

@@ -16,6 +16,8 @@ func TestFreeLibrary(t *testing.T) {
 	switch runtime.GOOS {
 	case "linux":
 		libName = "libc.so.6"
+	case "darwin":
+		libName = "libSystem.B.dylib"
 	case "windows":
 		libName = "msvcrt.dll"
 	default:
@@ -42,14 +44,17 @@ func TestFreeLibrary(t *testing.T) {
 
 // TestCallFunctionContext tests context-aware function calls.
 func TestCallFunctionContext(t *testing.T) {
-	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
-		t.Skip("Test requires Linux or Windows")
+	if runtime.GOOS != "linux" && runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		t.Skip("Test requires Linux, Windows, or macOS")
 	}
 
 	var libName, funcName string
 	switch runtime.GOOS {
 	case "linux":
 		libName = "libc.so.6"
+		funcName = "puts"
+	case "darwin":
+		libName = "libSystem.B.dylib"
 		funcName = "puts"
 	case "windows":
 		libName = "msvcrt.dll"

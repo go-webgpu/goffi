@@ -11,8 +11,8 @@ import (
 // BenchmarkGoffiOverhead measures the overhead of goffi FFI call with empty function.
 // This establishes the baseline cost of runtime.cgocall + assembly wrapper.
 func BenchmarkGoffiOverhead(b *testing.B) {
-	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
-		b.Skip("Benchmark requires Linux or Windows")
+	if runtime.GOOS != "linux" && runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		b.Skip("Benchmark requires Linux, Windows, or MacOS")
 	}
 
 	var libName, funcName string
@@ -23,6 +23,9 @@ func BenchmarkGoffiOverhead(b *testing.B) {
 	case "windows":
 		libName = "kernel32.dll"
 		funcName = "GetCurrentProcessId"
+	case "darwin":
+		libName = "libSystem.B.dylib"
+		funcName = "getpid" // Simple syscall wrapper, negligible C cost
 	}
 
 	handle, err := LoadLibrary(libName)
@@ -52,8 +55,8 @@ func BenchmarkGoffiOverhead(b *testing.B) {
 
 // BenchmarkGoffiIntArgs measures performance with integer arguments (GP registers).
 func BenchmarkGoffiIntArgs(b *testing.B) {
-	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
-		b.Skip("Benchmark requires Linux or Windows")
+	if runtime.GOOS != "linux" && runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		b.Skip("Benchmark requires Linux, Windows, or macOS")
 	}
 
 	var libName, funcName string
@@ -61,6 +64,9 @@ func BenchmarkGoffiIntArgs(b *testing.B) {
 	case "linux":
 		libName = "libc.so.6"
 		funcName = "abs" // int abs(int x)
+	case "darwin":
+		libName = "libSystem.B.dylib"
+		funcName = "abs"
 	case "windows":
 		libName = "msvcrt.dll"
 		funcName = "abs"
@@ -98,8 +104,8 @@ func BenchmarkGoffiIntArgs(b *testing.B) {
 
 // BenchmarkGoffiStringOutput measures performance with string output (common case).
 func BenchmarkGoffiStringOutput(b *testing.B) {
-	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
-		b.Skip("Benchmark requires Linux or Windows")
+	if runtime.GOOS != "linux" && runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		b.Skip("Benchmark requires Linux, Windows, or macOS")
 	}
 
 	var libName, funcName string
@@ -107,6 +113,9 @@ func BenchmarkGoffiStringOutput(b *testing.B) {
 	case "linux":
 		libName = "libc.so.6"
 		funcName = "strlen" // size_t strlen(const char* s)
+	case "darwin":
+		libName = "libSystem.B.dylib"
+		funcName = "strlen"
 	case "windows":
 		libName = "msvcrt.dll"
 		funcName = "strlen"
@@ -137,20 +146,29 @@ func BenchmarkGoffiStringOutput(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = CallFunction(cif, sym, unsafe.Pointer(&result), []unsafe.Pointer{strPtr})
+		_ = CallFunction(cif, sym, unsafe.Pointer(&result), []unsafe.Pointer{unsafe.Pointer(&strPtr)})
 	}
 }
 
 // BenchmarkGoffiMultipleArgs measures performance with multiple arguments.
 func BenchmarkGoffiMultipleArgs(b *testing.B) {
-	if runtime.GOOS != "linux" {
-		b.Skip("Benchmark requires Linux (libm)")
+	// Note this segfaults
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		b.Skip("Benchmark requires Linux or macOS (libm)")
 	}
 
-	// pow(double x, double y) - 2 double args, 1 double return (Linux only)
-	handle, err := LoadLibrary("libm.so.6")
+	var libName string
+	switch runtime.GOOS {
+	case "linux":
+		libName = "libm.so.6"
+	case "darwin":
+		libName = "libm.dylib"
+	}
+
+	// pow(double x, double y) - 2 double args, 1 double return
+	handle, err := LoadLibrary(libName)
 	if err != nil {
-		b.Skipf("LoadLibrary(libm.so.6) failed: %v", err)
+		b.Skipf("LoadLibrary(%s) failed: %v", libName, err)
 		return
 	}
 	defer FreeLibrary(handle)
@@ -222,14 +240,16 @@ func BenchmarkPrepareCallInterface(b *testing.B) {
 
 // BenchmarkLoadLibrary measures dynamic library loading overhead.
 func BenchmarkLoadLibrary(b *testing.B) {
-	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
-		b.Skip("Benchmark requires Linux or Windows")
+	if runtime.GOOS != "linux" && runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		b.Skip("Benchmark requires Linux, Windows, or macOS")
 	}
 
 	var libName string
 	switch runtime.GOOS {
 	case "linux":
 		libName = "libc.so.6"
+	case "darwin":
+		libName = "libSystem.B.dylib"
 	case "windows":
 		libName = "kernel32.dll"
 	}
@@ -246,8 +266,8 @@ func BenchmarkLoadLibrary(b *testing.B) {
 
 // BenchmarkGetSymbol measures symbol lookup overhead.
 func BenchmarkGetSymbol(b *testing.B) {
-	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
-		b.Skip("Benchmark requires Linux or Windows")
+	if runtime.GOOS != "linux" && runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		b.Skip("Benchmark requires Linux, Windows, or macOS")
 	}
 
 	var libName, funcName string
@@ -255,6 +275,9 @@ func BenchmarkGetSymbol(b *testing.B) {
 	case "linux":
 		libName = "libc.so.6"
 		funcName = "strlen"
+	case "darwin":
+		libName = "libSystem.B.dylib"
+		funcName = "getpid"
 	case "windows":
 		libName = "kernel32.dll"
 		funcName = "GetCurrentProcessId"
