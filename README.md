@@ -39,6 +39,28 @@ ffi.CallFunction(&cif, wgpuCreateInstance, &result, args)
 go get github.com/go-webgpu/goffi
 ```
 
+### Requirements
+
+goffi requires `CGO_ENABLED=0` to build. This is automatic when:
+- No C compiler is installed, or
+- Cross-compiling to a different OS/architecture
+
+If you have gcc/clang installed and get build errors, use:
+
+```bash
+CGO_ENABLED=0 go build ./...
+```
+
+Or set it permanently:
+
+```bash
+go env -w CGO_ENABLED=0
+```
+
+> **Why?** goffi uses Go's `cgo_import_dynamic` mechanism for dynamic library loading,
+> which only works when CGO is disabled. This allows goffi to call C functions without
+> requiring a C compiler at build time.
+
 ### Basic Example
 
 ```go
@@ -348,4 +370,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 **Made with ❤️ for GPU computing in pure Go**
 
-*Last updated: 2026-01-03 | goffi v0.3.7*
+*Last updated: 2026-01-24 | goffi v0.3.8*

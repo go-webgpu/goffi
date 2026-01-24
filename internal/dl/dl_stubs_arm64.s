@@ -1,4 +1,4 @@
-//go:build (linux || darwin) && arm64
+//go:build (linux || darwin) && arm64 && !cgo
 
 #include "textflag.h"
 
