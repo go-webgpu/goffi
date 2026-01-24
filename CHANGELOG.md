@@ -12,6 +12,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.5.0: Builder pattern API, variadic functions
 - v1.0.0: LTS release with API stability guarantee
 
+## [0.3.8] - 2026-01-24
+
+### Fixed
+- **CGO_ENABLED=1 build error handling** ([gogpu/wgpu#43](https://github.com/gogpu/wgpu/issues/43))
+  - Users on Linux/macOS with gcc/clang installed got confusing linker errors
+  - Root cause: Assembly files compiled under CGO=1 but referenced undefined symbols
+  - Solution: Enterprise-grade error handling with compile-time + runtime guards
+
+### Added
+- **Compile-time CGO detection** with descriptive error identifier
+  - `undefined: GOFFI_REQUIRES_CGO_ENABLED_0` - immediately clear what's wrong
+  - Godoc comment in `cgo_unsupported.go` with full instructions
+  - Runtime panic fallback with detailed fix instructions
+
+- **Requirements section in README.md**
+  - Clear documentation that `CGO_ENABLED=0` is required
+  - Three options for setting CGO_ENABLED
+  - Explanation of why this is needed (cgo_import_dynamic mechanism)
+
+### Changed
+- `internal/dl/dl_stubs_unix.s` - Added `!cgo` build constraint
+- `internal/dl/dl_wrappers_unix.s` - Added `!cgo` build constraint
+- `internal/dl/dl_stubs_arm64.s` - Added `!cgo` build constraint
+- `internal/dl/dl_wrappers_arm64.s` - Added `!cgo` build constraint
+- `ffi/dl_unix.go` - Added `!cgo` build constraint
+- `ffi/dl_darwin.go` - Added `!cgo` build constraint
+
+### Technical Details
+- goffi uses `cgo_import_dynamic` for dynamic library loading without CGO
+- This mechanism only works when `CGO_ENABLED=0`
+- On Linux/macOS with C compiler installed, Go defaults to `CGO_ENABLED=1`
+- New error handling provides clear guidance instead of cryptic linker errors
+
 ## [0.3.7] - 2026-01-03
 
 ### Added
@@ -630,7 +663,11 @@ See [API_TODO.md](docs/dev/API_TODO.md) for detailed roadmap to v1.0.
 
 ---
 
-[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.3.4...HEAD
+[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.3.8...HEAD
+[0.3.8]: https://github.com/go-webgpu/goffi/compare/v0.3.7...v0.3.8
+[0.3.7]: https://github.com/go-webgpu/goffi/compare/v0.3.6...v0.3.7
+[0.3.6]: https://github.com/go-webgpu/goffi/compare/v0.3.5...v0.3.6
+[0.3.5]: https://github.com/go-webgpu/goffi/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/go-webgpu/goffi/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/go-webgpu/goffi/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/go-webgpu/goffi/compare/v0.3.1...v0.3.2

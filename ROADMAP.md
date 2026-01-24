@@ -3,7 +3,7 @@
 > **Strategic Approach**: Build production-ready Zero-CGO FFI with benchmarked performance
 > **Philosophy**: Performance first, usability second, platform coverage third
 
-**Last Updated**: 2025-11-28 | **Current Version**: v0.2.1 | **Strategy**: Benchmarks → Callbacks → ARM64 → API → v1.0 LTS | **Milestone**: v0.2.1 RELEASED! → v0.3.0 ARM64 (Q1 2025) → v1.0.0 LTS (Q1 2026)
+**Last Updated**: 2026-01-24 | **Current Version**: v0.3.8 | **Strategy**: Benchmarks → Callbacks → ARM64 → API → v1.0 LTS | **Milestone**: v0.3.8 RELEASED! → v0.5.0 Usability (Q2 2025) → v1.0.0 LTS (Q1 2026)
 
 ---
 
@@ -47,8 +47,10 @@ v0.1.1 (macOS SUPPORT) ✅ RELEASED 2025-11-18
 v0.2.0 (CALLBACKS) ✅ RELEASED 2025-11-27
          ↓ (1 day - Windows hotfix)
 v0.2.1 (WINDOWS HOTFIX) ✅ RELEASED 2025-11-27
-         ↓ (in progress - ARM64 implementation)
-v0.3.0 (ARM64 SUPPORT) → Q1 2025
+         ↓ (ARM64 implementation)
+v0.3.0-v0.3.7 (ARM64 SUPPORT) ✅ RELEASED 2025-12-29
+         ↓ (CGO error handling)
+v0.3.8 (CGO ERROR HANDLING) ✅ RELEASED 2026-01-24
          ↓ (2-3 months)
 v0.5.0 (USABILITY + VARIADIC) → Q2 2025
          ↓ (2-3 months)
@@ -83,11 +85,17 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 - SEH exception limitation documented
 - Platform-specific callback implementations
 
-**v0.3.0** = ARM64 support 🟡 IN DEVELOPMENT
+**v0.3.0-v0.3.7** = ARM64 support ✅ RELEASED (2025-12-29)
 - **ARM64 architecture support** (Linux + macOS AAPCS64 ABI)
-- Cross-compile verified, awaiting real hardware testing
-- Feature branch: `feature/arm64-support`
-- Requested by: go-webgpu project (Apple Silicon support)
+- Tested on Apple Silicon M3 Pro (64 ns/op)
+- HFA returns, nested structs, mixed int/float support
+- Contributed by: @ppoage (PR #9)
+
+**v0.3.8** = CGO error handling ✅ RELEASED (2026-01-24)
+- **Enterprise-grade CGO_ENABLED=1 error handling**
+- Compile-time assertion: `GOFFI_REQUIRES_CGO_ENABLED_0`
+- Clear documentation in README.md Requirements section
+- Fixes confusing linker errors on Linux/macOS with gcc/clang
 
 **v0.5.0** = Usability + Variadic (Q2 2025)
 - Builder pattern API
@@ -102,36 +110,40 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 
 ---
 
-## 📊 Current Status (v0.1.0)
+## 📊 Current Status (v0.3.8)
 
-**Phase**: ✅ Performance Validated + Production Ready
+**Phase**: ✅ ARM64 Complete + Production Ready
 
 **What Works**:
 - ✅ Dynamic library loading (`LoadLibrary`, `GetSymbol`, `FreeLibrary`)
 - ✅ Function call interface (`PrepareCallInterface`)
 - ✅ Function execution (`CallFunction`, `CallFunctionContext`)
-- ✅ **Benchmarks**: 88-114 ns/op FFI overhead ✨
+- ✅ **Benchmarks**: 64-114 ns/op FFI overhead ✨
 - ✅ **Typed errors**: 5 error types with `errors.As()` support
 - ✅ **Context support**: Timeouts and cancellation
-- ✅ **Cross-platform**: Linux + Windows AMD64
+- ✅ **Cross-platform**: Linux + Windows + macOS (AMD64 + ARM64)
 - ✅ **Type system**: Predefined descriptors for common types
-- ✅ **89.1% test coverage** (exceeded 80% target)
+- ✅ **Callbacks**: C-to-Go function calls (2000 entries)
+- ✅ **89.6% test coverage** (exceeded 80% target)
 
 **Performance**:
-- ✅ BenchmarkGoffiOverhead: **88.09 ns/op** (empty function)
-- ✅ BenchmarkGoffiIntArgs: **113.9 ns/op** (integer args)
-- ✅ BenchmarkGoffiStringOutput: **97.81 ns/op** (string processing)
-- ✅ BenchmarkDirectGo: **0.21 ns/op** (baseline)
+- ✅ AMD64: **88-114 ns/op** (Intel i7-1255U)
+- ✅ ARM64: **64 ns/op** (Apple M3 Pro)
 - ✅ **Verdict**: < 5% overhead for WebGPU operations (target achieved!)
 
 **Platform Support**:
 - ✅ Linux AMD64 (System V ABI)
 - ✅ Windows AMD64 (Win64 ABI)
-- ✅ macOS AMD64 (System V ABI) - v0.1.1
-- 🟡 ARM64 Linux/macOS (AAPCS64 ABI) - in development for v0.3.0
+- ✅ macOS AMD64 (System V ABI)
+- ✅ Linux ARM64 (AAPCS64 ABI)
+- ✅ macOS ARM64 (AAPCS64 ABI) - Apple Silicon M1/M2/M3/M4
+
+**Requirements**:
+- ✅ `CGO_ENABLED=0` required (clear error message if CGO_ENABLED=1)
+- ✅ Go 1.21+ recommended
 
 **Documentation**:
-- ✅ README.md with real benchmarks
+- ✅ README.md with benchmarks and requirements
 - ✅ docs/PERFORMANCE.md (comprehensive guide)
 - ✅ CHANGELOG.md with migration guide
 - ✅ CONTRIBUTING.md
@@ -141,35 +153,6 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 ---
 
 ## 📅 What's Next
-
-### **v0.3.0 - ARM64 Support** (Q1 2025) 🟡 IN DEVELOPMENT
-
-**Goal**: Full ARM64 platform support for Apple Silicon and Linux ARM64
-
-**Status**: Cross-compile verified, awaiting real hardware testing
-
-**Completed**:
-- ✅ `internal/arch/arm64/` - Implementation, classification, call_unix
-- ✅ `internal/syscall/arm64` - Call8Float wrapper and assembly
-- ✅ `internal/dl/arm64` - Dynamic loader stubs and wrappers
-- ✅ `ffi/callback_arm64` - 2000-entry trampoline table
-- ✅ Cross-compile: `GOOS=linux GOARCH=arm64` builds
-- ✅ Cross-compile: `GOOS=darwin GOARCH=arm64` builds (Apple Silicon)
-
-**Pending**:
-- [ ] Real ARM64 hardware testing (Linux ARM64 / macOS M1+)
-- [ ] CI/CD ARM64 runners (GitHub Actions `macos-latest`)
-- [ ] Performance benchmarks on ARM64
-- [ ] Documentation updates
-
-**ARM64 AAPCS64 ABI Implementation**:
-- X0-X7: 8 integer/pointer registers
-- D0-D7: 8 floating-point registers
-- X8: Indirect result location
-- Homogeneous Floating-point Aggregate (HFA) support
-- 2000 callback trampolines
-
----
 
 ### **v0.5.0 - Usability + Variadic** (Q2 2025)
 
@@ -306,11 +289,12 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 
 ## 📊 Quality Metrics
 
-**Current (v0.1.0)**:
-- ✅ Test coverage: 89.1% (target: 80%+)
+**Current (v0.3.8)**:
+- ✅ Test coverage: 89.6% (target: 80%+)
 - ✅ Linter issues: 0
-- ✅ Benchmarks: 88-114 ns/op
-- ✅ Platforms: 2 (Linux, Windows AMD64)
+- ✅ Benchmarks: 64-114 ns/op (AMD64 + ARM64)
+- ✅ Platforms: 5 (Linux, Windows, macOS × AMD64/ARM64)
+- ✅ CGO requirement: Clear error message
 
 **Target (v1.0.0)**:
 - 🎯 Test coverage: 90%+
@@ -361,5 +345,5 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 
 ---
 
-*Version 1.1 (Updated 2025-11-28)*
-*Current: v0.2.1 (Callbacks + Windows Hotfix) | Phase: ARM64 Development | Next: v0.3.0 (ARM64) | Target: v1.0.0 LTS (Q1 2026)*
+*Version 1.2 (Updated 2026-01-24)*
+*Current: v0.3.8 (ARM64 + CGO Error Handling) | Phase: Production Ready | Next: v0.5.0 (Usability) | Target: v1.0.0 LTS (Q1 2026)*
