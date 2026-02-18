@@ -12,7 +12,7 @@ import (
 const callbackFloatRegCount = 8
 
 func callbackEntrySize() uintptr {
-	return callbackasmAddr(1) - callbackasmAddr(0)
+	return trampolineEntryAddr(1) - trampolineEntryAddr(0)
 }
 
 func callbackIndex(ptr uintptr) uintptr {
@@ -20,7 +20,7 @@ func callbackIndex(ptr uintptr) uintptr {
 	if entrySize == 0 {
 		return 0
 	}
-	return (ptr - callbackasmABI0) / entrySize
+	return (ptr - trampolineBaseAddr) / entrySize
 }
 
 func callbackIntRegCount() int {
@@ -52,8 +52,8 @@ func TestNewCallback_BasicRegistration(t *testing.T) {
 
 	// Verify pointer is within expected range
 	entrySize := callbackEntrySize()
-	baseAddr := callbackasmABI0
-	maxAddr := callbackasmABI0 + uintptr(maxCallbacks)*entrySize
+	baseAddr := trampolineBaseAddr
+	maxAddr := trampolineBaseAddr + uintptr(maxCallbacks)*entrySize
 
 	if ptr < baseAddr || ptr >= maxAddr {
 		t.Errorf("Callback pointer %x outside expected range [%x, %x)", ptr, baseAddr, maxAddr)

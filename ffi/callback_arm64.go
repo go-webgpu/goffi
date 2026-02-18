@@ -55,7 +55,7 @@ func NewCallback(fn any) uintptr {
 	callbacks.funcs[idx] = val
 	callbacks.count++
 
-	return callbackasmAddr(idx)
+	return trampolineEntryAddr(idx)
 }
 
 // validateCallbackSignature checks if a function type is valid for callbacks.
@@ -94,11 +94,11 @@ func validateCallbackSignature(typ reflect.Type) {
 	}
 }
 
-// callbackasmAddr calculates the address of a specific trampoline entry.
+// trampolineEntryAddr calculates the address of a specific trampoline entry.
 // Each trampoline entry is 8 bytes on ARM64.
-func callbackasmAddr(i int) uintptr {
+func trampolineEntryAddr(i int) uintptr {
 	const entrySize = 8 // ARM64: BL + MOV instructions
-	return callbackasmABI0 + uintptr(i*entrySize)
+	return trampolineBaseAddr + uintptr(i*entrySize)
 }
 
 // callbackWrap is called from assembly trampolines to invoke the actual Go callback.
@@ -232,8 +232,8 @@ func callbackWrap(a *callbackArgs) {
 	}
 }
 
-// callbackasmABI0 is the address of the callback assembly trampoline table.
+// trampolineBaseAddr is the address of the callback assembly trampoline table.
 //
-//go:linkname __callbackasm callbackasm
-var __callbackasm byte
-var callbackasmABI0 = uintptr(unsafe.Pointer(&__callbackasm))
+//go:linkname _callbackTrampoline github.com/go-webgpu/goffi/ffi.callbackTrampoline
+var _callbackTrampoline byte
+var trampolineBaseAddr = uintptr(unsafe.Pointer(&_callbackTrampoline))

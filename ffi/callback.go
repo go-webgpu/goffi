@@ -89,7 +89,7 @@ func NewCallback(fn any) uintptr {
 	callbacks.count++
 
 	// Return address to corresponding trampoline entry
-	return callbackasmAddr(idx)
+	return trampolineEntryAddr(idx)
 }
 
 // validateCallbackSignature checks if a function type is valid for callbacks.
@@ -131,15 +131,15 @@ func validateCallbackSignature(typ reflect.Type) {
 	}
 }
 
-// callbackasmAddr calculates the address of a specific trampoline entry.
+// trampolineEntryAddr calculates the address of a specific trampoline entry.
 // Each trampoline entry is 5 bytes (CALL instruction) on AMD64.
 // The calculation is: base_address + (index * entry_size).
 //
 // This function is called by NewCallback to get the C-callable function pointer
 // for a registered Go callback.
-func callbackasmAddr(i int) uintptr {
+func trampolineEntryAddr(i int) uintptr {
 	const entrySize = 5 // AMD64: CALL instruction = 5 bytes
-	return callbackasmABI0 + uintptr(i*entrySize)
+	return trampolineBaseAddr + uintptr(i*entrySize)
 }
 
 // callbackWrap is called from assembly trampolines to invoke the actual Go callback.
@@ -309,10 +309,10 @@ func callbackWrap(a *callbackArgs) {
 	}
 }
 
-// callbackasmABI0 is the address of the callback assembly trampoline table.
-// This variable is linked to the callbackasm symbol defined in callback_amd64.s.
+// trampolineBaseAddr is the address of the callback assembly trampoline table.
+// This variable is linked to the callbackTrampoline symbol defined in callback_amd64.s.
 // Using //go:linkname allows us to access the assembly symbol from Go code.
 //
-//go:linkname __callbackasm callbackasm
-var __callbackasm byte
-var callbackasmABI0 = uintptr(unsafe.Pointer(&__callbackasm))
+//go:linkname _callbackTrampoline github.com/go-webgpu/goffi/ffi.callbackTrampoline
+var _callbackTrampoline byte
+var trampolineBaseAddr = uintptr(unsafe.Pointer(&_callbackTrampoline))
