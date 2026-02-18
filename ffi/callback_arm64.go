@@ -55,7 +55,7 @@ func NewCallback(fn any) uintptr {
 	callbacks.funcs[idx] = val
 	callbacks.count++
 
-	return callbackasmAddr(idx)
+	return trampolineEntryAddr(idx)
 }
 
 // validateCallbackSignature checks if a function type is valid for callbacks.
@@ -94,14 +94,24 @@ func validateCallbackSignature(typ reflect.Type) {
 	}
 }
 
-// callbackasmAddr calculates the address of a specific trampoline entry.
-// Each trampoline entry is 8 bytes on ARM64.
-func callbackasmAddr(i int) uintptr {
-	const entrySize = 8 // ARM64: BL + MOV instructions
-	return callbackasmABI0 + uintptr(i*entrySize)
+// trampolineEntryAddr calculates the address of a specific trampoline entry.
+// Each trampoline entry is 8 bytes on ARM64 (MOVD $index, R12 = 4 bytes + B dispatcher = 4 bytes).
+func trampolineEntryAddr(i int) uintptr {
+	const entrySize = 8 // ARM64: MOVD (4 bytes) + B (4 bytes)
+	return trampolineBaseAddr + uintptr(i*entrySize)
 }
 
 // callbackWrap is called from assembly trampolines to invoke the actual Go callback.
+//
+// IMPORTANT: The assembly dispatcher calls this function directly (BL ·callbackWrap),
+// bypassing crosscall2/runtime.cgocallback. This means:
+//   - Safe when callback arrives on a Go-managed thread (G is already loaded)
+//   - Unsafe if a C library calls the callback from its own thread (G = nil → crash)
+//   - GC is not notified of the C→Go transition (risk during long callbacks)
+//
+// For the primary use case (WebGPU callbacks on the submitting thread), this is correct.
+// See TASK-012 for planned crosscall2 integration to support arbitrary C threads.
+//
 // ARM64 AAPCS64 argument block layout:
 //   - Floats: D0-D7 (8 registers, 64 bytes)
 //   - Integers: X0-X7 (8 registers, 64 bytes)
@@ -232,8 +242,8 @@ func callbackWrap(a *callbackArgs) {
 	}
 }
 
-// callbackasmABI0 is the address of the callback assembly trampoline table.
+// trampolineBaseAddr is the address of the callback assembly trampoline table.
 //
-//go:linkname __callbackasm callbackasm
-var __callbackasm byte
-var callbackasmABI0 = uintptr(unsafe.Pointer(&__callbackasm))
+//go:linkname _callbackTrampoline github.com/go-webgpu/goffi/ffi.callbackTrampoline
+var _callbackTrampoline byte
+var trampolineBaseAddr = uintptr(unsafe.Pointer(&_callbackTrampoline))

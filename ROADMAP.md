@@ -3,7 +3,7 @@
 > **Strategic Approach**: Build production-ready Zero-CGO FFI with benchmarked performance
 > **Philosophy**: Performance first, usability second, platform coverage third
 
-**Last Updated**: 2026-01-24 | **Current Version**: v0.3.8 | **Strategy**: Benchmarks → Callbacks → ARM64 → API → v1.0 LTS | **Milestone**: v0.3.8 RELEASED! → v0.5.0 Usability (Q2 2025) → v1.0.0 LTS (Q1 2026)
+**Last Updated**: 2026-02-18 | **Current Version**: v0.3.9 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → API → v1.0 LTS | **Milestone**: v0.3.9 (callback fixes) → v0.4.0 (crosscall2) → v0.5.0 Usability → v1.0.0 LTS
 
 ---
 
@@ -51,10 +51,14 @@ v0.2.1 (WINDOWS HOTFIX) ✅ RELEASED 2025-11-27
 v0.3.0-v0.3.7 (ARM64 SUPPORT) ✅ RELEASED 2025-12-29
          ↓ (CGO error handling)
 v0.3.8 (CGO ERROR HANDLING) ✅ RELEASED 2026-01-24
-         ↓ (2-3 months)
-v0.5.0 (USABILITY + VARIADIC) → Q2 2025
-         ↓ (2-3 months)
-v0.8.0 (ADVANCED FEATURES) → Q3 2025
+         ↓ (callback fixes)
+v0.3.9 (CALLBACK FIXES) → 2026-02 (in progress)
+         ↓ (runtime integration)
+v0.4.0 (CROSSCALL2 INTEGRATION) → 2026 Q1-Q2
+         ↓ (usability)
+v0.5.0 (USABILITY + VARIADIC) → 2026 Q2-Q3
+         ↓ (advanced features)
+v0.8.0 (ADVANCED FEATURES) → 2026 Q3-Q4
          ↓ (community adoption + validation)
 v1.0.0 LTS → Long-term support release (Q1 2026)
 ```
@@ -97,7 +101,17 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 - Clear documentation in README.md Requirements section
 - Fixes confusing linker errors on Linux/macOS with gcc/clang
 
-**v0.5.0** = Usability + Variadic (Q2 2025)
+**v0.3.9** = Callback fixes (2026-02, in progress)
+- **ARM64 callback trampoline rewrite** (BL→MOVD+B)
+- **Symbol rename** to avoid purego linker collision ([#15](https://github.com/go-webgpu/goffi/issues/15))
+- Package-scoped assembly symbols (`·callbackTrampoline`/`·callbackDispatcher`)
+
+**v0.4.0** = Runtime integration (2026 Q1-Q2)
+- **crosscall2 integration** for C-thread callbacks ([#16](https://github.com/go-webgpu/goffi/issues/16))
+- Proper C→Go transition: `runtime·load_g` + `runtime·cgocallback`
+- Support callbacks from arbitrary C threads (wgpu-native internal threads)
+
+**v0.5.0** = Usability + Variadic (2026 Q2-Q3)
 - Builder pattern API
 - Platform-specific struct handling
 - **Variadic function support** (printf, sprintf, etc.)
@@ -110,9 +124,9 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 
 ---
 
-## 📊 Current Status (v0.3.8)
+## 📊 Current Status (v0.3.9)
 
-**Phase**: ✅ ARM64 Complete + Production Ready
+**Phase**: Callback fixes + ARM64 trampoline rewrite
 
 **What Works**:
 - ✅ Dynamic library loading (`LoadLibrary`, `GetSymbol`, `FreeLibrary`)
@@ -289,7 +303,7 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 
 ## 📊 Quality Metrics
 
-**Current (v0.3.8)**:
+**Current (v0.3.9)**:
 - ✅ Test coverage: 89.6% (target: 80%+)
 - ✅ Linter issues: 0
 - ✅ Benchmarks: 64-114 ns/op (AMD64 + ARM64)
@@ -345,5 +359,5 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 
 ---
 
-*Version 1.2 (Updated 2026-01-24)*
-*Current: v0.3.8 (ARM64 + CGO Error Handling) | Phase: Production Ready | Next: v0.5.0 (Usability) | Target: v1.0.0 LTS (Q1 2026)*
+*Version 1.3 (Updated 2026-02-18)*
+*Current: v0.3.9 (Callback fixes) | Next: v0.4.0 (crosscall2) | Target: v1.0.0 LTS*

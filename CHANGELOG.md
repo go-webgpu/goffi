@@ -5,12 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.9] - 2026-02-18
+
+### Fixed
+- **ARM64 callback trampoline: BL overwrites LR** (Critical, [#15](https://github.com/go-webgpu/goffi/issues/15))
+  - `BL` (Branch-with-Link) was destroying C caller's return address in LR register
+  - Rewrote all 2000 trampoline entries to `MOVD $index, R12` + `B` (Branch without Link)
+  - Matches Go runtime (`zcallback_windows_arm64.s`) and purego (`zcallback_arm64.s`) patterns
+  - New dispatcher saves/restores R27 (callee-saved, used by Go assembler) and R30 (LR)
+  - 176-byte stack frame, 16-byte aligned per AAPCS64
+  - `entrySize` comment updated: `MOVD (4 bytes) + B (4 bytes) = 8 bytes`
+
+- **Callback assembly symbol collision with purego** ([#15](https://github.com/go-webgpu/goffi/issues/15))
+  - Global symbols `callbackasm`/`callbackasm1` conflicted with purego when linked together
+  - Renamed to package-scoped middot symbols (`·callbackTrampoline`/`·callbackDispatcher`)
+  - At link time these become `github.com/go-webgpu/goffi/ffi.callbackTrampoline` — no collision
+  - Go variable/function names updated for consistency:
+    - `callbackasmAddr` → `trampolineEntryAddr`
+    - `callbackasmABI0` → `trampolineBaseAddr`
+
+### Known Limitations
+- **Callback dispatcher bypasses crosscall2** ([#16](https://github.com/go-webgpu/goffi/issues/16))
+  - Callbacks work correctly on Go-managed threads (primary WebGPU use case)
+  - Callbacks on C-library-created threads will crash (G = nil)
+  - Planned fix: crosscall2 integration in v0.4.0
 
 ### Planned
 - See [ROADMAP.md](ROADMAP.md) for upcoming features
-- v0.5.0: Builder pattern API, variadic functions
-- v1.0.0: LTS release with API stability guarantee
 
 ## [0.3.8] - 2026-01-24
 
@@ -664,6 +685,7 @@ See [API_TODO.md](docs/dev/API_TODO.md) for detailed roadmap to v1.0.
 ---
 
 [Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.3.8...HEAD
+[0.3.9]: https://github.com/go-webgpu/goffi/compare/v0.3.8...v0.3.9
 [0.3.8]: https://github.com/go-webgpu/goffi/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/go-webgpu/goffi/compare/v0.3.6...v0.3.7
 [0.3.6]: https://github.com/go-webgpu/goffi/compare/v0.3.5...v0.3.6
