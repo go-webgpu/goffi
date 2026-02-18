@@ -2069,8 +2069,14 @@ TEXT ·callbackDispatcher(SB), NOSPLIT|NOFRAME, $0
 	MOVQ $0, 16(SP)     // callbackArgs.result = 0
 
 	// Call Go function: callbackWrap(*callbackArgs)
+	//
+	// NOTE: We call callbackWrap directly, bypassing the
+	// crosscall2 → runtime·load_g → runtime·cgocallback chain that
+	// purego uses. This is safe when the callback arrives on a Go-managed
+	// thread (the primary WebGPU use case), but will crash if a C library
+	// invokes the callback from its own internally-created thread (G = nil).
+	// See TASK-012 for planned crosscall2 integration.
 	LEAQ 0(SP), AX      // AX = &callbackArgs
-	// Call callbackWrap directly
 	CALL ·callbackWrap(SB)
 
 	// Retrieve result

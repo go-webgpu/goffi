@@ -149,6 +149,15 @@ func trampolineEntryAddr(i int) uintptr {
 //   - Calling the Go function
 //   - Marshaling the return value back to C format
 //
+// IMPORTANT: The assembly dispatcher calls this function directly (CALL ·callbackWrap),
+// bypassing crosscall2/runtime.cgocallback. This means:
+//   - Safe when callback arrives on a Go-managed thread (G is already loaded)
+//   - Unsafe if a C library calls the callback from its own thread (G = nil → crash)
+//   - GC is not notified of the C→Go transition (risk during long callbacks)
+//
+// For the primary use case (WebGPU callbacks on the submitting thread), this is correct.
+// See TASK-012 for planned crosscall2 integration to support arbitrary C threads.
+//
 // The assembly trampoline (callback_amd64.s) has already saved all CPU registers
 // into a contiguous memory block pointed to by a.args. The memory layout follows
 // the System V AMD64 ABI:

@@ -24,7 +24,7 @@ ffi.CallFunction(&cif, wgpuCreateInstance, &result, args)
 - **🚫 Zero CGO** - Pure Go, no C compiler needed
 - **⚡ Fast** - ~100ns FFI overhead ([benchmarks](#performance))
 - **🌐 Cross-platform** - Windows + Linux + macOS (AMD64 + ARM64)
-- **🔄 Callbacks** - C-to-Go function calls for async APIs (v0.2.0)
+- **🔄 Callbacks** - C-to-Go function calls for async APIs (compatible with purego)
 - **🔒 Type-safe** - Runtime type validation with detailed errors
 - **📦 Production-ready** - 87% test coverage, comprehensive error handling
 - **🎯 WebGPU-optimized** - Designed for wgpu-native bindings
@@ -167,6 +167,7 @@ See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for comprehensive analysis, optim
 - **Composite types** (structs) require manual initialization
 - **Cannot interrupt** C functions mid-execution (use `CallFunctionContext` for timeouts)
 - **ARM64** - Tested on Apple Silicon (M3 Pro), Linux ARM64 cross-compile verified
+- **Callbacks on C-threads** - Callbacks work on Go-managed threads; C-library-created threads not yet supported ([#16](https://github.com/go-webgpu/goffi/issues/16))
 - **No bitfields** in structs
 
 See [CHANGELOG.md](CHANGELOG.md#known-limitations) for full details.
@@ -285,7 +286,15 @@ See [docs/dev/TECHNICAL_ARCHITECTURE.md](docs/dev/TECHNICAL_ARCHITECTURE.md) for
 - 2000-entry callback trampolines for ARM64
 - Tested on Apple Silicon M3 Pro
 
-### v0.5.0 - Usability + Variadic (Q2 2025)
+### v0.3.9 - Callback Fixes (in progress)
+- **ARM64 callback trampoline rewrite** (BL→MOVD+B, matching Go runtime/purego)
+- **Symbol rename** to avoid linker collision with purego ([#15](https://github.com/go-webgpu/goffi/issues/15))
+- Package-scoped assembly symbols (`·callbackTrampoline`/`·callbackDispatcher`)
+
+### v0.4.0 - Runtime Integration (next)
+- **crosscall2 integration** for callbacks on C-created threads ([#16](https://github.com/go-webgpu/goffi/issues/16))
+
+### v0.5.0 - Usability + Variadic
 - Builder pattern API: `lib.Call("func").Arg(...).ReturnInt()`
 - **Variadic function support** (printf, sprintf, etc.)
 - Platform-specific struct alignment (Windows `#pragma pack`)
@@ -370,4 +379,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 **Made with ❤️ for GPU computing in pure Go**
 
-*Last updated: 2026-01-24 | goffi v0.3.8*
+*Last updated: 2026-02-18 | goffi v0.3.9*
