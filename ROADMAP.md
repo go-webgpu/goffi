@@ -3,7 +3,7 @@
 > **Strategic Approach**: Build production-ready Zero-CGO FFI with benchmarked performance
 > **Philosophy**: Performance first, usability second, platform coverage third
 
-**Last Updated**: 2026-02-18 | **Current Version**: v0.3.9 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → API → v1.0 LTS | **Milestone**: v0.3.9 (callback fixes) → v0.4.0 (crosscall2) → v0.5.0 Usability → v1.0.0 LTS
+**Last Updated**: 2026-02-27 | **Current Version**: v0.4.0 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → API → v1.0 LTS | **Milestone**: v0.4.0 (crosscall2) → v0.5.0 Usability → v1.0.0 LTS
 
 ---
 
@@ -52,9 +52,9 @@ v0.3.0-v0.3.7 (ARM64 SUPPORT) ✅ RELEASED 2025-12-29
          ↓ (CGO error handling)
 v0.3.8 (CGO ERROR HANDLING) ✅ RELEASED 2026-01-24
          ↓ (callback fixes)
-v0.3.9 (CALLBACK FIXES) → 2026-02 (in progress)
+v0.3.9 (CALLBACK FIXES) ✅ RELEASED 2026-02-18
          ↓ (runtime integration)
-v0.4.0 (CROSSCALL2 INTEGRATION) → 2026 Q1-Q2
+v0.4.0 (CROSSCALL2 INTEGRATION) ✅ RELEASED 2026-02-27
          ↓ (usability)
 v0.5.0 (USABILITY + VARIADIC) → 2026 Q2-Q3
          ↓ (advanced features)
@@ -101,15 +101,16 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 - Clear documentation in README.md Requirements section
 - Fixes confusing linker errors on Linux/macOS with gcc/clang
 
-**v0.3.9** = Callback fixes (2026-02, in progress)
+**v0.3.9** = Callback fixes ✅ RELEASED (2026-02-18)
 - **ARM64 callback trampoline rewrite** (BL→MOVD+B)
 - **Symbol rename** to avoid purego linker collision ([#15](https://github.com/go-webgpu/goffi/issues/15))
 - Package-scoped assembly symbols (`·callbackTrampoline`/`·callbackDispatcher`)
 
-**v0.4.0** = Runtime integration (2026 Q1-Q2)
+**v0.4.0** = Runtime integration ✅ RELEASED (2026-02-27)
 - **crosscall2 integration** for C-thread callbacks ([#16](https://github.com/go-webgpu/goffi/issues/16))
-- Proper C→Go transition: `runtime·load_g` + `runtime·cgocallback`
-- Support callbacks from arbitrary C threads (wgpu-native internal threads)
+- Proper C→Go transition: `crosscall2 → runtime·load_g → runtime·cgocallback`
+- Support callbacks from arbitrary C threads (Metal, wgpu-native internal threads)
+- fakecgo trampoline register fixes (synced with purego v0.10.0)
 
 **v0.5.0** = Usability + Variadic (2026 Q2-Q3)
 - Builder pattern API
@@ -124,9 +125,9 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 
 ---
 
-## 📊 Current Status (v0.3.9)
+## 📊 Current Status (v0.4.0)
 
-**Phase**: Callback fixes + ARM64 trampoline rewrite
+**Phase**: crosscall2 integration complete, C-thread callback support
 
 **What Works**:
 - ✅ Dynamic library loading (`LoadLibrary`, `GetSymbol`, `FreeLibrary`)
@@ -303,7 +304,7 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 
 ## 📊 Quality Metrics
 
-**Current (v0.3.9)**:
+**Current (v0.4.0)**:
 - ✅ Test coverage: 89.6% (target: 80%+)
 - ✅ Linter issues: 0
 - ✅ Benchmarks: 64-114 ns/op (AMD64 + ARM64)
@@ -359,5 +360,5 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 
 ---
 
-*Version 1.3 (Updated 2026-02-18)*
-*Current: v0.3.9 (Callback fixes) | Next: v0.4.0 (crosscall2) | Target: v1.0.0 LTS*
+*Version 1.4 (Updated 2026-02-27)*
+*Current: v0.4.0 (crosscall2 integration) | Next: v0.5.0 (Usability) | Target: v1.0.0 LTS*

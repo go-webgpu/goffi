@@ -142,25 +142,26 @@ func trampolineEntryAddr(i int) uintptr {
 	return trampolineBaseAddr + uintptr(i*entrySize)
 }
 
-// callbackWrap is called from assembly trampolines to invoke the actual Go callback.
+// callbackWrap_call allows the calling of the ABIInternal wrapper
+// which is required for runtime.cgocallback without the <ABIInternal>
+// tag which is only allowed in the runtime.
+// This closure is used inside callback_amd64.s to pass to crosscall2.
+var callbackWrap_call = callbackWrap
+
+// callbackWrap is called from assembly via crosscall2 to invoke the actual Go callback.
 // This function handles:
 //   - Looking up the callback function by index
 //   - Marshaling C arguments to Go values using reflection
 //   - Calling the Go function
 //   - Marshaling the return value back to C format
 //
-// IMPORTANT: The assembly dispatcher calls this function directly (CALL ·callbackWrap),
-// bypassing crosscall2/runtime.cgocallback. This means:
-//   - Safe when callback arrives on a Go-managed thread (G is already loaded)
-//   - Unsafe if a C library calls the callback from its own thread (G = nil → crash)
-//   - GC is not notified of the C→Go transition (risk during long callbacks)
+// The assembly dispatcher (callback_amd64.s) routes through crosscall2 →
+// runtime·load_g → runtime·cgocallback, which properly handles callbacks from
+// both Go-managed threads and C-library-created threads (e.g. Metal's
+// addCompletedHandler: dispatching on internal C threads).
 //
-// For the primary use case (WebGPU callbacks on the submitting thread), this is correct.
-// See TASK-012 for planned crosscall2 integration to support arbitrary C threads.
-//
-// The assembly trampoline (callback_amd64.s) has already saved all CPU registers
-// into a contiguous memory block pointed to by a.args. The memory layout follows
-// the System V AMD64 ABI:
+// The assembly trampoline has already saved all CPU registers into a contiguous
+// memory block pointed to by a.args. The memory layout follows the System V AMD64 ABI:
 //   - Floats: XMM0-XMM7 (8 registers, 64 bytes)
 //   - Integers: RDI, RSI, RDX, RCX, R8, R9 (6 registers, 48 bytes)
 //   - Stack arguments follow in memory

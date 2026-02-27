@@ -101,16 +101,18 @@ func trampolineEntryAddr(i int) uintptr {
 	return trampolineBaseAddr + uintptr(i*entrySize)
 }
 
-// callbackWrap is called from assembly trampolines to invoke the actual Go callback.
+// callbackWrap_call allows the calling of the ABIInternal wrapper
+// which is required for runtime.cgocallback without the <ABIInternal>
+// tag which is only allowed in the runtime.
+// This closure is used inside callback_arm64.s to pass to crosscall2.
+var callbackWrap_call = callbackWrap
+
+// callbackWrap is called from assembly via crosscall2 to invoke the actual Go callback.
 //
-// IMPORTANT: The assembly dispatcher calls this function directly (BL ·callbackWrap),
-// bypassing crosscall2/runtime.cgocallback. This means:
-//   - Safe when callback arrives on a Go-managed thread (G is already loaded)
-//   - Unsafe if a C library calls the callback from its own thread (G = nil → crash)
-//   - GC is not notified of the C→Go transition (risk during long callbacks)
-//
-// For the primary use case (WebGPU callbacks on the submitting thread), this is correct.
-// See TASK-012 for planned crosscall2 integration to support arbitrary C threads.
+// The assembly dispatcher (callback_arm64.s) routes through crosscall2 →
+// runtime·load_g → runtime·cgocallback, which properly handles callbacks from
+// both Go-managed threads and C-library-created threads (e.g. Metal's
+// addCompletedHandler: dispatching on internal C threads).
 //
 // ARM64 AAPCS64 argument block layout:
 //   - Floats: D0-D7 (8 registers, 64 bytes)

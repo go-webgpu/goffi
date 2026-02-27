@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-02-27
+
+### Added
+- **crosscall2 integration for C-thread callback support** ([#16](https://github.com/go-webgpu/goffi/issues/16))
+  - Callback dispatchers now route through `crosscall2 → runtime·load_g → runtime·cgocallback`
+  - Supports callbacks from both Go-managed threads and C-library-created threads
+  - Fixes crashes when C libraries invoke callbacks from internal threads (G = nil)
+  - Likely fixes gogpu#89 (blank Metal window on ARM64 macOS)
+  - `callbackWrap_call` closure variable for ABIInternal function pointer reference from assembly
+  - Uses `go_asm.h` auto-generated constants for `callbackArgs` struct offsets
+  - ARM64: paired load/store instructions (FSTPD/STP) for efficient register saving
+  - AMD64: `PUSH_REGS_HOST_TO_ABI0` / `POP_REGS_HOST_TO_ABI0` for proper ABI transition
+
+### Fixed
+- **fakecgo trampoline register bugs** (synced with purego v0.10.0)
+  - ARM64: R26 (callee-saved) → R9 (volatile), R2 (argument) → R9 (volatile)
+  - ARM64: `threadentry` now saves/restores callee-saved registers (R19-R28, F8-F15)
+  - AMD64: DX (3rd arg register) → R11 (volatile), CX (4th arg register) → R11 (volatile)
+  - AMD64: BX (callee-saved) → R11 in `setg` and `call5`
+  - AMD64: `notify`/`bindm` trampolines use JMP (tail call) instead of CALL+RET
+  - AMD64: `threadentry` uses `PUSH_REGS_HOST_TO_ABI0` for proper ABI transition
+
+### Removed
+- crosscall2 bypass warnings from assembly and Go source comments (no longer applicable)
+
+### Technical Details
+- `crosscall2` is the Go runtime's entry point for C→Go transitions
+- It calls `runtime·load_g` to set up the goroutine pointer, then `runtime·cgocallback`
+- This chain is essential for callbacks arriving on C-created threads where G = nil
+- The `callbackWrap_call` closure pattern is the canonical workaround for referencing
+  ABIInternal function pointers from assembly outside the runtime package
+- Go 1.26 confirmed: crosscall2 API unchanged, cgo ~30% faster
+
 ## [0.3.9] - 2026-02-18
 
 ### Fixed
@@ -684,7 +717,8 @@ See [API_TODO.md](docs/dev/API_TODO.md) for detailed roadmap to v1.0.
 
 ---
 
-[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.3.8...HEAD
+[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/go-webgpu/goffi/compare/v0.3.9...v0.4.0
 [0.3.9]: https://github.com/go-webgpu/goffi/compare/v0.3.8...v0.3.9
 [0.3.8]: https://github.com/go-webgpu/goffi/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/go-webgpu/goffi/compare/v0.3.6...v0.3.7

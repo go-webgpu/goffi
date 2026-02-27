@@ -1,6 +1,9 @@
 //go:build (linux || darwin) && amd64
 
 #include "textflag.h"
+#include "go_asm.h"
+#include "funcdata.h"
+#include "abi_amd64.h"
 
 // callbackTrampoline is the entry point for all callback trampolines.
 // Each entry is exactly 5 bytes (CALL instruction).
@@ -2011,83 +2014,84 @@ TEXT ·callbackTrampoline(SB), NOSPLIT|NOFRAME, $0
 	CALL ·callbackDispatcher(SB)
 
 // callbackDispatcher is the common handler for all callback trampolines.
-// It:
-//   1. Saves all CPU registers (XMM0-7, RDI, RSI, RDX, RCX, R8, R9)
-//   2. Calculates the callback index from return address
-//   3. Calls callbackWrap (Go function) with register values
-//   4. Returns the result to C caller
+// It routes through crosscall2 → runtime·load_g → runtime·cgocallback
+// to properly support callbacks from both Go-managed threads and
+// C-library-created threads (e.g. Metal's addCompletedHandler:).
+//
+// On entry:
+//   0(SP)  = return address (points to next CALL in callbackTrampoline)
+//   8(SP)  = original caller's return address
+//   RDI-R9 = integer arguments from C
+//   XMM0-7 = float arguments from C
 //
 // Register usage (System V AMD64 ABI):
 //   Integer args: RDI, RSI, RDX, RCX, R8, R9
 //   Float args: XMM0-XMM7
 //   Return: RAX (integer), XMM0 (float)
 TEXT ·callbackDispatcher(SB), NOSPLIT|NOFRAME, $0
-	// Save return address (will be used to calculate callback index)
-	MOVQ 0(SP), AX      // AX = return address (points to next CALL in callbackTrampoline)
-	MOVQ 8(SP), R10     // R10 = original caller's return address
-	ADDQ $8, SP         // Remove our return address from stack
+	// On entry: return address on stack points into callbackTrampoline.
+	MOVQ 0(SP), AX  // save the return address to calculate the cb index
+	MOVQ 8(SP), R10 // get the return SP so that we can align register args with stack args
+	ADDQ $8, SP     // remove return address from stack, we are not returning to callbackTrampoline, but to its caller.
 
-	// Allocate space for saved registers (14*8 = 112 bytes)
-	// Layout: [XMM0-7: 64 bytes][RDI,RSI,RDX,RCX,R8,R9: 48 bytes]
-	SUBQ $112, SP
+	// Make space for first six int and 8 float argument registers.
+	ADJSP $14*8, SP
+	MOVSD X0, (1*8)(SP)
+	MOVSD X1, (2*8)(SP)
+	MOVSD X2, (3*8)(SP)
+	MOVSD X3, (4*8)(SP)
+	MOVSD X4, (5*8)(SP)
+	MOVSD X5, (6*8)(SP)
+	MOVSD X6, (7*8)(SP)
+	MOVSD X7, (8*8)(SP)
+	MOVQ  DI, (9*8)(SP)
+	MOVQ  SI, (10*8)(SP)
+	MOVQ  DX, (11*8)(SP)
+	MOVQ  CX, (12*8)(SP)
+	MOVQ  R8, (13*8)(SP)
+	MOVQ  R9, (14*8)(SP)
+	LEAQ  8(SP), R8      // R8 = address of args vector
 
-	// Save XMM (float) registers (8 registers * 8 bytes = 64 bytes)
-	MOVSD X0, 0(SP)
-	MOVSD X1, 8(SP)
-	MOVSD X2, 16(SP)
-	MOVSD X3, 24(SP)
-	MOVSD X4, 32(SP)
-	MOVSD X5, 40(SP)
-	MOVSD X6, 48(SP)
-	MOVSD X7, 56(SP)
+	PUSHQ R10 // push the stack pointer below registers
 
-	// Save integer registers (6 registers * 8 bytes = 48 bytes)
-	MOVQ DI, 64(SP)
-	MOVQ SI, 72(SP)
-	MOVQ DX, 80(SP)
-	MOVQ CX, 88(SP)
-	MOVQ R8, 96(SP)
-	MOVQ R9, 104(SP)
+	// Switch from the host ABI to the Go ABI.
+	PUSH_REGS_HOST_TO_ABI0()
 
-	// Calculate callback index
-	// index = (return_address - trampoline_base) / 5 - 1
+	// Determine callback index: (return_addr - trampoline_base) / 5 - 1.
 	MOVQ $·callbackTrampoline(SB), DX
-	SUBQ DX, AX         // AX = offset from callbackTrampoline
+	SUBQ DX, AX
 	MOVQ $0, DX
-	MOVQ $5, CX         // Each CALL is 5 bytes
-	DIVL CX             // AX = AX / 5
-	SUBQ $1, AX         // Adjust for return address pointing to next instruction
+	MOVQ $5, CX               // divide by 5 because each CALL instruction is 5 bytes long
+	DIVL CX
+	SUBQ $1, AX               // subtract 1 because return PC is to the next slot
 
-	// Allocate space for callbackArgs struct + alignment
-	// struct { index uintptr; args unsafe.Pointer; result uintptr }
-	SUBQ $32, SP        // 24 bytes for struct + 8 for alignment
+	// Create a struct callbackArgs on our stack to be passed as
+	// the "frame" to cgocallback and on to callbackWrap.
+	// $24 to make enough room for the arguments to runtime.cgocallback.
+	SUBQ $(24+callbackArgs__size), SP
+	MOVQ AX, (24+callbackArgs_index)(SP)  // callback index
+	MOVQ R8, (24+callbackArgs_args)(SP)   // address of args vector
+	MOVQ $0, (24+callbackArgs_result)(SP) // result
+	LEAQ 24(SP), AX                       // take the address of callbackArgs
 
-	// Initialize callbackArgs
-	MOVQ AX, 0(SP)      // callbackArgs.index
-	LEAQ 32(SP), BX     // BX = address of saved registers
-	MOVQ BX, 8(SP)      // callbackArgs.args
-	MOVQ $0, 16(SP)     // callbackArgs.result = 0
+	// Call cgocallback, which will call callbackWrap(frame).
+	MOVQ ·callbackWrap_call(SB), DI // Get the ABIInternal function pointer
+	MOVQ (DI), DI                   // without <ABIInternal> by using a closure.
+	MOVQ AX, SI                     // frame (address of callbackArgs)
+	MOVQ $0, CX                     // context
 
-	// Call Go function: callbackWrap(*callbackArgs)
-	//
-	// NOTE: We call callbackWrap directly, bypassing the
-	// crosscall2 → runtime·load_g → runtime·cgocallback chain that
-	// purego uses. This is safe when the callback arrives on a Go-managed
-	// thread (the primary WebGPU use case), but will crash if a C library
-	// invokes the callback from its own internally-created thread (G = nil).
-	// See TASK-012 for planned crosscall2 integration.
-	LEAQ 0(SP), AX      // AX = &callbackArgs
-	CALL ·callbackWrap(SB)
+	CALL crosscall2(SB) // runtime.cgocallback(fn, frame, ctxt uintptr)
 
-	// Retrieve result
-	MOVQ 16(SP), AX     // AX = callbackArgs.result
+	// Get callback result.
+	MOVQ (24+callbackArgs_result)(SP), AX
+	ADDQ $(24+callbackArgs__size), SP     // remove callbackArgs struct
 
-	// Clean up callbackArgs
-	ADDQ $32, SP
+	POP_REGS_HOST_TO_ABI0()
 
-	// Restore stack (skip saved registers, we don't need them anymore)
-	ADDQ $112, SP
+	POPQ  R10        // get the SP back
+	ADJSP $-14*8, SP // remove arguments
 
-	// Jump to original return address (caller expects us to return there)
-	JMP R10
+	MOVQ R10, 0(SP)
+
+	RET
 
