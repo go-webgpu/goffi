@@ -1,6 +1,9 @@
 //go:build (linux || darwin) && arm64
 
 #include "textflag.h"
+#include "go_asm.h"
+#include "funcdata.h"
+#include "abi_arm64.h"
 
 // callbackTrampoline contains 2000 trampoline entries for ARM64 callbacks.
 // Each entry loads its index into R12 (a volatile register per AAPCS64)
@@ -4008,84 +4011,89 @@ TEXT ·callbackTrampoline(SB), NOSPLIT|NOFRAME, $0
 	MOVD $1999, R12
 	B ·callbackDispatcher(SB)
 
-// callbackDispatcher handles the actual callback invocation on ARM64.
+// callbackDispatcher handles the actual callback invocation on ARM64
+// via crosscall2 → runtime·load_g → runtime·cgocallback.
+// This supports callbacks from both Go-managed threads and C-library-created
+// threads (e.g. Metal's addCompletedHandler: dispatching on internal C threads).
+//
 // On entry:
 //   R12 = callback index (volatile register, set by trampoline MOVD)
 //   R30 (LR) = C caller's return address (preserved by B in trampoline)
 //   R0-R7 = integer arguments from C
 //   F0-F7 = float arguments from C
 //
-// Stack frame layout (176 bytes, 16-byte aligned):
+// Stack frame layout (26*8 = 208 bytes total):
 //   [0-7]     saved R27 (callee-saved, used by Go assembler for ADRP)
-//   [8-15]    saved R30/LR (C caller's return address)
-//   [16-23]   callbackArgs.index
-//   [24-31]   callbackArgs.args (pointer to saved registers)
-//   [32-39]   callbackArgs.result
+//   [8-15]    saved R30/LR (C caller's return address, crosscall2 doesn't save it)
+//   [16-39]   callbackArgs struct (index, args, result = 3*8 bytes)
 //   [40-47]   padding (16-byte alignment)
-//   [48-111]  saved F0-F7 (8 registers * 8 bytes = 64 bytes)
-//   [112-175] saved X0-X7 (8 registers * 8 bytes = 64 bytes)
 //
-// Register usage (AAPCS64 ABI):
-//   R12: callback index (volatile, X9-X15 range)
+// Above the 26*8 frame (at R14 = RSP before frame allocation):
+//   [0-63]    saved F0-F7 (8 * 8 bytes, contiguous with X0-X7 below)
+//   [64-127]  saved X0-X7 (8 * 8 bytes)
+//
+// Register usage:
+//   R12: callback index (volatile, set by trampoline)
+//   R13: pointer to callbackArgs struct
+//   R14: pointer to saved register block (args vector)
 //   R27: callee-saved, must preserve (Go assembler uses for ADRP)
 //   R30: link register, must preserve for C caller return
 TEXT ·callbackDispatcher(SB), NOSPLIT|NOFRAME, $0
-	// Allocate stack frame (176 bytes, 16-byte aligned)
-	SUB  $176, RSP, RSP
+	NO_LOCAL_POINTERS
 
-	// Save callee-saved registers immediately
-	// R27: Go assembler uses it for ADRP in MOVD ·symbol(SB) instructions
-	// R30: C caller's return address, will be overwritten by BL ·callbackWrap
-	MOVD R27, 0(RSP)
-	MOVD R30, 8(RSP)
+	// On entry: R12 = callback index (from trampoline MOVD $index, R12)
 
-	// Save floating-point argument registers F0-F7
-	FMOVD F0, 48(RSP)
-	FMOVD F1, 56(RSP)
-	FMOVD F2, 64(RSP)
-	FMOVD F3, 72(RSP)
-	FMOVD F4, 80(RSP)
-	FMOVD F5, 88(RSP)
-	FMOVD F6, 96(RSP)
-	FMOVD F7, 104(RSP)
+	// Save callback register arguments F0-F7, R0-R7 contiguously.
+	// We do this at the top of the frame so they're contiguous with stack arguments.
+	SUB   $(16*8), RSP, R14
+	FSTPD (F0, F1), (0*8)(R14)
+	FSTPD (F2, F3), (2*8)(R14)
+	FSTPD (F4, F5), (4*8)(R14)
+	FSTPD (F6, F7), (6*8)(R14)
+	STP   (R0, R1), (8*8)(R14)
+	STP   (R2, R3), (10*8)(R14)
+	STP   (R4, R5), (12*8)(R14)
+	STP   (R6, R7), (14*8)(R14)
 
-	// Save integer argument registers X0-X7
-	MOVD R0, 112(RSP)
-	MOVD R1, 120(RSP)
-	MOVD R2, 128(RSP)
-	MOVD R3, 136(RSP)
-	MOVD R4, 144(RSP)
-	MOVD R5, 152(RSP)
-	MOVD R6, 160(RSP)
-	MOVD R7, 168(RSP)
+	// Allocate full frame for R27/R30 save area + callbackArgs struct.
+	SUB $(26*8), RSP
 
-	// Build callbackArgs struct at RSP+16
-	// struct { index uintptr; args unsafe.Pointer; result uintptr }
-	MOVD R12, 16(RSP)           // callbackArgs.index = R12 (callback index from trampoline)
-	ADD  $48, RSP, R0           // R0 = address of saved registers area (F0-F7, X0-X7)
-	MOVD R0, 24(RSP)            // callbackArgs.args = &saved_registers
-	MOVD ZR, 32(RSP)            // callbackArgs.result = 0
+	// It is important to save R27 because the go assembler
+	// uses it for move instructions for a variable.
+	// This line:
+	// MOVD ·callbackWrap_call(SB), R0
+	// Creates the instructions:
+	// ADRP 14335(PC), R27
+	// MOVD 388(27), R0
+	// R27 is a callee saved register so we are responsible
+	// for ensuring its value doesn't change. So save it and
+	// restore it at the end of this function.
+	// R30 is the link register. crosscall2 doesn't save it
+	// so it's saved here.
+	STP (R27, R30), 0(RSP)
 
-	// Call Go callback handler: callbackWrap(*callbackArgs)
-	//
-	// NOTE: We call callbackWrap directly via BL, bypassing the
-	// crosscall2 → runtime·load_g → runtime·cgocallback chain that
-	// purego uses. This is safe when the callback arrives on a Go-managed
-	// thread (the primary WebGPU use case), but will crash if a C library
-	// invokes the callback from its own internally-created thread (G = nil).
-	// See TASK-012 for planned crosscall2 integration.
-	ADD  $16, RSP, R0           // R0 = &callbackArgs (first argument per AAPCS64)
-	BL   ·callbackWrap(SB)
+	// Build callbackArgs struct on the stack.
+	MOVD $(callbackArgs__size)(RSP), R13
+	MOVD R12, callbackArgs_index(R13)    // callback index
+	MOVD R14, callbackArgs_args(R13)     // address of args vector
+	MOVD ZR, callbackArgs_result(R13)    // result = 0
 
-	// Retrieve result
-	MOVD 32(RSP), R0            // R0 = callbackArgs.result
+	// Move parameters into registers.
+	// Get the ABIInternal function pointer
+	// without <ABIInternal> by using a closure.
+	MOVD ·callbackWrap_call(SB), R0
+	MOVD (R0), R0                   // fn unsafe.Pointer
+	MOVD R13, R1                    // frame (&callbackArgs{...})
+	MOVD $0, R3                     // ctxt uintptr
 
-	// Restore callee-saved registers
-	MOVD 0(RSP), R27            // restore R27
-	MOVD 8(RSP), R30            // restore LR (C caller's return address)
+	BL crosscall2(SB)
 
-	// Deallocate stack frame
-	ADD  $176, RSP, RSP
+	// Get callback result.
+	MOVD $(callbackArgs__size)(RSP), R13
+	MOVD callbackArgs_result(R13), R0
 
-	// Return to C caller (RET uses restored LR)
+	// Restore LR and R27.
+	LDP 0(RSP), (R27, R30)
+	ADD $(26*8), RSP
+
 	RET

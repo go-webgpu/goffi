@@ -22,11 +22,11 @@ ffi.CallFunction(&cif, wgpuCreateInstance, &result, args)
 ## ✨ Features
 
 - **🚫 Zero CGO** - Pure Go, no C compiler needed
-- **⚡ Fast** - ~100ns FFI overhead ([benchmarks](#performance))
+- **⚡ Fast** - 64-114ns FFI overhead ([benchmarks](#performance))
 - **🌐 Cross-platform** - Windows + Linux + macOS (AMD64 + ARM64)
-- **🔄 Callbacks** - C-to-Go function calls for async APIs (compatible with purego)
-- **🔒 Type-safe** - Runtime type validation with detailed errors
-- **📦 Production-ready** - 87% test coverage, comprehensive error handling
+- **🔄 Callbacks** - C-to-Go function calls via `crosscall2`, safe from any thread
+- **🔒 Type-safe** - Typed call interface with runtime validation and detailed errors
+- **📦 Production-ready** - 89.6% test coverage, comprehensive error handling
 - **🎯 WebGPU-optimized** - Designed for wgpu-native bindings
 
 ---
@@ -155,7 +155,7 @@ See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for comprehensive analysis, optim
 
 **Variadic functions NOT supported** (`printf`, `sprintf`, etc.)
 - Workaround: Use non-variadic wrappers (`puts` instead of `printf`)
-- Planned: v0.5.0 (Q2 2025)
+- Planned: v0.5.0
 
 **Struct packing** follows System V ABI only
 - Windows `#pragma pack` directives NOT honored
@@ -167,7 +167,7 @@ See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for comprehensive analysis, optim
 - **Composite types** (structs) require manual initialization
 - **Cannot interrupt** C functions mid-execution (use `CallFunctionContext` for timeouts)
 - **ARM64** - Tested on Apple Silicon (M3 Pro), Linux ARM64 cross-compile verified
-- **Callbacks on C-threads** - Callbacks work on Go-managed threads; C-library-created threads not yet supported ([#16](https://github.com/go-webgpu/goffi/issues/16))
+- **Callbacks on C-threads** - Fully supported via `crosscall2` integration (v0.4.0)
 - **No bitfields** in structs
 
 See [CHANGELOG.md](CHANGELOG.md#known-limitations) for full details.
@@ -246,6 +246,29 @@ ffi.PrepareCallInterface(cif, convention, returnType, argTypes)
 
 ---
 
+## 💎 Why goffi?
+
+| Feature | **goffi** | purego | CGO |
+|---------|-----------|--------|-----|
+| **C compiler required** | No | No | Yes |
+| **Typed FFI (struct passing)** | ✅ Full struct support | ❌ Scalar only | ✅ |
+| **Typed errors** | ✅ 5 error types | ❌ Generic errors | N/A |
+| **Context support** | ✅ Timeouts/cancellation | ❌ | ❌ |
+| **C-thread callbacks** | ✅ crosscall2 | ✅ crosscall2 | ✅ |
+| **ARM64 performance** | 64 ns/op | ~60 ns/op | ~2 ns/op |
+| **AMD64 performance** | 88-114 ns/op | ~100 ns/op | ~2 ns/op |
+| **Call interface reuse** | ✅ PrepareCallInterface | ❌ Reflect per call | N/A |
+| **WebGPU-optimized** | ✅ Primary target | General purpose | General purpose |
+
+**Key advantages over purego:**
+- **Typed FFI** — pass/return structs by value, not just scalars
+- **Typed errors** — `errors.As()` for precise error handling (`LibraryError`, `TypeValidationError`, etc.)
+- **Context support** — `CallFunctionContext()` with timeouts and cancellation
+- **Call interface reuse** — prepare once, call many times (zero per-call reflection overhead)
+- **WebGPU focus** — designed specifically for GPU bindings with wgpu-native
+
+---
+
 ## 🏗️ Architecture
 
 goffi uses a **4-layer architecture** for safe Go→C transitions:
@@ -263,8 +286,9 @@ C Function (External Library)
 ```
 
 **Key technologies**:
-- `runtime.cgocall` for GC-safe stack switching
-- Hand-written assembly for System V AMD64 (Linux) and Win64 (Windows) ABIs
+- `runtime.cgocall` for GC-safe Go→C stack switching
+- `crosscall2` for safe C→Go callback transitions (any thread)
+- Hand-written assembly for System V AMD64, Win64, and AAPCS64 ABIs
 - Runtime type validation (no codegen/reflection)
 
 See [docs/dev/TECHNICAL_ARCHITECTURE.md](docs/dev/TECHNICAL_ARCHITECTURE.md) for deep dive (internal docs).
@@ -286,13 +310,16 @@ See [docs/dev/TECHNICAL_ARCHITECTURE.md](docs/dev/TECHNICAL_ARCHITECTURE.md) for
 - 2000-entry callback trampolines for ARM64
 - Tested on Apple Silicon M3 Pro
 
-### v0.3.9 - Callback Fixes (in progress)
+### v0.3.9 - Callback Fixes ✅ **RELEASED!**
 - **ARM64 callback trampoline rewrite** (BL→MOVD+B, matching Go runtime/purego)
 - **Symbol rename** to avoid linker collision with purego ([#15](https://github.com/go-webgpu/goffi/issues/15))
 - Package-scoped assembly symbols (`·callbackTrampoline`/`·callbackDispatcher`)
 
-### v0.4.0 - Runtime Integration (next)
+### v0.4.0 - Runtime Integration ✅ **RELEASED!**
 - **crosscall2 integration** for callbacks on C-created threads ([#16](https://github.com/go-webgpu/goffi/issues/16))
+- Proper C→Go transition: `crosscall2 → runtime·load_g → runtime·cgocallback`
+- Support callbacks from arbitrary C threads (Metal, wgpu-native internal threads)
+- fakecgo trampoline register fixes (synced with purego v0.10.0)
 
 ### v0.5.0 - Usability + Variadic
 - Builder pattern API: `lib.Call("func").Arg(...).ReturnInt()`
@@ -318,7 +345,7 @@ go test ./...
 
 # Run with coverage
 go test -cover ./...
-# Current coverage: 89.1%
+# Current coverage: 89.6%
 
 # Run benchmarks
 go test -bench=. -benchmem ./ffi
@@ -379,4 +406,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 **Made with ❤️ for GPU computing in pure Go**
 
-*Last updated: 2026-02-18 | goffi v0.3.9*
+*Last updated: 2026-02-27 | goffi v0.4.0*
