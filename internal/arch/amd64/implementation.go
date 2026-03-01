@@ -37,13 +37,22 @@ func (i *Implementation) ClassifyArgument(
 	}
 }
 
-// Return value handling (common for both platforms)
+// Return value handling (common for both Unix and Windows AMD64).
+// retVal  = RAX (first integer return register)
+// retVal2 = RDX (second integer return register, used for 9-16 byte struct returns)
 func (i *Implementation) handleReturn(
 	cif *types.CallInterface,
 	rvalue unsafe.Pointer,
 	retVal uint64,
+	retVal2 uint64,
 ) error {
 	if rvalue == nil || cif.ReturnType.Kind == types.VoidType {
+		return nil
+	}
+
+	// Structs > 16 bytes are returned via hidden first argument (sret pointer);
+	// the callee writes directly into the buffer, so nothing to do here.
+	if cif.ReturnType.Kind == types.StructType && cif.ReturnType.Size > 16 {
 		return nil
 	}
 
@@ -72,9 +81,23 @@ func (i *Implementation) handleReturn(
 	case types.UInt64Type, types.SInt64Type, types.PointerType:
 		*(*uint64)(rvalue) = retVal
 	case types.StructType:
-		if cif.ReturnType.Size <= 8 {
+		// System V AMD64 ABI struct return rules:
+		//   <= 8 bytes : returned in RAX
+		//   9-16 bytes : returned in RAX (low 8) + RDX (high 8)
+		//   > 16 bytes : returned via hidden sret pointer (handled above)
+		size := cif.ReturnType.Size
+		switch {
+		case size <= 8:
 			*(*uint64)(rvalue) = retVal
-		} else {
+		case size <= 16:
+			// Copy RAX into first 8 bytes, RDX into remaining bytes
+			*(*uint64)(rvalue) = retVal
+			// Remaining bytes are in RDX; copy only what is needed
+			remaining := size - 8
+			src := (*[8]byte)(unsafe.Pointer(&retVal2))
+			dst := (*[8]byte)(unsafe.Add(rvalue, 8))
+			copy(dst[:remaining], src[:remaining])
+		default:
 			return types.ErrUnsupportedReturnType
 		}
 	default:
