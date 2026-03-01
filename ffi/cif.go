@@ -1,12 +1,17 @@
 package ffi
 
 import (
+	"errors"
 	"fmt"
 	"runtime"
 
 	"github.com/go-webgpu/goffi/internal/arch"
 	"github.com/go-webgpu/goffi/types"
 )
+
+// ErrTooManyArguments is returned when the argument count exceeds the platform
+// limit of registers plus stack slots supported by the syscall layer.
+var ErrTooManyArguments = errors.New("goffi: argument count exceeds platform limit")
 
 // prepareCallInterfaceCore implements core call interface preparation
 func prepareCallInterfaceCore(
@@ -75,13 +80,28 @@ func preparePlatformSpecific(cif *types.CallInterface) error {
 
 	var gprCount, sseCount int
 	maxGPR, maxSSE := maxGPRegisters(cif.Convention), maxSSERegisters(cif.Convention)
+	maxStack := maxStackSlots(cif.Convention)
 
 	for _, arg := range cif.ArgTypes {
 		classification := arch.Registry.Classifier.ClassifyArgument(arg, cif.Convention)
 		gprCount += classification.GPRCount
 		sseCount += classification.SSECount
-		// Register overflow is handled by stack allocation in arch-specific code
-		_ = gprCount > maxGPR || sseCount > maxSSE
+	}
+
+	// Compute stack overflow counts
+	gprStack := 0
+	if gprCount > maxGPR {
+		gprStack = gprCount - maxGPR
+	}
+	sseStack := 0
+	if sseCount > maxSSE {
+		sseStack = sseCount - maxSSE
+	}
+	totalStack := gprStack + sseStack
+
+	if totalStack > maxStack {
+		return fmt.Errorf("%w: %d args overflow to stack, platform supports %d stack slots",
+			ErrTooManyArguments, totalStack, maxStack)
 	}
 
 	// Windows-specific: requires 32-byte shadow space
@@ -162,18 +182,36 @@ func align(value, alignment uintptr) uintptr {
 	return (value + alignment - 1) &^ (alignment - 1)
 }
 
-// maxGPRegisters returns max general purpose registers
+// maxGPRegisters returns max general purpose registers for the calling convention.
 func maxGPRegisters(convention types.CallingConvention) int {
-	if convention == types.UnixCallingConvention {
-		return 6 // RDI, RSI, RDX, RCX, R8, R9
+	switch convention {
+	case types.WindowsCallingConvention, types.GnuWindowsCallingConvention:
+		return 4 // Windows Win64: RCX, RDX, R8, R9
+	default:
+		// System V AMD64: RDI, RSI, RDX, RCX, R8, R9 (6)
+		// AAPCS64 (ARM64): X0-X7 (8)
+		// At compile time the correct value is selected by arch-specific code;
+		// here we use the AMD64 Unix default which is also used for overflow checking.
+		return 6
 	}
-	return 4 // Windows: RCX, RDX, R8, R9
 }
 
-// maxSSERegisters returns max SSE registers
+// maxSSERegisters returns max SSE/FP registers for the calling convention.
 func maxSSERegisters(convention types.CallingConvention) int {
-	if convention == types.UnixCallingConvention {
-		return 8 // XMM0-7
+	switch convention {
+	case types.WindowsCallingConvention, types.GnuWindowsCallingConvention:
+		return 4 // Windows Win64: XMM0-XMM3
+	default:
+		return 8 // System V AMD64 / AAPCS64: XMM0-7 / D0-D7
 	}
-	return 4 // Windows: XMM0-3
+}
+
+// maxStackSlots returns the maximum number of additional stack argument slots
+// supported by the platform-specific syscall layer.
+func maxStackSlots(convention types.CallingConvention) int {
+	// Our syscall layer supports up to maxArgs (15) total args:
+	// Unix AMD64:  6 GP registers + 9 stack slots = 15
+	// Unix ARM64:  8 GP registers + 7 stack slots = 15
+	// Windows:     syscall.SyscallN supports up to 15 args natively
+	return 9
 }
