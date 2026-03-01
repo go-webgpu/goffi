@@ -3,6 +3,8 @@
 package amd64
 
 import (
+	"math"
+	"runtime"
 	"syscall"
 	"unsafe"
 
@@ -15,9 +17,10 @@ func (i *Implementation) Execute(
 	rvalue unsafe.Pointer,
 	avalue []unsafe.Pointer,
 ) error {
-	// Collect all arguments into a slice for syscall.SyscallN
-	// Win64 ABI: first 4 in RCX/RDX/R8/R9, rest on stack
-	// syscall.SyscallN handles both register and stack arguments
+	// Win64 ABI: arguments are passed in numbered slots.
+	// First 4 args: RCX, RDX, R8, R9 (integer) or XMM0-XMM3 (float).
+	// Args 5+: on the stack.
+	// syscall.SyscallN handles the full Win64 stack layout including shadow space.
 	args := make([]uintptr, len(cif.ArgTypes))
 
 	for idx := range cif.ArgTypes {
@@ -35,11 +38,12 @@ func (i *Implementation) Execute(
 		case types.SInt64Type, types.UInt64Type:
 			args[idx] = uintptr(*(*uint64)(avalue[idx]))
 		case types.FloatType:
-			// Pass float32 as bit pattern in 64-bit register
-			f := float64(*(*float32)(avalue[idx]))
-			args[idx] = *(*uintptr)(unsafe.Pointer(&f))
+			// Use math.Float32bits to preserve the exact 32-bit IEEE-754 pattern
+			// in the XMM register slot. Widening to float64 corrupts the bit pattern
+			// because callee reads only the lower 32 bits from the XMM register.
+			args[idx] = uintptr(math.Float32bits(*(*float32)(avalue[idx])))
 		case types.DoubleType:
-			// Pass float64 as bit pattern
+			// Pass float64 as raw bit pattern
 			args[idx] = *(*uintptr)(avalue[idx])
 		default:
 			// For unknown/composite types, treat as pointer to value
@@ -47,14 +51,17 @@ func (i *Implementation) Execute(
 		}
 	}
 
-	// Call via syscall.SyscallN - handles all args including stack args (5+)
+	// Call via syscall.SyscallN — handles all args including stack args (5+).
 	ret, _, _ := syscall.SyscallN(uintptr(fn), args...)
 
-	// Handle return value
-	retVal := uint64(ret)
+	runtime.KeepAlive(avalue)
 
-	// Note: Float return values (XMM0) are not captured by SyscallN.
-	// This is a known limitation matching purego's behavior.
-
-	return i.handleReturn(cif, rvalue, retVal)
+	// Handle return value.
+	// Note: float return values in XMM0 are not captured by syscall.SyscallN on Windows.
+	// This is a known limitation: Go's syscall package on Windows only exposes RAX (ret).
+	// Float-returning C functions on Windows require a custom assembly wrapper to capture
+	// XMM0. Since this requires significant additional infrastructure and matches purego's
+	// documented limitation, it is recorded as a known limitation for v0.4.1.
+	// See: TASK-019, GAP-7. Workaround: use integer return type and reinterpret bits.
+	return i.handleReturn(cif, rvalue, uint64(ret), 0)
 }

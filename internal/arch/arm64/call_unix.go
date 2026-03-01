@@ -6,12 +6,17 @@
 package arm64
 
 import (
+	"fmt"
 	"math"
+	"runtime"
 	"unsafe"
 
 	gosyscall "github.com/go-webgpu/goffi/internal/syscall"
 	"github.com/go-webgpu/goffi/types"
 )
+
+// maxStackArgs is the number of stack spill slots supported in the syscall ABI.
+const maxStackArgs = 7
 
 func placeStructRegisters(
 	base unsafe.Pointer,
@@ -147,16 +152,56 @@ func (i *Implementation) Execute(
 	rvalue unsafe.Pointer,
 	avalue []unsafe.Pointer,
 ) error {
-	// Prepare register arguments following AAPCS64
-	// X0-X7: 8 integer/pointer registers
-	// D0-D7: 8 floating-point registers
+	// AAPCS64 ABI:
+	// - X0-X7: 8 integer/pointer GP registers
+	// - D0-D7: 8 floating-point registers
+	// - Stack:  args 9+ (GP) or FP overflow
+
 	var gpr [8]uintptr
 	var fpr [8]uint64
+	var stackArgs [maxStackArgs]uintptr
 
 	gprIdx := 0
 	fprIdx := 0
+	stackIdx := 0
 
-	// Map arguments to registers
+	addInt := func(x uintptr) bool {
+		if gprIdx < 8 {
+			gpr[gprIdx] = x
+			gprIdx++
+			return true
+		}
+		if stackIdx < maxStackArgs {
+			stackArgs[stackIdx] = x
+			stackIdx++
+			return true
+		}
+		return false
+	}
+
+	addFloat := func(x uint64) bool {
+		if fprIdx < 8 {
+			fpr[fprIdx] = x
+			fprIdx++
+			return true
+		}
+		// AAPCS64: float overflow goes to stack as a full 8-byte slot
+		if stackIdx < maxStackArgs {
+			stackArgs[stackIdx] = uintptr(x)
+			stackIdx++
+			return true
+		}
+		return false
+	}
+
+	// Determine if we need to pass X8 for large struct return (sret)
+	var r8 uintptr
+	if cif.Flags&types.ReturnViaPointer != 0 && rvalue != nil {
+		// For sret, pass rvalue pointer in X8 - callee writes directly to it
+		r8 = uintptr(rvalue)
+	}
+
+	// Map arguments to registers or stack
 	for idx, argType := range cif.ArgTypes {
 		if idx >= len(avalue) {
 			break
@@ -164,94 +209,65 @@ func (i *Implementation) Execute(
 
 		switch argType.Kind {
 		case types.FloatType:
-			if fprIdx < 8 {
-				bits := math.Float32bits(*(*float32)(avalue[idx]))
-				fpr[fprIdx] = uint64(bits) // stored in low 32 bits
-				fprIdx++
-			}
+			// Use math.Float32bits to preserve exact 32-bit IEEE-754 pattern.
+			addFloat(uint64(math.Float32bits(*(*float32)(avalue[idx]))))
 		case types.DoubleType:
-			if fprIdx < 8 {
-				bits := math.Float64bits(*(*float64)(avalue[idx]))
-				fpr[fprIdx] = bits
-				fprIdx++
-			}
+			addFloat(math.Float64bits(*(*float64)(avalue[idx])))
 		case types.PointerType:
-			if gprIdx < 8 {
-				gpr[gprIdx] = *(*uintptr)(avalue[idx])
-				gprIdx++
-			}
+			addInt(*(*uintptr)(avalue[idx]))
 		case types.SInt8Type:
-			if gprIdx < 8 {
-				gpr[gprIdx] = uintptr(int64(*(*int8)(avalue[idx])))
-				gprIdx++
-			}
+			addInt(uintptr(int64(*(*int8)(avalue[idx]))))
 		case types.UInt8Type:
-			if gprIdx < 8 {
-				gpr[gprIdx] = uintptr(*(*uint8)(avalue[idx]))
-				gprIdx++
-			}
+			addInt(uintptr(*(*uint8)(avalue[idx])))
 		case types.SInt16Type:
-			if gprIdx < 8 {
-				gpr[gprIdx] = uintptr(int64(*(*int16)(avalue[idx])))
-				gprIdx++
-			}
+			addInt(uintptr(int64(*(*int16)(avalue[idx]))))
 		case types.UInt16Type:
-			if gprIdx < 8 {
-				gpr[gprIdx] = uintptr(*(*uint16)(avalue[idx]))
-				gprIdx++
-			}
+			addInt(uintptr(*(*uint16)(avalue[idx])))
 		case types.SInt32Type:
-			if gprIdx < 8 {
-				gpr[gprIdx] = uintptr(int64(*(*int32)(avalue[idx])))
-				gprIdx++
-			}
+			addInt(uintptr(int64(*(*int32)(avalue[idx]))))
 		case types.UInt32Type:
-			if gprIdx < 8 {
-				gpr[gprIdx] = uintptr(*(*uint32)(avalue[idx]))
-				gprIdx++
-			}
+			addInt(uintptr(*(*uint32)(avalue[idx])))
 		case types.SInt64Type:
-			if gprIdx < 8 {
-				gpr[gprIdx] = uintptr(*(*int64)(avalue[idx]))
-				gprIdx++
-			}
+			addInt(uintptr(*(*int64)(avalue[idx])))
 		case types.UInt64Type:
-			if gprIdx < 8 {
-				gpr[gprIdx] = uintptr(*(*uint64)(avalue[idx]))
-				gprIdx++
-			}
+			addInt(uintptr(*(*uint64)(avalue[idx])))
 		case types.StructType:
 			// AAPCS64:
-			// - HFA (1-4 floats/doubles): passed in D registers
-			// - <=16 bytes non-HFA: passed in X registers (1 or 2 registers)
-			// - >16 bytes: passed by reference
+			// - HFA (1-4 floats/doubles): passed in D registers; if no room → entire HFA on stack
+			// - <=16 bytes non-HFA: passed in X registers (1 or 2)
+			// - >16 bytes non-HFA: passed by reference
 			ensureStructLayout(argType)
 
 			isHFA, hfaCount, _ := isHomogeneousFloatAggregate(argType)
-			if isHFA && hfaCount > 0 && hfaCount <= 4 && fprIdx+hfaCount <= 8 {
-				ok := placeStructRegisters(
-					avalue[idx],
-					argType,
-					func(v uint64) bool {
-						if gprIdx >= 8 {
-							return false
-						}
-						gpr[gprIdx] = uintptr(v)
-						gprIdx++
-						return true
-					},
-					func(v uint64) bool {
-						if fprIdx >= 8 {
-							return false
-						}
-						fpr[fprIdx] = v
-						fprIdx++
-						return true
-					},
-				)
-				if ok {
+			if isHFA && hfaCount > 0 && hfaCount <= 4 {
+				if fprIdx+hfaCount <= 8 {
+					// Fits in FP registers
+					ok := placeStructRegisters(
+						avalue[idx],
+						argType,
+						func(v uint64) bool { return addInt(uintptr(v)) },
+						func(v uint64) bool { return addFloat(v) },
+					)
+					if ok {
+						break
+					}
+				}
+				// AAPCS64 HFA overflow rule: if HFA does not fit in remaining FP registers,
+				// the entire HFA goes onto the stack (not split between regs and stack).
+				// Each element occupies one 8-byte stack slot.
+				hfaOverflow := false
+				for k := 0; k < int(argType.Size/4) && !hfaOverflow; k++ {
+					slot := *(*uint32)(unsafe.Add(avalue[idx], uintptr(k)*4))
+					if !addFloat(uint64(slot)) {
+						hfaOverflow = true
+					}
+				}
+				if !hfaOverflow {
 					break
 				}
+				// Fallthrough: pass entire struct on stack by reference as last resort
+				addInt(uintptr(avalue[idx]))
+				break
 			}
 
 			if argType.Size <= 16 {
@@ -260,22 +276,8 @@ func (i *Implementation) Execute(
 					ok := placeStructRegisters(
 						avalue[idx],
 						argType,
-						func(v uint64) bool {
-							if gprIdx >= 8 {
-								return false
-							}
-							gpr[gprIdx] = uintptr(v)
-							gprIdx++
-							return true
-						},
-						func(v uint64) bool {
-							if fprIdx >= 8 {
-								return false
-							}
-							fpr[fprIdx] = v
-							fprIdx++
-							return true
-						},
+						func(v uint64) bool { return addInt(uintptr(v)) },
+						func(v uint64) bool { return addFloat(v) },
 					)
 					if ok {
 						break
@@ -283,29 +285,23 @@ func (i *Implementation) Execute(
 				}
 			}
 
-			// Fallback: pass by reference.
-			if gprIdx < 8 {
-				gpr[gprIdx] = uintptr(avalue[idx])
-				gprIdx++
-			}
+			// Fallback: pass by reference (pointer to value)
+			addInt(uintptr(avalue[idx]))
 		default:
 			// For unknown types, pass as pointer
-			if gprIdx < 8 {
-				gpr[gprIdx] = uintptr(avalue[idx])
-				gprIdx++
-			}
+			addInt(uintptr(avalue[idx]))
 		}
 	}
 
-	// Determine if we need to pass r8 for large struct return (sret)
-	var r8 uintptr
-	if cif.Flags&types.ReturnViaPointer != 0 && rvalue != nil {
-		// For sret, pass rvalue pointer in X8 - callee writes directly to it
-		r8 = uintptr(rvalue)
+	// Validate we haven't exceeded platform maximum
+	if stackIdx > maxStackArgs {
+		return fmt.Errorf("goffi: %d stack arguments exceed platform limit of %d", stackIdx, maxStackArgs)
 	}
 
 	// Call via our ARM64 syscall wrapper
-	ret1, ret2, fret := gosyscall.Call8Float(uintptr(fn), gpr, fpr, r8)
+	ret1, ret2, fret := gosyscall.CallNFloat(uintptr(fn), gpr, fpr, stackArgs, stackIdx, r8)
+
+	runtime.KeepAlive(avalue)
 
 	// Handle return value based on type
 	return i.handleReturn(cif, rvalue, uint64(ret1), uint64(ret2), fret)
