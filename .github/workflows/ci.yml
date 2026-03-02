@@ -88,6 +88,9 @@ jobs:
     name: Test - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     needs: [lint, formatting]
+    permissions:
+      contents: read
+      id-token: write  # Required for Codecov OIDC tokenless upload
     env:
       CGO_ENABLED: 0  # goffi is zero-CGO library
     strategy:
@@ -144,7 +147,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@v5
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
           slug: go-webgpu/goffi
           files: ./coverage.txt
           flags: unittests
