@@ -186,6 +186,7 @@ See [CHANGELOG.md](CHANGELOG.md#known-limitations) for full details.
 
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history, migration guides
 - **[ROADMAP.md](ROADMAP.md)** - Development roadmap to v1.0
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Technical architecture deep dive
 - **[docs/PERFORMANCE.md](docs/PERFORMANCE.md)** - Comprehensive performance analysis
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines
 - **[SECURITY.md](SECURITY.md)** - Security policy and best practices
