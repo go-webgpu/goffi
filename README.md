@@ -216,20 +216,22 @@ if err != nil {
 |---------|-----------|--------|-----|
 | C compiler required | No | No | Yes |
 | API style | libffi-like (prepare once, call many) | reflect-based (RegisterFunc) | Native |
-| Per-call allocations | Zero (CIF reusable) | sync.Pool per call | Zero |
-| Struct pass/return | Full (RAX+RDX, sret) | Full | Full |
-| Callback float returns | XMM0 in asm | panic | Full |
-| ARM64 HFA detection | Recursive (nested structs) | Top-level only | Full |
+| Per-call allocations | Zero (CIF reusable) | reflect + sync.Pool per call | Zero |
+| Struct pass/return | Full (RAX+RDX, sret) | Partial (no Windows structs) | Full |
+| Callback float returns | XMM0 in asm | Not supported (panic) | Full |
+| ARM64 HFA detection | Recursive (nested structs) | Partial (bug in nested path) | Full |
 | Typed errors | 5 types + errors.As() | Generic | N/A |
 | Context support | Timeouts/cancellation | No | No |
 | C-thread callbacks | crosscall2 | crosscall2 | Full |
 | String/bool/slice args | Raw pointers only | Auto-marshaling | Full |
-| Platform breadth | 6 targets | 9+ architectures | All |
-| AMD64 overhead | 88–114 ns | ~100 ns | ~140 ns (Go 1.26) |
+| Platform breadth | 6 targets | 8 GOARCH / 20+ OS×ARCH | All |
+| AMD64 overhead | 88–114 ns | Not published | ~140 ns (Go 1.26 claims ~30% reduction) |
 
 **Choose goffi** for GPU/real-time workloads: struct passing, zero per-call overhead, callback float returns, typed errors.
 
 **Choose purego** for general-purpose bindings: string auto-marshaling, broad architecture support, less boilerplate.
+
+**See also:** [JupiterRider/ffi](https://github.com/JupiterRider/ffi) — pure Go binding for libffi via purego. Supports struct pass/return and variadic functions; requires libffi at runtime.
 
 ---
 

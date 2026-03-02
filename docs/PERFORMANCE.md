@@ -257,12 +257,12 @@ FFI overhead: 0.0001ms = 0.001% ✅
 
 | Aspect | goffi | purego |
 |--------|-------|-------|
-| **Overhead** | ~100 ns | ~100-150 ns |
-| **Per-call allocations** | Zero (CIF reused) | sync.Pool per call |
+| **Overhead** | ~100 ns | Not published |
+| **Per-call allocations** | Zero (CIF reused) | reflect dispatch + sync.Pool per call |
 | **Type Safety** | ✅ TypeDescriptor validation | Go reflect.Type |
 | **Error Handling** | ✅ 5 typed errors | Generic errors |
 | **Callback float returns** | ✅ XMM0 in asm | ❌ panic |
-| **ARM64 HFA** | Recursive struct walk | Top-level only |
+| **ARM64 HFA** | Recursive struct walk | Partial recursive (bug in nested path) |
 | **Context support** | ✅ Timeouts/cancellation | ❌ |
 | **Platforms** | 5 (quality focus) | 9+ (breadth focus) |
 
