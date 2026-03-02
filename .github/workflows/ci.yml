@@ -145,6 +145,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          slug: go-webgpu/goffi
           files: ./coverage.txt
           flags: unittests
           name: codecov-goffi
