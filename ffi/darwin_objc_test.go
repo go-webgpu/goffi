@@ -549,6 +549,9 @@ func TestDarwinNSScreenVisibleFrame(t *testing.T) {
 	if runtime.GOARCH != "arm64" {
 		t.Skip("struct return tests require arm64")
 	}
+	if os.Getenv("CI") != "" {
+		t.Skip("NSScreen mainScreen crashes in headless CI (no display)")
+	}
 
 	rt := loadObjcRuntime(t)
 
