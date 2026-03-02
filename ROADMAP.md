@@ -3,7 +3,7 @@
 > **Strategic Approach**: Build production-ready Zero-CGO FFI with benchmarked performance
 > **Philosophy**: Performance first, usability second, platform coverage third
 
-**Last Updated**: 2026-02-27 | **Current Version**: v0.4.0 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → API → v1.0 LTS | **Milestone**: v0.4.0 (crosscall2) → v0.5.0 Usability → v1.0.0 LTS
+**Last Updated**: 2026-03-02 | **Current Version**: v0.4.1 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → API → v1.0 LTS | **Milestone**: v0.4.1 (ABI compliance) → v0.5.0 Usability → v1.0.0 LTS
 
 ---
 
@@ -110,7 +110,14 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 - **crosscall2 integration** for C-thread callbacks ([#16](https://github.com/go-webgpu/goffi/issues/16))
 - Proper C→Go transition: `crosscall2 → runtime·load_g → runtime·cgocallback`
 - Support callbacks from arbitrary C threads (Metal, wgpu-native internal threads)
-- fakecgo trampoline register fixes (synced with purego v0.10.0)
+- fakecgo trampoline register fixes
+
+**v0.4.1** = ABI compliance hotfix ✅ RELEASED (2026-03-02)
+- **Full ABI compliance audit** — 10 of 11 gaps fixed ([#19](https://github.com/go-webgpu/goffi/issues/19))
+- AMD64/ARM64 stack spill for arguments beyond register count
+- Float32 argument encoding fix (`math.Float32bits`)
+- Struct return 9-16 bytes, sret hidden pointer, HFA stack spill
+- Overflow detection, `runtime.KeepAlive` safety
 
 **v0.5.0** = Usability + Variadic (2026 Q2-Q3)
 - Builder pattern API
@@ -125,9 +132,9 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 
 ---
 
-## 📊 Current Status (v0.4.0)
+## 📊 Current Status (v0.4.1)
 
-**Phase**: crosscall2 integration complete, C-thread callback support
+**Phase**: ABI compliance audit complete, forward call path fully verified
 
 **What Works**:
 - ✅ Dynamic library loading (`LoadLibrary`, `GetSymbol`, `FreeLibrary`)

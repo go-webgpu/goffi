@@ -153,6 +153,11 @@ See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for comprehensive analysis, optim
 - Workaround: Build native libraries with `panic=abort` or use Linux/macOS
 - Fix planned: **Go 1.26** ([#58542](https://github.com/golang/go/issues/58542))
 
+**Windows: float return values not captured from XMM0**
+- `syscall.SyscallN` only returns RAX, not XMM0
+- This is a Go `syscall` package limitation on Windows
+- Workaround: reinterpret integer return bits if function returns float via RAX
+
 **Variadic functions NOT supported** (`printf`, `sprintf`, etc.)
 - Workaround: Use non-variadic wrappers (`puts` instead of `printf`)
 - Planned: v0.5.0
@@ -321,6 +326,13 @@ See [docs/dev/TECHNICAL_ARCHITECTURE.md](docs/dev/TECHNICAL_ARCHITECTURE.md) for
 - Support callbacks from arbitrary C threads (Metal, wgpu-native internal threads)
 - fakecgo trampoline register fixes (synced with purego v0.10.0)
 
+### v0.4.1 - ABI Compliance Hotfix ✅ **RELEASED!**
+- **Full ABI compliance audit** — 10 of 11 gaps fixed ([#19](https://github.com/go-webgpu/goffi/issues/19))
+- AMD64/ARM64 stack spill for arguments beyond register count
+- Float32 argument encoding fix (`math.Float32bits`)
+- Struct return 9-16 bytes via RAX+RDX, sret hidden pointer for >16 bytes
+- ARM64 HFA stack spill, overflow detection, `runtime.KeepAlive` safety
+
 ### v0.5.0 - Usability + Variadic
 - Builder pattern API: `lib.Call("func").Arg(...).ReturnInt()`
 - **Variadic function support** (printf, sprintf, etc.)
@@ -406,4 +418,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 **Made with ❤️ for GPU computing in pure Go**
 
-*Last updated: 2026-02-27 | goffi v0.4.0*
+*Last updated: 2026-03-02 | goffi v0.4.1*

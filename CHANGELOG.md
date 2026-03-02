@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-03-02
+
+### Fixed
+- **Float32 argument encoding bug** — used `math.Float32bits` instead of widening to float64, which corrupted the lower 32 bits in XMM registers ([#19](https://github.com/go-webgpu/goffi/issues/19))
+- **AMD64 Unix: stack spill for arguments 7+** — arguments beyond the 6 GP registers (RDI..R9) are now correctly pushed onto the stack before CALL. Previously they were silently dropped ([#19](https://github.com/go-webgpu/goffi/issues/19))
+- **ARM64 Unix: stack spill for arguments 9+** — arguments beyond the 8 GP registers (X0-X7) are now correctly pushed onto the stack before BL
+- **AMD64 struct return 9-16 bytes** — return values in the RAX+RDX register pair are now correctly assembled into the output buffer
+- **AMD64 sret hidden pointer** — structs larger than 16 bytes now inject a caller-allocated buffer pointer as the first argument (RDI), matching System V AMD64 ABI
+- **ARM64 HFA stack spill** — when a Homogeneous Floating-point Aggregate doesn't fit in the remaining FP registers, the entire HFA is correctly spilled to the stack per AAPCS64
+- **runtime.KeepAlive added after FFI calls** — prevents GC from collecting argument pointers during C function execution
+
+### Added
+- **Overflow detection** — `PrepareCallInterface` now returns `ErrTooManyArguments` when argument count exceeds platform capacity (15 args max: 6 GP + 9 stack on AMD64, 8 GP + 7 stack on ARM64)
+- Regression tests: `TestWindowsStackArguments` (CreateFileA, 7 args), `TestWindowsStackArgumentsFileIO` (CreateFileA+WriteFile+ReadFile, data integrity), `TestWindowsStackArguments10Args` (CreateProcessA, 10 args with exit code verification), `TestFloat32ArgEncoding` (modff), `TestOverflowDetection` (20 args), `TestUnixStackSpill7Args` (snprintf, 7 args)
+
+### Removed
+- Dead `callUnix64` assembly experiment from `call_unix.s`
+
+### Known Limitations
+- **Windows: float return values from XMM0 not captured** — `syscall.SyscallN` only returns RAX. Workaround: reinterpret integer return bits if function returns float via RAX
+
 ## [0.4.0] - 2026-02-27
 
 ### Added
@@ -717,7 +738,8 @@ See [API_TODO.md](docs/dev/API_TODO.md) for detailed roadmap to v1.0.
 
 ---
 
-[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/go-webgpu/goffi/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/go-webgpu/goffi/compare/v0.3.9...v0.4.0
 [0.3.9]: https://github.com/go-webgpu/goffi/compare/v0.3.8...v0.3.9
 [0.3.8]: https://github.com/go-webgpu/goffi/compare/v0.3.7...v0.3.8
