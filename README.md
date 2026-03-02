@@ -1,7 +1,7 @@
 # goffi - Zero-CGO FFI for Go
 
 [![CI](https://github.com/go-webgpu/goffi/actions/workflows/ci.yml/badge.svg)](https://github.com/go-webgpu/goffi/actions)
-[![Coverage](https://img.shields.io/badge/coverage-89.6%25-brightgreen)](https://github.com/go-webgpu/goffi)
+[![codecov](https://codecov.io/gh/go-webgpu/goffi/graph/badge.svg)](https://codecov.io/gh/go-webgpu/goffi)
 [![Go Report Card](https://goreportcard.com/badge/github.com/go-webgpu/goffi)](https://goreportcard.com/report/github.com/go-webgpu/goffi)
 [![GitHub release](https://img.shields.io/github/v/release/go-webgpu/goffi)](https://github.com/go-webgpu/goffi/releases)
 [![Go version](https://img.shields.io/github/go-mod/go-version/go-webgpu/goffi)](https://github.com/go-webgpu/goffi/blob/main/go.mod)
