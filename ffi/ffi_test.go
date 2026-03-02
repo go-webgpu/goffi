@@ -1024,6 +1024,9 @@ func TestUnixStackSpill7Args(t *testing.T) {
 	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 		t.Skip("Test requires Linux or macOS (Unix ABI with 6 GP registers)")
 	}
+	if runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" {
+		t.Skip("snprintf is variadic; Apple ARM64 ABI requires variadic args on stack, not in registers")
+	}
 
 	var libName string
 	switch runtime.GOOS {
