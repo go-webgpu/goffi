@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - README: replaced static coverage badge with dynamic Codecov badge
 
+### Added
+- Unit tests for `types` package: `RuntimeEnvironment`, `DefaultConvention`, type descriptors, constants
+- Unit tests for `internal/arch/amd64`: `align`, `classifyReturnAMD64`, `classifyArgumentAMD64`, `handleReturn` (17 sub-cases)
+- Overall test coverage increased from 75% to 89% (`-coverpkg=./...`)
+
 ## [0.4.1] - 2026-03-02
 
 ### Fixed
