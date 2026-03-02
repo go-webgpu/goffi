@@ -1,8 +1,8 @@
-# Performance Guide - goffi v0.1.0
+# Performance Guide - goffi v0.4.1
 
 > **Comprehensive performance analysis, benchmarks, and usage guidelines**
 > **Platform**: Windows AMD64, 12th Gen Intel Core i7-1255U
-> **Go Version**: 1.25.3
+> **Go Version**: 1.25+
 
 ---
 
@@ -14,8 +14,8 @@
 
 **Comparison**:
 - **goffi**: ~100 ns/op overhead
-- **CGO**: ~200-250 ns/op (estimated, similar mechanism)
-- **purego**: ~150-200 ns/op (estimated, similar approach)
+- **CGO**: ~140-170 ns/op (Go 1.26 reduced overhead ~30%)
+- **purego**: ~100-150 ns/op (similar approach)
 - **Direct Go**: ~0.2 ns/op (baseline)
 
 **Verdict**: goffi is **production-ready for WebGPU** and similar use cases where function calls are rare (< 10K/sec) and expensive (> 1µs each).
@@ -246,41 +246,54 @@ FFI overhead: 0.0001ms = 0.001% ✅
 
 | Aspect | goffi | CGO |
 |--------|-------|-----|
-| **Overhead** | ~100 ns | ~200-250 ns |
+| **Overhead** | ~100 ns | ~140-170 ns (Go 1.26) |
 | **Build** | Zero deps | Requires C compiler |
 | **Cross-compile** | ✅ Easy | ❌ Complex |
 | **Static binary** | ✅ Yes | ⚠️ Often requires libc |
-| **Performance** | **Better!** | Slower (more indirection) |
+
+> **Note**: Go 1.26 (Feb 2026) reduced CGO overhead ~30% by removing the dedicated syscall P state. goffi benefits from the same improvement — both use `runtime.cgocall` internally.
 
 ### goffi vs purego
 
 | Aspect | goffi | purego |
 |--------|-------|-------|
-| **Overhead** | ~100 ns | ~150-200 ns (estimated) |
-| **Type Safety** | ✅ TypeDescriptor validation | ⚠️ Manual |
-| **Error Handling** | ✅ 5 typed errors | ⚠️ Generic errors |
-| **Structs** | ✅ Auto layout calc | ❌ Manual |
-| **API Levels** | 3 (low/mid/high planned) | 1 (low) |
-| **Documentation** | ✅ Comprehensive | ⚠️ Basic |
+| **Overhead** | ~100 ns | ~100-150 ns |
+| **Per-call allocations** | Zero (CIF reused) | sync.Pool per call |
+| **Type Safety** | ✅ TypeDescriptor validation | Go reflect.Type |
+| **Error Handling** | ✅ 5 typed errors | Generic errors |
+| **Callback float returns** | ✅ XMM0 in asm | ❌ panic |
+| **ARM64 HFA** | Recursive struct walk | Top-level only |
+| **Context support** | ✅ Timeouts/cancellation | ❌ |
+| **Platforms** | 5 (quality focus) | 9+ (breadth focus) |
+
+---
+
+## Go 1.26 CGO Improvements
+
+Go 1.26 (released February 2026) [reduced cgo call overhead by ~30%](https://go.dev/doc/go1.26) by removing the dedicated syscall P state. Benchmarks on Apple M1 show `CgoCall` is 33% faster, `CgoCallWithCallback` is 21% faster.
+
+**What this means for goffi:**
+
+- **goffi benefits too** — our `runtime.cgocall` path gets the same ~30% speedup, because goffi uses the same Go runtime machinery internally
+- **CGO still requires a C compiler** at build time — goffi does not
+- **Cross-compilation** with CGO still requires cross-toolchains — `GOOS=linux GOARCH=arm64 go build` just works with goffi
+- **Static binaries** — CGO often pulls in libc, goffi produces fully static Go binaries
+
+The gap between CGO and pure-Go FFI is narrowing from both directions. We welcome it.
 
 ---
 
 ## Performance Roadmap
 
-### v0.2.0 - Profiling Tools
-- [ ] Built-in profiler (`ffi.EnableProfiling()`)
-- [ ] Call statistics (frequency, duration)
-- [ ] Hotspot detection
+### v0.5.0 - Usability + Optimization
+- [ ] Builder pattern API (less boilerplate)
+- [ ] Variadic function support
+- [ ] Assembly micro-optimizations
 
-### v0.5.0 - Advanced Optimizations
-- [ ] JIT stub generation (reduce indirect jumps)
-- [ ] Batch API (`ffi.CallBatch()` for multiple calls)
-- [ ] Assembly micro-optimizations (target: ~70ns)
-
-### v1.0.0 - Production Tuning
+### v1.0.0 - Production Benchmarks
+- [ ] Comprehensive benchmarks vs CGO/purego (published)
 - [ ] Platform-specific tuning (Linux, macOS, ARM64)
-- [ ] Comprehensive benchmarks vs CGO/purego
-- [ ] Real-world case studies (WebGPU, Vulkan, SQLite)
+- [ ] Real-world case studies (WebGPU, Vulkan)
 
 ---
 
@@ -367,4 +380,4 @@ benchstat before.txt after.txt
 
 *Benchmarks conducted on Windows AMD64, Intel i7-1255U @ 12 cores*
 *Your results may vary depending on CPU, OS, and workload*
-*Last updated: 2025-01-17 | goffi v0.1.0*
+*Last updated: 2026-03-02 | goffi v0.4.1*

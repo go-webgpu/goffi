@@ -7,8 +7,11 @@
 [![Go version](https://img.shields.io/github/go-mod/go-version/go-webgpu/goffi)](https://github.com/go-webgpu/goffi/blob/main/go.mod)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Go Reference](https://pkg.go.dev/badge/github.com/go-webgpu/goffi.svg)](https://pkg.go.dev/github.com/go-webgpu/goffi)
+[![Dev.to](https://img.shields.io/badge/dev.to-deep%20dive-0A0A0A?logo=devdotto)](https://dev.to/kolkov/goffi-zero-cgo-foreign-function-interface-for-go-how-we-call-c-libraries-without-a-c-compiler-ca5)
 
 **Pure Go Foreign Function Interface (FFI)** for calling C libraries without CGO. Primary use case: **WebGPU bindings** for GPU computing in pure Go.
+
+> **Read the deep dive:** [goffi: Zero-CGO FFI for Go — How We Call C Libraries Without a C Compiler](https://dev.to/kolkov/goffi-zero-cgo-foreign-function-interface-for-go-how-we-call-c-libraries-without-a-c-compiler-ca5)
 
 ```go
 // Call C functions directly from Go - no CGO required!
@@ -253,24 +256,32 @@ ffi.PrepareCallInterface(cif, convention, returnType, argTypes)
 
 ## 💎 Why goffi?
 
+### goffi vs purego vs CGO
+
 | Feature | **goffi** | purego | CGO |
 |---------|-----------|--------|-----|
 | **C compiler required** | No | No | Yes |
-| **Typed FFI (struct passing)** | ✅ Full struct support | ❌ Scalar only | ✅ |
-| **Typed errors** | ✅ 5 error types | ❌ Generic errors | N/A |
+| **API style** | libffi-like (prepare once, call many) | reflect-based (RegisterFunc) | Native |
+| **Per-call allocations** | Zero (CIF reusable) | sync.Pool per call | Zero |
+| **Struct pass/return** | ✅ Full (9-16B RAX+RDX, sret >16B) | ✅ Full | ✅ |
+| **Callback float returns** | ✅ XMM0 in asm | ❌ panic | ✅ |
+| **ARM64 HFA detection** | Recursive (nested structs) | Top-level only | Full |
+| **Typed errors** | ✅ 5 error types + errors.As() | ❌ Generic | N/A |
 | **Context support** | ✅ Timeouts/cancellation | ❌ | ❌ |
 | **C-thread callbacks** | ✅ crosscall2 | ✅ crosscall2 | ✅ |
-| **ARM64 performance** | 64 ns/op | ~60 ns/op | ~2 ns/op |
+| **String/bool/slice args** | ❌ Raw pointers only | ✅ Auto-marshaling | ✅ |
+| **Platform breadth** | 5 targets (quality focus) | 9+ architectures | All |
 | **AMD64 performance** | 88-114 ns/op | ~100 ns/op | ~2 ns/op |
-| **Call interface reuse** | ✅ PrepareCallInterface | ❌ Reflect per call | N/A |
-| **WebGPU-optimized** | ✅ Primary target | General purpose | General purpose |
 
-**Key advantages over purego:**
-- **Typed FFI** — pass/return structs by value, not just scalars
-- **Typed errors** — `errors.As()` for precise error handling (`LibraryError`, `TypeValidationError`, etc.)
-- **Context support** — `CallFunctionContext()` with timeouts and cancellation
-- **Call interface reuse** — prepare once, call many times (zero per-call reflection overhead)
-- **WebGPU focus** — designed specifically for GPU bindings with wgpu-native
+### Design philosophy
+
+**goffi** is a low-level **libffi-style** interface: describe types once via `TypeDescriptor`, pre-compute classification into a `CallInterface`, call many times with zero overhead. Designed for GPU/real-time workloads where every nanosecond counts.
+
+**purego** is a high-level **reflect-based** wrapper: write a Go function signature, get a callable via `RegisterFunc`. More ergonomic, broader platform support, but reflect dispatch on every call.
+
+**Choose goffi when**: you need struct passing, zero per-call allocations, callback float returns, typed errors, or WebGPU/GPU bindings.
+
+**Choose purego when**: you need string auto-marshaling, broad architecture support (386, ppc64le, riscv64...), or quick one-off C library bindings.
 
 ---
 
@@ -296,7 +307,7 @@ C Function (External Library)
 - Hand-written assembly for System V AMD64, Win64, and AAPCS64 ABIs
 - Runtime type validation (no codegen/reflection)
 
-See [docs/dev/TECHNICAL_ARCHITECTURE.md](docs/dev/TECHNICAL_ARCHITECTURE.md) for deep dive (internal docs).
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture documentation.
 
 ---
 
@@ -411,7 +422,10 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## 🔗 Related Projects
 
-- **[go-webgpu](https://github.com/go-webgpu/go-webgpu)** - WebGPU bindings using goffi (coming soon!)
+- **[Dev.to Article](https://dev.to/kolkov/goffi-zero-cgo-foreign-function-interface-for-go-how-we-call-c-libraries-without-a-c-compiler-ca5)** - Deep dive: how goffi works, architecture, and ecosystem
+- **[go-webgpu/webgpu](https://github.com/go-webgpu/webgpu)** - Zero-CGO WebGPU bindings (wgpu-native)
+- **[born-ml/born](https://github.com/born-ml/born)** - ML framework for Go, GPU-accelerated
+- **[gogpu](https://github.com/gogpu)** - GPU computing ecosystem (dual Rust + Pure Go backends)
 - **[wgpu-native](https://github.com/gfx-rs/wgpu-native)** - Native WebGPU implementation
 
 ---
