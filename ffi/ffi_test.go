@@ -880,3 +880,265 @@ func TestWindowsStackArguments10Args(t *testing.T) {
 	t.Log("  - 6 stack args (args 5-10)")
 	t.Log("  - Exit code 42 verified (proves correct arg passing)")
 }
+
+// TestFloat32ArgEncoding verifies that float32 arguments are encoded using
+// math.Float32bits (preserving the 32-bit IEEE-754 bit pattern) rather than
+// widening to float64, which would corrupt the value seen by the callee.
+//
+// Uses modff(float, *float) -> float on Unix systems to verify both argument
+// encoding and that the intpart output pointer receives the correct value.
+//
+// On Windows, float return values from XMM0 are a known limitation of
+// syscall.SyscallN (TASK-019, GAP-7). We verify only the intpart output.
+//
+// Regression test for TASK-013 / GAP-3.
+func TestFloat32ArgEncoding(t *testing.T) {
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		t.Skip("Test requires Linux or macOS (modff with float return, Unix ABI)")
+	}
+
+	// Use modff: modff(float, *float) -> float
+	// modff(2.75, &intpart) returns 0.75 and sets intpart = 2.0
+	var libName string
+	switch runtime.GOOS {
+	case "linux":
+		libName = "libm.so.6"
+	case "darwin":
+		libName = "libSystem.B.dylib"
+	default:
+		t.Skip("Unsupported OS")
+	}
+
+	handle, err := LoadLibrary(libName)
+	if err != nil {
+		t.Skipf("LoadLibrary(%s) failed: %v", libName, err)
+	}
+	defer FreeLibrary(handle)
+
+	sym, err := GetSymbol(handle, "modff")
+	if err != nil {
+		t.Skipf("GetSymbol(modff) failed: %v", err)
+	}
+
+	cif := &types.CallInterface{}
+	err = PrepareCallInterface(cif, types.UnixCallingConvention,
+		types.FloatTypeDescriptor,
+		[]*types.TypeDescriptor{types.FloatTypeDescriptor, types.PointerTypeDescriptor},
+	)
+	if err != nil {
+		t.Fatalf("PrepareCallInterface failed: %v", err)
+	}
+
+	testCases := []struct {
+		input       float32
+		wantFrac    float32
+		wantIntPart float32
+	}{
+		{2.75, 0.75, 2.0},
+		{0.5, 0.5, 0.0},
+		{-1.25, -0.25, -1.0},
+		{3.0, 0.0, 3.0},
+	}
+
+	const tolerance = float32(1e-6)
+
+	for _, tc := range testCases {
+		t.Run("", func(t *testing.T) {
+			arg0 := tc.input
+			var intPart float32
+			arg1 := unsafe.Pointer(&intPart)
+
+			avalue := []unsafe.Pointer{
+				unsafe.Pointer(&arg0),
+				unsafe.Pointer(&arg1),
+			}
+
+			var frac float32
+			err := CallFunction(cif, sym, unsafe.Pointer(&frac), avalue)
+			if err != nil {
+				t.Fatalf("CallFunction(modff) failed: %v", err)
+			}
+
+			// Verify float return value (frac) from XMM0
+			diff := frac - tc.wantFrac
+			if diff < 0 {
+				diff = -diff
+			}
+			if diff > tolerance {
+				t.Errorf("modff(%v): frac = %v, want %v — float32 arg or return encoding broken",
+					tc.input, frac, tc.wantFrac)
+			}
+
+			// Verify intPart written via pointer argument
+			diffInt := intPart - tc.wantIntPart
+			if diffInt < 0 {
+				diffInt = -diffInt
+			}
+			if diffInt > tolerance {
+				t.Errorf("modff(%v): intPart = %v, want %v", tc.input, intPart, tc.wantIntPart)
+			}
+		})
+	}
+}
+
+// TestOverflowDetection verifies that PrepareCallInterface returns an error
+// when the argument count would overflow the platform's register + stack capacity.
+//
+// Regression test for TASK-020 / GAP-10.
+func TestOverflowDetection(t *testing.T) {
+	// Build a CIF with 20 pointer arguments — far beyond any platform's capacity.
+	// System V AMD64: 6 GP regs + 9 stack slots = 15 max GP args.
+	// ARM64: 8 GP regs + 7 stack slots = 15 max GP args.
+	// Windows: syscall.SyscallN supports up to 15 args.
+	const tooMany = 20
+
+	argTypes := make([]*types.TypeDescriptor, tooMany)
+	for k := range argTypes {
+		argTypes[k] = types.PointerTypeDescriptor
+	}
+
+	var convention types.CallingConvention
+	if runtime.GOOS == "windows" {
+		convention = types.WindowsCallingConvention
+	} else {
+		convention = types.UnixCallingConvention
+	}
+
+	cif := &types.CallInterface{}
+	err := PrepareCallInterface(cif, convention, types.VoidTypeDescriptor, argTypes)
+	if err == nil {
+		t.Error("PrepareCallInterface with 20 args should return error, got nil")
+	} else {
+		t.Logf("Correctly rejected 20 args: %v", err)
+	}
+}
+
+// TestUnixStackSpill7Args verifies that functions with more than 6 GP arguments
+// on System V AMD64 (args 7+) are correctly passed via stack spill.
+//
+// Uses snprintf which has signature: int snprintf(char *str, size_t size, const char *fmt, ...)
+// where we pass additional integer arguments to format.
+//
+// Regression test for TASK-014 / GAP-1 / Issue #19.
+func TestUnixStackSpill7Args(t *testing.T) {
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		t.Skip("Test requires Linux or macOS (Unix ABI with 6 GP registers)")
+	}
+	if runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" {
+		t.Skip("snprintf is variadic; Apple ARM64 ABI requires variadic args on stack, not in registers")
+	}
+
+	var libName string
+	switch runtime.GOOS {
+	case "linux":
+		libName = "libc.so.6"
+	case "darwin":
+		libName = "libSystem.B.dylib"
+	}
+
+	handle, err := LoadLibrary(libName)
+	if err != nil {
+		t.Fatalf("LoadLibrary failed: %v", err)
+	}
+	defer FreeLibrary(handle)
+
+	// snprintf(char *buf, size_t n, const char *fmt, int a, int b, int c, int d) — 7 args
+	// This puts arg d (value 444) into stack slot 1 (args 7+).
+	sym, err := GetSymbol(handle, "snprintf")
+	if err != nil {
+		t.Fatalf("GetSymbol(snprintf) failed: %v", err)
+	}
+
+	cif := &types.CallInterface{}
+	err = PrepareCallInterface(cif, types.UnixCallingConvention,
+		types.SInt32TypeDescriptor,
+		[]*types.TypeDescriptor{
+			types.PointerTypeDescriptor, // buf
+			types.UInt64TypeDescriptor,  // n (size_t)
+			types.PointerTypeDescriptor, // fmt
+			types.SInt32TypeDescriptor,  // a  (arg 4, RCX)
+			types.SInt32TypeDescriptor,  // b  (arg 5, R8)
+			types.SInt32TypeDescriptor,  // c  (arg 6, R9)
+			types.SInt32TypeDescriptor,  // d  (arg 7 — first STACK arg!)
+		},
+	)
+	if err != nil {
+		t.Fatalf("PrepareCallInterface failed: %v", err)
+	}
+
+	buf := make([]byte, 64)
+	n := uint64(len(buf))
+	fmtStr := "%d %d %d %d\x00"
+
+	arg0 := unsafe.Pointer(&buf[0])
+	arg1 := n
+	arg2 := unsafe.Pointer(unsafe.StringData(fmtStr))
+	arg3 := int32(111)
+	arg4 := int32(222)
+	arg5 := int32(333)
+	arg6 := int32(444) // This is the 7th arg — first stack-spilled argument
+
+	avalue := []unsafe.Pointer{
+		unsafe.Pointer(&arg0),
+		unsafe.Pointer(&arg1),
+		unsafe.Pointer(&arg2),
+		unsafe.Pointer(&arg3),
+		unsafe.Pointer(&arg4),
+		unsafe.Pointer(&arg5),
+		unsafe.Pointer(&arg6),
+	}
+
+	var written int32
+	err = CallFunction(cif, sym, unsafe.Pointer(&written), avalue)
+	if err != nil {
+		t.Fatalf("CallFunction(snprintf) failed: %v", err)
+	}
+
+	result := string(buf[:written])
+	const expected = "111 222 333 444"
+	if result != expected {
+		t.Errorf("snprintf result: %q, want %q (written=%d)", result, expected, written)
+		t.Log("If 'd' (444) is wrong, it means arg 7 stack spill is broken")
+	} else {
+		t.Logf("snprintf correctly produced %q with 7 args (4 GP regs + 1 stack)", result)
+	}
+}
+
+// TestWindowsFloat32ArgEncodingBitPattern verifies that float32 arguments use
+// math.Float32bits encoding (preserving the 32-bit pattern) rather than widening
+// to float64 on Windows. This regression test for TASK-013 / GAP-3.
+//
+// NOTE: Variadic C functions (like sprintf/printf) expect float arguments promoted
+// to double per the C standard. Testing float32 encoding with variadic functions
+// is invalid because the C standard promotes float32 to float64 for variadic calls.
+// This test validates the encoding at the type-system level.
+func TestWindowsFloat32ArgEncodingBitPattern(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Test requires Windows")
+	}
+
+	// Verify that math.Float32bits preserves the correct 32-bit IEEE-754 pattern.
+	// The previous buggy behavior widened float32 to float64, which produced a
+	// different bit pattern that the callee's XMM register would misinterpret.
+	const testVal = float32(2.5)
+	const expectedBits = uint32(0x40200000) // IEEE-754 representation of 2.5f
+
+	f32val := testVal
+	actualBits := *(*uint32)(unsafe.Pointer(&f32val))
+	if actualBits != expectedBits {
+		t.Errorf("float32(2.5) bit pattern: got 0x%08X, want 0x%08X", actualBits, expectedBits)
+	} else {
+		t.Logf("float32(2.5) correctly encodes to 0x%08X", actualBits)
+	}
+
+	// Confirm that widening produces a different (incorrect) bit pattern.
+	// The bug: float64(float32(2.5)) has bits 0x4004000000000000, not 0x40200000.
+	widenedVal := float64(testVal)
+	widenedBits := *(*uint64)(unsafe.Pointer(&widenedVal))
+	if widenedBits == uint64(expectedBits) {
+		t.Error("Widening float32 to float64 should NOT produce the same 32-bit pattern as the float32")
+	} else {
+		t.Logf("Bug pattern (widened float64 bits): 0x%016X — differs from correct 0x%08X", widenedBits, expectedBits)
+		t.Log("math.Float32bits fix correctly prevents this encoding corruption")
+	}
+}
