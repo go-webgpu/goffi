@@ -4,6 +4,7 @@ package ffi
 
 import (
 	"math"
+	"os"
 	"runtime"
 	"sync"
 	"testing"
@@ -673,6 +674,9 @@ func TestDarwinCoreGraphicsStructs(t *testing.T) {
 func TestDarwinCAMetalLayerProperties(t *testing.T) {
 	if runtime.GOARCH != "arm64" {
 		t.Skip("struct argument/return tests require arm64")
+	}
+	if os.Getenv("CI") != "" {
+		t.Skip("CAMetalLayer requires real GPU; GitHub Actions runners have no Metal support")
 	}
 
 	rt := loadObjcRuntime(t)
