@@ -252,6 +252,13 @@ if err != nil {
 
 **No bitfields** in struct types.
 
+**Unix: duplicate symbol conflict with purego** ([#22](https://github.com/go-webgpu/goffi/issues/22))
+- When using goffi and purego in the same binary with `CGO_ENABLED=0`, the linker reports `duplicated definition of symbol _cgo_init`. Both libraries include `internal/fakecgo` which defines identical runtime symbols.
+- Workaround: build with `-tags nofakecgo` to disable goffi's fakecgo, relying on purego's copy:
+  ```bash
+  CGO_ENABLED=0 go build -tags nofakecgo ./...
+  ```
+
 ---
 
 ## Platform Support
