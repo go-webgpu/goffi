@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-03-03
+
+### Fixed
+- **Unix: duplicate symbol conflict with purego** — added build tag `nofakecgo` to disable goffi's internal fakecgo for projects that already provide `_cgo_init` and related runtime symbols (e.g., via purego). Build with `go build -tags nofakecgo` when using both libraries with `CGO_ENABLED=0` ([#22](https://github.com/go-webgpu/goffi/issues/22))
+
 ### Changed
 - README: replaced static coverage badge with dynamic Codecov badge
+- README: added purego compatibility workaround to Known Limitations
 
 ### Added
 - Unit tests for `types` package: `RuntimeEnvironment`, `DefaultConvention`, type descriptors, constants
