@@ -263,10 +263,11 @@ Five typed error types for precise error handling: `InvalidCallInterfaceError`, 
 |----------|-------------|-----|--------|
 | **Linux** | AMD64 | System V | Production |
 | **Windows** | AMD64 | Win64 | Production |
+| **Windows** | ARM64 | AAPCS64 | Production (tested on Snapdragon X) |
 | **macOS** | AMD64 | System V | Production |
-| **FreeBSD** | AMD64 | System V | Production (untested) |
-| **Linux** | ARM64 | AAPCS64 | Production |
 | **macOS** | ARM64 | AAPCS64 | Production (tested on M3 Pro) |
+| **FreeBSD** | AMD64 | System V | Cross-compile verified |
+| **Linux** | ARM64 | AAPCS64 | Production |
 
 ---
 

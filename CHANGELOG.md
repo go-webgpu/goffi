@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-03-29
+
+### Added
+- **Windows ARM64 (Snapdragon X) support** — extended AAPCS64 ARM64 implementation to Windows via build tag changes. Uses `runtime.cgocall` (free on Windows without fakecgo). Tested on Samsung Galaxy Book 4 Edge with Snapdragon X Elite ([#31](https://github.com/go-webgpu/goffi/issues/31))
+- **FreeBSD amd64 support** — added `internal/dl/dl_freebsd.go` and `dl_freebsd_nocgo.go` for `libc.so.7` dynamic loading. FreeBSD uses identical System V ABI as Linux. Requires `-gcflags="github.com/go-webgpu/goffi/internal/fakecgo=-std"` for `CGO_ENABLED=0` builds
+- **CI cross-compilation check** — new job validates all 7 supported platforms compile correctly (linux/darwin/windows × amd64 + arm64 + freebsd/amd64)
+
+### Changed
+- Renamed ARM64 files to drop misleading "unix" suffix: `call_unix.go` → `call_arm64.go`, `syscall_unix_arm64.go/s` → `syscall_arm64.go/s`
+- Extended `ffi/dl_windows.go` and `ffi/callback_windows.go` from `windows && amd64` to `windows` (all architectures)
+- Extended 15+ build tags to include `freebsd` alongside `linux || darwin`
+
 ## [0.4.2] - 2026-03-03
 
 ### Fixed
