@@ -1,4 +1,4 @@
-//go:build (linux || darwin) && cgo
+//go:build (linux || darwin || freebsd) && cgo
 
 // Package ffi cannot be built with CGO_ENABLED=1.
 //

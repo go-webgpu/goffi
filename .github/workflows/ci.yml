@@ -109,8 +109,6 @@ jobs:
             "darwin/arm64"
             "windows/amd64"
             "windows/arm64"
-            # freebsd/amd64 excluded: fakecgo cgo_export_dynamic + missing Execute
-            # See: https://github.com/go-webgpu/goffi/issues/32
           )
           FAILED=0
           for target in "${targets[@]}"; do
@@ -124,11 +122,23 @@ jobs:
               FAILED=1
             fi
           done
+
+          # FreeBSD requires -gcflags="-std" for fakecgo's //go:cgo_export_dynamic
+          echo "Building freebsd/amd64 (with -gcflags for fakecgo)..."
+          if GOOS=freebsd GOARCH=amd64 go build \
+            -gcflags="github.com/go-webgpu/goffi/internal/fakecgo=-std" \
+            ./... 2>&1; then
+            echo "  ✅ freebsd/amd64"
+          else
+            echo "  ❌ freebsd/amd64 FAILED"
+            FAILED=1
+          fi
+
           if [ $FAILED -eq 1 ]; then
             echo "❌ Cross-compilation check FAILED"
             exit 1
           fi
-          echo "✅ All 6 platforms compile successfully"
+          echo "✅ All 7 platforms compile successfully"
 
   # Unit tests - Platform-specific (Linux + Windows + macOS AMD64)
   test:
@@ -333,7 +343,7 @@ jobs:
           echo "✅ All CI checks passed!"
           echo "✅ Lint: PASSED"
           echo "✅ Formatting: PASSED"
-          echo "✅ Cross-Compile: PASSED (6 platforms)"
+          echo "✅ Cross-Compile: PASSED (7 platforms)"
           echo "✅ Tests: PASSED"
           echo "   - Linux AMD64 (ubuntu-latest)"
           echo "   - Windows AMD64 (windows-latest)"

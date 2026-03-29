@@ -1,4 +1,4 @@
-//go:build (linux || darwin) && !cgo && !nofakecgo
+//go:build (linux || darwin || freebsd) && !cgo && !nofakecgo
 
 package ffi
 

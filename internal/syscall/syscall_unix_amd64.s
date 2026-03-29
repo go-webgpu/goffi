@@ -1,4 +1,4 @@
-//go:build (linux || darwin) && amd64
+//go:build (linux || darwin || freebsd) && amd64
 
 #include "textflag.h"
 #include "abi_amd64.h"
