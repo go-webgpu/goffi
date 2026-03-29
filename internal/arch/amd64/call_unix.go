@@ -1,4 +1,4 @@
-//go:build amd64 && (linux || darwin)
+//go:build amd64 && (linux || darwin || freebsd)
 
 // Unix implementation using System V AMD64 ABI (Linux, macOS, FreeBSD, etc.)
 // This implementation closely follows purego's proven approach but is OUR OWN code.

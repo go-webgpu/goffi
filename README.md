@@ -32,7 +32,7 @@ ffi.CallFunction(cif, sym, unsafe.Pointer(&result), args)
 |---|---------|---------|
 | **Zero CGO** | Pure Go | No C compiler needed. `go get` and build. |
 | **Fast** | 88–114 ns/op | Pre-computed CIF, zero per-call allocations |
-| **Cross-platform** | 6 targets | Windows, Linux, macOS × AMD64 + ARM64 |
+| **Cross-platform** | 7 targets | Windows, Linux, macOS, FreeBSD × AMD64 + ARM64 |
 | **Callbacks** | C→Go safe | `crosscall2` integration, works from any C thread |
 | **Type-safe** | Runtime validation | 5 typed error types with `errors.As()` support |
 | **Struct passing** | Full ABI | ≤8B (RAX), 9–16B (RAX+RDX), >16B (sret) |
@@ -224,7 +224,7 @@ if err != nil {
 | Context support | Timeouts/cancellation | No | No |
 | C-thread callbacks | crosscall2 | crosscall2 | Full |
 | String/bool/slice args | Raw pointers only | Auto-marshaling | Full |
-| Platform breadth | 6 targets | 8 GOARCH / 20+ OS×ARCH | All |
+| Platform breadth | 7 targets | 8 GOARCH / 20+ OS×ARCH | All |
 | AMD64 overhead | 88–114 ns | Not published | ~140 ns (Go 1.26 claims ~30% reduction) |
 
 **Choose goffi** for GPU/real-time workloads: struct passing, zero per-call overhead, callback float returns, typed errors.
@@ -266,11 +266,12 @@ if err != nil {
 | Platform | Arch | ABI | Since | CI |
 |----------|------|-----|-------|----|
 | Windows | amd64 | Win64 | v0.1.0 | Tested |
+| Windows | arm64 | AAPCS64 | v0.5.0 | Tested (Snapdragon X) |
 | Linux | amd64 | System V | v0.1.0 | Tested |
-| macOS | amd64 | System V | v0.1.1 | Tested |
-| FreeBSD | amd64 | System V | v0.1.0 | Untested |
 | Linux | arm64 | AAPCS64 | v0.3.0 | Cross-compile verified |
+| macOS | amd64 | System V | v0.1.1 | Tested |
 | macOS | arm64 | AAPCS64 | v0.3.7 | Tested (M3 Pro) |
+| FreeBSD | amd64 | System V | v0.5.0 | Cross-compile verified |
 
 ---
 
@@ -282,7 +283,8 @@ if err != nil {
 | v0.3.x | Released | ARM64 (AAPCS64), HFA, Apple Silicon |
 | v0.4.0 | Released | crosscall2 for C-thread callbacks |
 | v0.4.1 | Released | ABI compliance audit — 10/11 gaps fixed |
-| **v0.5.0** | **Next** | Variadic functions, builder API, Windows struct packing |
+| v0.4.2 | Released | purego compatibility (`-tags nofakecgo`) |
+| **v0.5.0** | **Next** | Windows ARM64, FreeBSD, variadic functions, builder API |
 | v1.0.0 | Planned | API stability (SemVer 2.0), security audit |
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and [ROADMAP.md](ROADMAP.md) for the full plan.

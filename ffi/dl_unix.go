@@ -1,6 +1,6 @@
-//go:build linux && (amd64 || arm64) && !cgo
+//go:build (linux || freebsd) && (amd64 || arm64) && !cgo
 
-// Linux library loading - OUR OWN implementation (NO dependencies!)
+// Unix library loading via dlopen - OUR OWN implementation (NO dependencies!)
 //
 // Status: ✅ FULLY WORKING
 // ✅ syscall6 (internal/syscall) - Core C function calls (~30ns overhead)

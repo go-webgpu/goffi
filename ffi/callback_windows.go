@@ -1,4 +1,4 @@
-//go:build windows && amd64
+//go:build windows
 
 // Package ffi provides Foreign Function Interface capabilities.
 // This file contains Windows-specific callback implementation using syscall.NewCallback.

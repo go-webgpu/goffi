@@ -1,4 +1,4 @@
-//go:build (linux || darwin) && !cgo
+//go:build (linux || darwin || freebsd) && !cgo
 
 // OUR OWN Dlopen/Dlsym implementation - NO dependencies!
 // Uses runtime.cgocall approach similar to syscall6.

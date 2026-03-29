@@ -83,6 +83,63 @@ jobs:
           fi
           echo "All files are properly formatted ✓"
 
+  # Cross-compilation - Verify all 7 supported platforms compile
+  cross-compile:
+    name: Cross-Compile
+    runs-on: ubuntu-latest
+    needs: [lint, formatting]
+    env:
+      CGO_ENABLED: 0
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Cross-compile all platforms
+        run: |
+          targets=(
+            "linux/amd64"
+            "linux/arm64"
+            "darwin/amd64"
+            "darwin/arm64"
+            "windows/amd64"
+            "windows/arm64"
+          )
+          FAILED=0
+          for target in "${targets[@]}"; do
+            os="${target%%/*}"
+            arch="${target##*/}"
+            echo "Building ${os}/${arch}..."
+            if GOOS=$os GOARCH=$arch go build ./... 2>&1; then
+              echo "  ✅ ${os}/${arch}"
+            else
+              echo "  ❌ ${os}/${arch} FAILED"
+              FAILED=1
+            fi
+          done
+
+          # FreeBSD requires -gcflags="-std" for fakecgo's //go:cgo_export_dynamic
+          echo "Building freebsd/amd64 (with -gcflags for fakecgo)..."
+          if GOOS=freebsd GOARCH=amd64 go build \
+            -gcflags="github.com/go-webgpu/goffi/internal/fakecgo=-std" \
+            ./... 2>&1; then
+            echo "  ✅ freebsd/amd64"
+          else
+            echo "  ❌ freebsd/amd64 FAILED"
+            FAILED=1
+          fi
+
+          if [ $FAILED -eq 1 ]; then
+            echo "❌ Cross-compilation check FAILED"
+            exit 1
+          fi
+          echo "✅ All 7 platforms compile successfully"
+
   # Unit tests - Platform-specific (Linux + Windows + macOS AMD64)
   test:
     name: Test - ${{ matrix.os }}
@@ -277,7 +334,7 @@ jobs:
   # Final status - All checks passed
   ci-success:
     name: CI Success
-    needs: [lint, formatting, test, benchmarks, quality-gate]
+    needs: [lint, formatting, cross-compile, test, benchmarks, quality-gate]
     runs-on: ubuntu-latest
     if: success()
     steps:
@@ -286,6 +343,7 @@ jobs:
           echo "✅ All CI checks passed!"
           echo "✅ Lint: PASSED"
           echo "✅ Formatting: PASSED"
+          echo "✅ Cross-Compile: PASSED (7 platforms)"
           echo "✅ Tests: PASSED"
           echo "   - Linux AMD64 (ubuntu-latest)"
           echo "   - Windows AMD64 (windows-latest)"
@@ -293,5 +351,5 @@ jobs:
           echo "✅ Benchmarks: PASSED"
           echo "✅ Quality Gate: PASSED"
           echo ""
-          echo "Note: macOS Intel uses same ABI as Linux AMD64"
+          echo "Note: Windows ARM64 cross-compile verified, runtime tested by community"
           echo "🚀 Ready for merge!"
