@@ -51,13 +51,18 @@ go get github.com/go-webgpu/goffi
 
 ### Requirements
 
-goffi requires `CGO_ENABLED=0`. This is automatic when no C compiler is installed or when cross-compiling. If you have gcc/clang:
+goffi works under **both** `CGO_ENABLED=0` and `CGO_ENABLED=1`. The default — `CGO_ENABLED=0`, no C compiler required — is still the recommended path for the gogpu ecosystem and most users; nothing about that mode has changed.
 
 ```bash
+# CGO_ENABLED=0 (default, no C compiler needed)
 CGO_ENABLED=0 go build ./...
+
+# CGO_ENABLED=1 (for binaries that already link other CGO libraries,
+# e.g. gocv, libavcodec wrappers, native database drivers)
+CGO_ENABLED=1 go build ./...
 ```
 
-> **Why?** goffi uses Go's `cgo_import_dynamic` for dynamic library loading, which only activates when CGO is disabled.
+> **How?** goffi uses Go's `cgo_import_dynamic` for dynamic library loading. Under `CGO_ENABLED=0` the cgo runtime is supplied by `internal/fakecgo`; under `CGO_ENABLED=1` the standard `runtime/cgo` is linked in. Both modes share the same FFI fast path and ABIs.
 
 ### Example: Calling strlen
 
@@ -254,10 +259,11 @@ if err != nil {
 
 **Unix: duplicate symbol conflict with purego** ([#22](https://github.com/go-webgpu/goffi/issues/22))
 - When using goffi and purego in the same binary with `CGO_ENABLED=0`, the linker reports `duplicated definition of symbol _cgo_init`. Both libraries include `internal/fakecgo` which defines identical runtime symbols.
-- Workaround: build with `-tags nofakecgo` to disable goffi's fakecgo, relying on purego's copy:
+- Workaround A: build with `-tags nofakecgo` to disable goffi's fakecgo, relying on purego's copy:
   ```bash
   CGO_ENABLED=0 go build -tags nofakecgo ./...
   ```
+- Workaround B: build with `CGO_ENABLED=1`. In cgo mode the real `runtime/cgo` supplies the symbols and both libraries' `fakecgo` packages are gated out by `//go:build !cgo`.
 
 ---
 
