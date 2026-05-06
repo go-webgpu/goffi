@@ -9,6 +9,18 @@
 
 package dl
 
+// Link to libdl.so.2 functions using cgo_import_dynamic.
+// This works under both CGO_ENABLED=0 (where fakecgo provides the cgo runtime)
+// and CGO_ENABLED=1 (where the standard runtime/cgo is linked, see cgo.go).
+
+//go:cgo_import_dynamic goffi_dlopen dlopen "libdl.so.2"
+//go:cgo_import_dynamic goffi_dlsym dlsym "libdl.so.2"
+//go:cgo_import_dynamic goffi_dlerror dlerror "libdl.so.2"
+//go:cgo_import_dynamic goffi_dlclose dlclose "libdl.so.2"
+
+// Force dependency on libdl.so.2
+//go:cgo_import_dynamic _ _ "libdl.so.2"
+
 // RTLD constants from <dlfcn.h> for dynamic library loading on Linux.
 const (
 	// RTLD_LAZY performs relocations at an implementation-dependent time.

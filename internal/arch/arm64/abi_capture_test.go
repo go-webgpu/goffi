@@ -8,7 +8,6 @@ import (
 	"testing"
 	"unsafe"
 
-	_ "github.com/go-webgpu/goffi/internal/fakecgo"
 	"github.com/go-webgpu/goffi/types"
 )
 

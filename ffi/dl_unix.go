@@ -1,4 +1,4 @@
-//go:build (linux || freebsd) && (amd64 || arm64) && !cgo
+//go:build (linux || freebsd) && (amd64 || arm64)
 
 // Unix library loading via dlopen - OUR OWN implementation (NO dependencies!)
 //
