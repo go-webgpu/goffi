@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 The Goffi Authors
 
-//go:build (linux || darwin || freebsd) && amd64
+//go:build (linux || darwin || freebsd || windows) && amd64
 
 package ffi
 
@@ -33,16 +33,25 @@ func TestMain(m *testing.M) {
 
 func buildStructTestLib() error {
 	srcPath := filepath.Join("testdata", "structtest.c")
-	soPath := filepath.Join("testdata", "libstructtest.so")
-	if runtime.GOOS == "darwin" {
+	var soPath string
+	switch runtime.GOOS {
+	case "darwin":
 		soPath = filepath.Join("testdata", "libstructtest.dylib")
+	case "windows":
+		soPath = filepath.Join("testdata", "structtest.dll")
+	default:
+		soPath = filepath.Join("testdata", "libstructtest.so")
 	}
 
 	cc := os.Getenv("CC")
 	if cc == "" {
 		cc = "gcc"
 	}
-	cmd := exec.Command(cc, "-shared", "-fPIC", "-O2", "-o", soPath, srcPath)
+	args := []string{"-shared", "-O2", "-o", soPath, srcPath}
+	if runtime.GOOS != "windows" {
+		args = []string{"-shared", "-fPIC", "-O2", "-o", soPath, srcPath}
+	}
+	cmd := exec.Command(cc, args...)
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		return err
@@ -112,6 +121,9 @@ func TestStructArg8B_IntegerPair(t *testing.T) {
 // TestStructArg8B_FloatPair tests SSE classification: struct {float, float}.
 func TestStructArg8B_FloatPair(t *testing.T) {
 	requireStructLib(t)
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows: float struct args/returns not supported via syscall.SyscallN (XMM limitation)")
+	}
 
 	sym, err := GetSymbol(structTestLib, "take_struct_2floats")
 	if err != nil {
