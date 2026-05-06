@@ -251,28 +251,24 @@ func callbackWrap(a *callbackArgs) {
 			// 3. reflect.NewAt creates a proper typed pointer from the address
 			if intIdx < numIntRegs {
 				pos := numFloatRegs + intIdx
-				//nolint:govet,gosec // G103: Converting uintptr from CPU register to pointer for FFI callback argument
-				ptr := unsafe.Pointer(frame[pos])
+				// Double-indirection: reinterpret uintptr bits as pointer without
+				// triggering checkptr arithmetic check (go.dev/issue/58625).
+				ptr := *(*unsafe.Pointer)(unsafe.Pointer(&frame[pos]))
 				val = reflect.NewAt(argType.Elem(), ptr)
 				intIdx++
 			} else {
-				//nolint:govet,gosec // G103: Converting uintptr from stack to pointer for FFI callback argument
-				ptr := unsafe.Pointer(frame[stackIdx])
+				ptr := *(*unsafe.Pointer)(unsafe.Pointer(&frame[stackIdx]))
 				val = reflect.NewAt(argType.Elem(), ptr)
 				stackIdx++
 			}
 
 		case reflect.UnsafePointer:
-			// UnsafePointer comes from integer registers.
-			// Converting uintptr to unsafe.Pointer is necessary for FFI interop.
 			if intIdx < numIntRegs {
 				pos := numFloatRegs + intIdx
-				//nolint:govet,gosec // G103: Converting uintptr from register to unsafe.Pointer for FFI
-				val = reflect.ValueOf(unsafe.Pointer(frame[pos]))
+				val = reflect.ValueOf(*(*unsafe.Pointer)(unsafe.Pointer(&frame[pos])))
 				intIdx++
 			} else {
-				//nolint:govet,gosec // G103: Converting uintptr from stack to unsafe.Pointer for FFI
-				val = reflect.ValueOf(unsafe.Pointer(frame[stackIdx]))
+				val = reflect.ValueOf(*(*unsafe.Pointer)(unsafe.Pointer(&frame[stackIdx])))
 				stackIdx++
 			}
 
