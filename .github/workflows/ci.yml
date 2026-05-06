@@ -141,19 +141,23 @@ jobs:
           echo "✅ All 7 platforms compile successfully"
 
   # Unit tests - Platform-specific (Linux + Windows + macOS AMD64)
+  # Tested under both CGO_ENABLED=0 (fakecgo path) and CGO_ENABLED=1 (real
+  # runtime/cgo path). Both modes must pass identically; CGO_ENABLED=0 is the
+  # primary path used by the gogpu ecosystem and must not regress.
   test:
-    name: Test - ${{ matrix.os }}
+    name: Test - ${{ matrix.os }} (cgo=${{ matrix.cgo }})
     runs-on: ${{ matrix.os }}
     needs: [lint, formatting]
     permissions:
       contents: read
       id-token: write  # Required for Codecov OIDC tokenless upload
     env:
-      CGO_ENABLED: 0  # goffi is zero-CGO library
+      CGO_ENABLED: ${{ matrix.cgo }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        cgo: ['0', '1']
         # macos-latest: Apple Silicon ARM64 (M-series)
         # Note: macOS Intel (x86_64) deprecated Dec 2025, no free tier Intel runners
         # Intel tested via Linux/Windows AMD64 (same System V / similar ABI)
@@ -196,12 +200,12 @@ jobs:
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-${{ matrix.os }}
+          name: coverage-${{ matrix.os }}-cgo${{ matrix.cgo }}
           path: coverage.txt
           retention-days: 7
 
-      - name: Upload coverage to Codecov (Linux only)
-        if: matrix.os == 'ubuntu-latest'
+      - name: Upload coverage to Codecov (Linux, CGO_ENABLED=0)
+        if: matrix.os == 'ubuntu-latest' && matrix.cgo == '0'
         uses: codecov/codecov-action@v5
         with:
           use_oidc: true
@@ -212,12 +216,12 @@ jobs:
           fail_ci_if_error: false
           verbose: true
 
-  # NOTE: Race detection is NOT supported for zero-CGO libraries
-  # - Race detector requires CGO_ENABLED=1
-  # - Our fakecgo has build tag !cgo
-  # - With CGO_ENABLED=1, fakecgo doesn't compile
-  # - This is a known limitation of zero-CGO approach
-  # - Manual race testing can be done with CGO enabled and real C runtime
+  # NOTE: Race detection requires CGO_ENABLED=1
+  # The CGO_ENABLED=1 matrix entry above already exercises the real
+  # runtime/cgo path, which is what allows the race detector to be used.
+  # Race-detector-enabled CI can be added on top of that matrix entry without
+  # any source changes if/when desired. fakecgo (CGO_ENABLED=0) is gated
+  # by `//go:build !cgo` and therefore not compiled in cgo mode.
 
   # Benchmarks - Performance validation (Linux only - reference platform)
   benchmarks:
@@ -299,8 +303,9 @@ jobs:
               continue
             fi
 
-            # Extract OS name from path
-            os=$(echo "$report" | sed -E 's/.*coverage-([^/]+).*/\1/')
+            # Extract job label (e.g. "ubuntu-latest-cgo0") and OS from path
+            label=$(echo "$report" | sed -E 's/.*coverage-([^/]+).*/\1/')
+            os=$(echo "$label" | sed -E 's/-cgo[01]$//')
 
             # Calculate coverage percentage
             total_line=$(go tool cover -func "$report" | grep total)
@@ -309,15 +314,15 @@ jobs:
             # ARM64 (macos-latest) is cross-compile verified, not production
             # Only enforce coverage on production AMD64 platforms
             if [[ "$os" == "macos-latest" ]]; then
-              echo "📊 $os (ARM64) coverage: ${cov}% (informational, cross-compile verified)"
+              echo "📊 $label (ARM64) coverage: ${cov}% (informational, cross-compile verified)"
               continue
             fi
 
-            echo "📊 $os coverage: ${cov}%"
+            echo "📊 $label coverage: ${cov}%"
 
             # Check threshold (use awk for float comparison)
             if awk -v cov="$cov" -v min="$MIN_COVERAGE" 'BEGIN {exit !(cov < min)}'; then
-              echo "::error::Coverage for $os (${cov}%) is below ${MIN_COVERAGE}%"
+              echo "::error::Coverage for $label (${cov}%) is below ${MIN_COVERAGE}%"
               FAILED=1
             fi
           done
@@ -344,7 +349,7 @@ jobs:
           echo "✅ Lint: PASSED"
           echo "✅ Formatting: PASSED"
           echo "✅ Cross-Compile: PASSED (7 platforms)"
-          echo "✅ Tests: PASSED"
+          echo "✅ Tests: PASSED (CGO_ENABLED=0 and CGO_ENABLED=1)"
           echo "   - Linux AMD64 (ubuntu-latest)"
           echo "   - Windows AMD64 (windows-latest)"
           echo "   - macOS ARM64 (macos-latest)"
