@@ -159,6 +159,18 @@ Implementation in `internal/arch/amd64/call_unix.go`, helpers in `classification
 - **HFA (Homogeneous Floating-point Aggregate)**: up to 4 same-type floats → D0-D3
 - **\> 16 bytes**: passed by reference
 
+### End-to-End Testing
+
+Struct argument passing is verified by `ffi/struct_e2e_test.go`, which compiles a C test library (`testdata/structtest.c`) via gcc at test time. Five scenarios are tested:
+
+1. **≤8B integer pair** (`{int32, uint32}`) — INTEGER class, single GP register
+2. **≤8B float pair** (`{float, float}`) — SSE class, single XMM register
+3. **16B integer pair** (`{int64, int64}`) — two INTEGER eightbytes, two GP registers
+4. **24B triple** (`{int64, int64, int64}`) — MEMORY class, copied to stack
+5. **Struct + scalar** — mixed register allocation
+
+Tests run on Linux, macOS, and FreeBSD where gcc is available; skipped gracefully on Windows.
+
 ---
 
 ## Struct Return Handling

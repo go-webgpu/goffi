@@ -52,6 +52,12 @@ func (i *Implementation) Execute(
 		}
 	}
 
+	addStack := func(x uintptr) {
+		const maxGPRegs = 6
+		sysargs[maxGPRegs+numStack] = x
+		numStack++
+	}
+
 	addFloat := func(x uintptr) {
 		if numFloats < 8 {
 			floats[numFloats] = x
@@ -164,6 +170,7 @@ func (i *Implementation) Execute(
 				}
 			default:
 				// MEMORY class (> 16 bytes): copy onto stack in 8-byte chunks.
+				// Per SysV ABI §3.2.3: MEMORY class structs bypass registers entirely.
 				nChunks := (sz + 7) / 8
 				for k := uintptr(0); k < nChunks; k++ {
 					chunkPtr := unsafe.Add(argPtr, k*8)
@@ -183,7 +190,7 @@ func (i *Implementation) Execute(
 							v = *(*uintptr)(chunkPtr)
 						}
 					}
-					addInt(v)
+					addStack(v)
 				}
 			}
 		default:
