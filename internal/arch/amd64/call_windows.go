@@ -45,6 +45,22 @@ func (i *Implementation) Execute(
 		case types.DoubleType:
 			// Pass float64 as raw bit pattern
 			args[idx] = *(*uintptr)(avalue[idx])
+		case types.StructType:
+			// Windows x64 ABI: structs of exactly 1, 2, 4, or 8 bytes are passed by
+			// value (integer register / stack slot). All other sizes are passed by
+			// reference — the caller passes a pointer to a copy of the struct.
+			switch argType.Size {
+			case 1:
+				args[idx] = uintptr(*(*uint8)(avalue[idx]))
+			case 2:
+				args[idx] = uintptr(*(*uint16)(avalue[idx]))
+			case 4:
+				args[idx] = uintptr(*(*uint32)(avalue[idx]))
+			case 8:
+				args[idx] = *(*uintptr)(avalue[idx])
+			default:
+				args[idx] = uintptr(avalue[idx])
+			}
 		default:
 			// For unknown/composite types, treat as pointer to value
 			args[idx] = uintptr(avalue[idx])
