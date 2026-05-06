@@ -57,7 +57,8 @@ func (i *Implementation) handleReturn(
 	}
 
 	if cif.Flags&types.ReturnViaPointer != 0 {
-		*(*unsafe.Pointer)(rvalue) = unsafe.Pointer(uintptr(retVal))
+		// Double-indirection to satisfy checkptr (go.dev/issue/58625).
+		*(*unsafe.Pointer)(rvalue) = *(*unsafe.Pointer)(unsafe.Pointer(&retVal))
 		return nil
 	}
 

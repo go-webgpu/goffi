@@ -52,6 +52,12 @@ func (i *Implementation) Execute(
 		}
 	}
 
+	addStack := func(x uintptr) {
+		const maxGPRegs = 6
+		sysargs[maxGPRegs+numStack] = x
+		numStack++
+	}
+
 	addFloat := func(x uintptr) {
 		if numFloats < 8 {
 			floats[numFloats] = x
@@ -100,6 +106,93 @@ func (i *Implementation) Execute(
 			addInt(uintptr(*(*uint32)(avalue[idx])))
 		case types.SInt64Type, types.UInt64Type:
 			addInt(uintptr(*(*uint64)(avalue[idx])))
+		case types.StructType:
+			argPtr := avalue[idx]
+			sz := argType.Size
+			switch {
+			case sz == 0:
+				// Zero-size struct: pass nothing.
+			case sz <= 8:
+				// Single eightbyte: INTEGER if any member is not float/double, else SSE.
+				if isStructAllFloats(argType) {
+					addFloat(*(*uintptr)(argPtr))
+				} else {
+					// Read only the bytes present to avoid overread.
+					var v uintptr
+					switch {
+					case sz == 1:
+						v = uintptr(*(*uint8)(argPtr))
+					case sz == 2:
+						v = uintptr(*(*uint16)(argPtr))
+					case sz <= 4:
+						v = uintptr(*(*uint32)(argPtr))
+					default:
+						v = *(*uintptr)(argPtr)
+					}
+					addInt(v)
+				}
+			case sz <= 16:
+				// Two eightbytes: classify each independently.
+				// System V ABI §3.2.3: INTEGER wins over SSE within an eightbyte.
+				if classifyEightbyte(argType, 0, 8) {
+					addFloat(*(*uintptr)(argPtr))
+				} else {
+					addInt(*(*uintptr)(argPtr))
+				}
+				remaining := sz - 8
+				secondPtr := unsafe.Add(argPtr, 8)
+				if classifyEightbyte(argType, 8, sz) {
+					var v uintptr
+					switch {
+					case remaining == 1:
+						v = uintptr(*(*uint8)(secondPtr))
+					case remaining == 2:
+						v = uintptr(*(*uint16)(secondPtr))
+					case remaining <= 4:
+						v = uintptr(*(*uint32)(secondPtr))
+					default:
+						v = *(*uintptr)(secondPtr)
+					}
+					addFloat(v)
+				} else {
+					var v uintptr
+					switch {
+					case remaining == 1:
+						v = uintptr(*(*uint8)(secondPtr))
+					case remaining == 2:
+						v = uintptr(*(*uint16)(secondPtr))
+					case remaining <= 4:
+						v = uintptr(*(*uint32)(secondPtr))
+					default:
+						v = *(*uintptr)(secondPtr)
+					}
+					addInt(v)
+				}
+			default:
+				// MEMORY class (> 16 bytes): copy onto stack in 8-byte chunks.
+				// Per SysV ABI §3.2.3: MEMORY class structs bypass registers entirely.
+				nChunks := (sz + 7) / 8
+				for k := uintptr(0); k < nChunks; k++ {
+					chunkPtr := unsafe.Add(argPtr, k*8)
+					bytesLeft := sz - k*8
+					var v uintptr
+					if bytesLeft >= 8 {
+						v = *(*uintptr)(chunkPtr)
+					} else {
+						switch {
+						case bytesLeft == 1:
+							v = uintptr(*(*uint8)(chunkPtr))
+						case bytesLeft == 2:
+							v = uintptr(*(*uint16)(chunkPtr))
+						case bytesLeft <= 4:
+							v = uintptr(*(*uint32)(chunkPtr))
+						default:
+							v = *(*uintptr)(chunkPtr)
+						}
+					}
+					addStack(v)
+				}
+			}
 		default:
 			// For unknown/composite types, pass as pointer-to-value
 			addInt(uintptr(avalue[idx]))

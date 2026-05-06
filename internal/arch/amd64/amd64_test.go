@@ -105,9 +105,10 @@ func TestClassifyArgumentAMD64(t *testing.T) {
 			1, 1,
 		},
 		{
+			// MEMORY class: > 16 bytes → passed on stack, no registers consumed.
 			"Struct24B_large",
 			&types.TypeDescriptor{Size: 24, Kind: types.StructType},
-			3, 0,
+			0, 0,
 		},
 		{
 			"Struct8B_withDouble",
