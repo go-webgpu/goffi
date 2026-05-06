@@ -19,6 +19,11 @@
 /internal/fakecgo/ @kolkov
 /internal/dl/ @kolkov
 
+# CGO_ENABLED=1 code path - @jiyeyuran maintains dual-mode support
+/internal/dl/cgo.go @kolkov @jiyeyuran
+/internal/syscall/cgo.go @kolkov @jiyeyuran
+/ffi/callback_cthread_test.go @kolkov @jiyeyuran
+
 # Examples - Reference implementations
 /examples/ @kolkov
 
