@@ -132,6 +132,35 @@ TEXT syscallN(SB), NOSPLIT|NOFRAME, $0
 
 ---
 
+## Struct Argument Passing
+
+ABI rules for passing structs as arguments depend on size and platform:
+
+### System V AMD64 (Linux, macOS, FreeBSD)
+
+Per §3.2.3, each struct is classified by its eightbytes (8-byte chunks):
+
+- **≤ 8 bytes**: single eightbyte. If all fields are float/double → SSE (XMM register). Otherwise → INTEGER (GP register). INTEGER wins over SSE within the same eightbyte (merge rule).
+- **9-16 bytes**: two eightbytes, each classified independently. First 8 bytes → GP or XMM. Remaining bytes → GP or XMM. Both classifications use the same INTEGER-wins merge rule.
+- **\> 16 bytes**: MEMORY class. Caller copies struct bytes onto the stack in 8-byte chunks.
+
+Implementation in `internal/arch/amd64/call_unix.go`, helpers in `classification.go`:
+- `isStructAllFloats(t)` — returns true if all members are float/double
+- `classifyEightbyte(t, startOff, endOff)` — per-eightbyte SSE classification with merge rule
+
+### Win64 (Windows AMD64)
+
+- **Exactly 1, 2, 4, or 8 bytes**: passed as integer by value (same register slot)
+- **All other sizes**: passed by reference — caller passes a pointer
+
+### AAPCS64 (ARM64)
+
+- **≤ 16 bytes**: passed in GP registers (up to 2)
+- **HFA (Homogeneous Floating-point Aggregate)**: up to 4 same-type floats → D0-D3
+- **\> 16 bytes**: passed by reference
+
+---
+
 ## Struct Return Handling
 
 ABI rules for returning structs depend on size:

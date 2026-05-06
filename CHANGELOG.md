@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **AMD64: struct-by-value argument passing** — structs passed as arguments were sent as raw pointers instead of their bytes. Now correctly handles ≤8B (single eightbyte, INTEGER/SSE classification), 9-16B (two eightbytes classified independently), and >16B (MEMORY class, copied to stack). Follows System V AMD64 ABI §3.2.3. ([#33](https://github.com/go-webgpu/goffi/issues/33))
+- **AMD64 Windows: struct argument passing** — structs of exactly 1, 2, 4, or 8 bytes are now passed by value per Win64 ABI, not by pointer
+- **Race detector compatibility** — replaced direct `uintptr→unsafe.Pointer` casts with double-indirection pattern (Go proposal [#58625](https://github.com/golang/go/issues/58625)) in callback dispatch and return handling. `CGO_ENABLED=1 go test -race` now passes cleanly
+- **Classification: >16B structs** — `classifyArgumentAMD64` now correctly returns zero register usage for MEMORY class structs (previously claimed GP registers)
+- **Classification: mixed eightbyte** — per-eightbyte SSE/INTEGER classification now walks all members with INTEGER-wins merge rule per System V ABI
+
+### Added
+- `CGO_ENABLED=1` support ([#13](https://github.com/go-webgpu/goffi/issues/13), PR [#37](https://github.com/go-webgpu/goffi/pull/37) by [@jiyeyuran](https://github.com/jiyeyuran)) — goffi now builds and tests under both `CGO_ENABLED=0` (fakecgo) and `CGO_ENABLED=1` (real `runtime/cgo`). Enables race detector, coexistence with CGO libraries (gocv, database drivers, etc.), and resolves [#22](https://github.com/go-webgpu/goffi/issues/22) duplicate symbol conflict as alternative workaround
+- C-thread callback test — `TestCallback_FromCThread` verifies `NewCallback` works when invoked from a `pthread_create`-spawned C thread under both CGO modes
+- Unit tests for struct argument classification and value packing (25 test cases)
+
 ## [0.5.0] - 2026-03-29
 
 ### Added
