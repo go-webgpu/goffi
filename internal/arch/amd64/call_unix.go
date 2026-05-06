@@ -100,6 +100,92 @@ func (i *Implementation) Execute(
 			addInt(uintptr(*(*uint32)(avalue[idx])))
 		case types.SInt64Type, types.UInt64Type:
 			addInt(uintptr(*(*uint64)(avalue[idx])))
+		case types.StructType:
+			argPtr := avalue[idx]
+			sz := argType.Size
+			switch {
+			case sz == 0:
+				// Zero-size struct: pass nothing.
+			case sz <= 8:
+				// Single eightbyte: INTEGER if any member is not float/double, else SSE.
+				if isStructAllFloats(argType) {
+					addFloat(*(*uintptr)(argPtr))
+				} else {
+					// Read only the bytes present to avoid overread.
+					var v uintptr
+					switch {
+					case sz == 1:
+						v = uintptr(*(*uint8)(argPtr))
+					case sz == 2:
+						v = uintptr(*(*uint16)(argPtr))
+					case sz <= 4:
+						v = uintptr(*(*uint32)(argPtr))
+					default:
+						v = *(*uintptr)(argPtr)
+					}
+					addInt(v)
+				}
+			case sz <= 16:
+				// Two eightbytes: classify each independently.
+				// System V ABI §3.2.3: INTEGER wins over SSE within an eightbyte.
+				if classifyEightbyte(argType, 0, 8) {
+					addFloat(*(*uintptr)(argPtr))
+				} else {
+					addInt(*(*uintptr)(argPtr))
+				}
+				remaining := sz - 8
+				secondPtr := unsafe.Add(argPtr, 8)
+				if classifyEightbyte(argType, 8, sz) {
+					var v uintptr
+					switch {
+					case remaining == 1:
+						v = uintptr(*(*uint8)(secondPtr))
+					case remaining == 2:
+						v = uintptr(*(*uint16)(secondPtr))
+					case remaining <= 4:
+						v = uintptr(*(*uint32)(secondPtr))
+					default:
+						v = *(*uintptr)(secondPtr)
+					}
+					addFloat(v)
+				} else {
+					var v uintptr
+					switch {
+					case remaining == 1:
+						v = uintptr(*(*uint8)(secondPtr))
+					case remaining == 2:
+						v = uintptr(*(*uint16)(secondPtr))
+					case remaining <= 4:
+						v = uintptr(*(*uint32)(secondPtr))
+					default:
+						v = *(*uintptr)(secondPtr)
+					}
+					addInt(v)
+				}
+			default:
+				// MEMORY class (> 16 bytes): copy onto stack in 8-byte chunks.
+				nChunks := (sz + 7) / 8
+				for k := uintptr(0); k < nChunks; k++ {
+					chunkPtr := unsafe.Add(argPtr, k*8)
+					bytesLeft := sz - k*8
+					var v uintptr
+					if bytesLeft >= 8 {
+						v = *(*uintptr)(chunkPtr)
+					} else {
+						switch {
+						case bytesLeft == 1:
+							v = uintptr(*(*uint8)(chunkPtr))
+						case bytesLeft == 2:
+							v = uintptr(*(*uint16)(chunkPtr))
+						case bytesLeft <= 4:
+							v = uintptr(*(*uint32)(chunkPtr))
+						default:
+							v = *(*uintptr)(chunkPtr)
+						}
+					}
+					addInt(v)
+				}
+			}
 		default:
 			// For unknown/composite types, pass as pointer-to-value
 			addInt(uintptr(avalue[idx]))
@@ -145,4 +231,46 @@ func (i *Implementation) Execute(
 	}
 
 	return i.handleReturn(cif, rvalue, retVal, uint64(r2))
+}
+
+// isStructAllFloats returns true if every member of a flat struct is float or double.
+// Per System V AMD64 ABI §3.2.3: if any member in an eightbyte is INTEGER class,
+// the entire eightbyte is classified as INTEGER (INTEGER wins over SSE).
+func isStructAllFloats(t *types.TypeDescriptor) bool {
+	if len(t.Members) == 0 {
+		return false
+	}
+	for _, m := range t.Members {
+		if m.Kind != types.FloatType && m.Kind != types.DoubleType {
+			return false
+		}
+	}
+	return true
+}
+
+// classifyEightbyte returns true if all struct fields whose offset falls within
+// [startOff, endOff) are SSE types (float or double).
+// Returns false if any field in the range is INTEGER class, or if no fields lie in the range.
+func classifyEightbyte(t *types.TypeDescriptor, startOff, endOff uintptr) bool {
+	var offset uintptr
+	allFloat := true
+	hasField := false
+	for _, m := range t.Members {
+		if m == nil {
+			continue
+		}
+		// Align offset to member alignment requirement.
+		if m.Alignment > 0 {
+			offset = (offset + m.Alignment - 1) &^ (m.Alignment - 1)
+		}
+		if offset >= startOff && offset < endOff {
+			hasField = true
+			if m.Kind != types.FloatType && m.Kind != types.DoubleType {
+				allFloat = false
+				break
+			}
+		}
+		offset += m.Size
+	}
+	return hasField && allFloat
 }
