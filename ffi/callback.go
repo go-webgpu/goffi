@@ -289,9 +289,13 @@ func callbackWrap(a *callbackArgs) {
 			}
 
 		case reflect.Struct:
-			val = reflect.New(argType)
-			valPtr := val.UnsafePointer()
 			sz := argType.Size()
+			structData := make([]byte, sz)
+			var valPtr unsafe.Pointer
+			if sz > 0 {
+				valPtr = unsafe.Pointer(&structData[0])
+			}
+
 			switch {
 			case sz == 0:
 				// Zero-size struct: no fields to populate
@@ -334,6 +338,9 @@ func callbackWrap(a *callbackArgs) {
 					stackIdx++
 				}
 			}
+			val = reflect.New(argType)
+			valByteSlice := unsafe.Slice((*byte)(val.UnsafePointer()), sz)
+			copy(valByteSlice, structData)
 			val = val.Elem()
 
 		default:
