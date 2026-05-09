@@ -290,7 +290,7 @@ func callbackWrap(a *callbackArgs) {
 
 		case reflect.Struct:
 			sz := argType.Size()
-			structData := make([]byte, sz)
+			structData := make([]byte, max(sz, 8))
 			var valPtr unsafe.Pointer
 			if sz > 0 {
 				valPtr = unsafe.Pointer(&structData[0])
