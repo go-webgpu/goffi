@@ -169,7 +169,21 @@ Struct argument passing is verified by `ffi/struct_e2e_test.go`, which compiles 
 4. **24B triple** (`{int64, int64, int64}`) — MEMORY class, copied to stack
 5. **Struct + scalar** — mixed register allocation
 
-Tests run on Linux, macOS, and FreeBSD where gcc is available; skipped gracefully on Windows.
+Tests run on Linux, macOS, FreeBSD, and Windows where gcc is available; skipped gracefully otherwise.
+
+---
+
+## Callback Struct Arguments (C→Go)
+
+When C code calls a goffi callback with struct arguments, the callback dispatch (`callbackWrap` in `callback.go`) reconstructs struct values from CPU registers and stack using `reflect.Type`:
+
+- **≤ 8 bytes**: single eightbyte in GP or XMM register. `isStructAllFloats()` determines classification (recursive, supports nested structs).
+- **9-16 bytes**: two eightbytes, each classified independently via `classifyEightbyte()` using `reflect.StructField.Offset`.
+- **\> 16 bytes**: MEMORY class — C caller copies bytes onto stack. Callback reads consecutive stack slots directly. No assembly changes needed.
+
+Classification uses `reflect.Type` (not `types.TypeDescriptor`) since callback signatures are Go functions registered via `NewCallback()`.
+
+**Limitations**: callback struct args supported on AMD64 Unix only. ARM64 and Windows callbacks do not yet support struct arguments.
 
 ---
 
