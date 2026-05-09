@@ -33,7 +33,7 @@ ffi.CallFunction(cif, sym, unsafe.Pointer(&result), args)
 | **Zero CGO** | Pure Go | No C compiler needed. `go get` and build. |
 | **Fast** | 88–114 ns/op | Pre-computed CIF, zero per-call allocations |
 | **Cross-platform** | 7 targets | Windows, Linux, macOS, FreeBSD × AMD64 + ARM64 |
-| **Callbacks** | C→Go safe | `crosscall2` integration, works from any C thread |
+| **Callbacks** | C→Go safe | `crosscall2` integration, struct args, works from any C thread |
 | **Type-safe** | Runtime validation | 5 typed error types with `errors.As()` support |
 | **Struct pass/return** | Full ABI | Args: INTEGER/SSE classification. Returns: ≤8B (RAX), 9–16B (RAX+RDX), >16B (sret) |
 | **Context** | Timeouts | `CallFunctionContext(ctx, ...)` cancellation |
@@ -224,6 +224,7 @@ if err != nil {
 | API style | libffi-like (prepare once, call many) | reflect-based (RegisterFunc) | Native |
 | Per-call allocations | Zero (CIF reusable) | reflect + sync.Pool per call | Zero |
 | Struct pass/return | Full (RAX+RDX, sret) | Partial (no Windows structs) | Full |
+| Callback struct args | ≤8B, 9-16B, >16B (AMD64) | Not supported (panic) | Full |
 | Callback float returns | XMM0 in asm | Not supported (panic) | Full |
 | ARM64 HFA detection | Recursive (nested structs) | Partial (bug in nested path) | Full |
 | Typed errors | 5 types + errors.As() | Generic | N/A |

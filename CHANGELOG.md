@@ -13,12 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Race detector compatibility** — replaced direct `uintptr→unsafe.Pointer` casts with double-indirection pattern (Go proposal [#58625](https://github.com/golang/go/issues/58625)) in callback dispatch and return handling. `CGO_ENABLED=1 go test -race` now passes cleanly
 - **Classification: >16B structs** — `classifyArgumentAMD64` now correctly returns zero register usage for MEMORY class structs (previously claimed GP registers)
 - **Classification: mixed eightbyte** — per-eightbyte SSE/INTEGER classification now walks all members with INTEGER-wins merge rule per System V ABI
+- **Deprecated `reflect.Ptr`** — replaced with `reflect.Pointer` in callback validation (PR [#38](https://github.com/go-webgpu/goffi/pull/38), flagged by golangci-lint v2.12.1)
 
 ### Added
 - `CGO_ENABLED=1` support ([#13](https://github.com/go-webgpu/goffi/issues/13), PR [#37](https://github.com/go-webgpu/goffi/pull/37) by [@jiyeyuran](https://github.com/jiyeyuran)) — goffi now builds and tests under both `CGO_ENABLED=0` (fakecgo) and `CGO_ENABLED=1` (real `runtime/cgo`). Enables race detector, coexistence with CGO libraries (gocv, database drivers, etc.), and resolves [#22](https://github.com/go-webgpu/goffi/issues/22) duplicate symbol conflict as alternative workaround
 - C-thread callback test — `TestCallback_FromCThread` verifies `NewCallback` works when invoked from a `pthread_create`-spawned C thread under both CGO modes
 - Unit tests for struct argument classification and value packing (25 test cases)
-- **End-to-end struct argument tests** — `ffi/struct_e2e_test.go` compiles a C test library (`testdata/structtest.c`) via gcc at test time and validates 5 struct passing scenarios: ≤8B integer pair (issue #33 repro), ≤8B float pair (SSE), 16B two-eightbyte, >16B MEMORY class, and struct+scalar mixed arguments. Runs on Linux/macOS/FreeBSD where gcc is available; skipped gracefully elsewhere
+- **End-to-end struct argument tests** — `ffi/struct_e2e_test.go` compiles a C test library (`testdata/structtest.c`) via gcc at test time and validates 5 struct passing scenarios: ≤8B integer pair (issue #33 repro), ≤8B float pair (SSE), 16B two-eightbyte, >16B MEMORY class, and struct+scalar mixed arguments. Runs on Linux/macOS/FreeBSD/Windows where gcc is available; skipped gracefully elsewhere
+- **Callback struct argument support** ([#41](https://github.com/go-webgpu/goffi/issues/41), PR [#42](https://github.com/go-webgpu/goffi/pull/42) by [@pekim](https://github.com/pekim)) — callbacks (C→Go) now accept struct arguments on AMD64 Unix. All three size classes: ≤8B (INTEGER/SSE), 9-16B (two-eightbyte), >16B (MEMORY class from stack). Includes reflect-based ABI classification, nested struct support in `isStructAllFloats`, e2e tests with gcc-compiled C callback wrappers
+- **End-to-end callback struct tests** — 5 callback scenarios with C functions that construct structs and pass them by value to Go callbacks
 
 ## [0.5.0] - 2026-03-29
 
