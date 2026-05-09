@@ -398,7 +398,11 @@ func isStructAllFloats(structType reflect.Type) bool {
 
 	for i := range structType.NumField() {
 		field := structType.Field(i)
-		if field.Type.Kind() != reflect.Float32 && field.Type.Kind() != reflect.Float64 {
+		if field.Type.Kind() == reflect.Struct {
+			if !isStructAllFloats(field.Type) {
+				return false
+			}
+		} else if field.Type.Kind() != reflect.Float32 && field.Type.Kind() != reflect.Float64 {
 			return false
 		}
 	}

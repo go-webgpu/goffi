@@ -3,6 +3,7 @@
 package ffi
 
 import (
+	"reflect"
 	"testing"
 	"unsafe"
 )
@@ -217,4 +218,49 @@ func TestCallbackStruct20B(t *testing.T) {
 	frame[callbackStackIndex(1)] = uintptr(0x0F0E0D0C0B0A0908)
 	frame[callbackStackIndex(2)] = uintptr(0x00000011)
 	testCallbackStruct(t, frame, expected)
+}
+
+func TestIsStructAllFloats(t *testing.T) {
+	tests := []struct {
+		name     string
+		struct_  any
+		expected bool
+	}{
+		{"empty", struct{}{}, false},
+		{"float32", struct {
+			a float32
+		}{}, true},
+		{"float64", struct {
+			a float64
+		}{}, true},
+		{"two floats", struct {
+			a float32
+			b float64
+		}{}, true},
+		{"mixed", struct {
+			a float32
+			b int
+		}{}, false},
+		{"nested, float", struct {
+			a float32
+			b struct{ a float32 }
+		}{}, true},
+		{"nested, mixed", struct {
+			a float32
+			b struct {
+				a float32
+				b int
+			}
+		}{}, false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			typ := reflect.ValueOf(test.struct_).Type()
+			isAllFLoats := isStructAllFloats(typ)
+			if isAllFLoats != test.expected {
+				t.Fatalf("expected %t, but is %t", test.expected, isAllFLoats)
+			}
+		})
+	}
 }
