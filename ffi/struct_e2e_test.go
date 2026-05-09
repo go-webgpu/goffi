@@ -290,6 +290,9 @@ func TestStructArgWithScalar(t *testing.T) {
 }
 
 func TestCallbackStructArg8B_IntegerPair(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("callback struct args not supported on Windows")
+	}
 	requireStructLib(t)
 
 	sym, err := GetSymbol(structTestLib, "callback_struct_8")
@@ -334,6 +337,9 @@ func TestCallbackStructArg8B_IntegerPair(t *testing.T) {
 }
 
 func TestCallbackStructArg8B_FloatPair(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("callback struct args not supported on Windows")
+	}
 	requireStructLib(t)
 
 	sym, err := GetSymbol(structTestLib, "callback_struct_2floats")
@@ -378,6 +384,9 @@ func TestCallbackStructArg8B_FloatPair(t *testing.T) {
 }
 
 func TestCallbackStructArg16B(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("callback struct args not supported on Windows")
+	}
 	requireStructLib(t)
 
 	sym, err := GetSymbol(structTestLib, "callback_struct_16")
@@ -422,6 +431,9 @@ func TestCallbackStructArg16B(t *testing.T) {
 }
 
 func TestCallbackStructArg24B_MemoryClass(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("callback struct args not supported on Windows")
+	}
 	requireStructLib(t)
 
 	sym, err := GetSymbol(structTestLib, "callback_struct_24")
@@ -469,6 +481,9 @@ func TestCallbackStructArg24B_MemoryClass(t *testing.T) {
 }
 
 func TestCallbackStructArgWithScalar(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("callback struct args not supported on Windows")
+	}
 	requireStructLib(t)
 
 	sym, err := GetSymbol(structTestLib, "callback_struct_and_int")
