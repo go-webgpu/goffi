@@ -288,3 +288,246 @@ func TestStructArgWithScalar(t *testing.T) {
 		t.Errorf("take_struct_and_int({10, 20}, 1000) = %d, want %d", result, expected)
 	}
 }
+
+func TestCallbackStructArg8B_IntegerPair(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("callback struct args not supported on Windows")
+	}
+	requireStructLib(t)
+
+	sym, err := GetSymbol(structTestLib, "callback_struct_8")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var cif types.CallInterface
+	if err := PrepareCallInterface(&cif, types.DefaultCall, types.VoidTypeDescriptor,
+		[]*types.TypeDescriptor{
+			types.SInt32TypeDescriptor,
+			types.UInt32TypeDescriptor,
+			types.PointerTypeDescriptor,
+		}); err != nil {
+		t.Fatal(err)
+	}
+
+	type Pair struct {
+		A int32
+		B uint32
+	}
+
+	var receivedArg Pair
+	callback := NewCallback(func(s Pair) {
+		receivedArg = s
+	})
+
+	expected := Pair{42, 10}
+	args := []unsafe.Pointer{
+		unsafe.Pointer(&expected.A),
+		unsafe.Pointer(&expected.B),
+		unsafe.Pointer(&callback),
+	}
+
+	if err := CallFunction(&cif, sym, nil, args); err != nil {
+		t.Fatal(err)
+	}
+
+	if receivedArg != expected {
+		t.Errorf("expected %#v, received %#v", expected, receivedArg)
+	}
+}
+
+func TestCallbackStructArg8B_FloatPair(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("callback struct args not supported on Windows")
+	}
+	requireStructLib(t)
+
+	sym, err := GetSymbol(structTestLib, "callback_struct_2floats")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var cif types.CallInterface
+	if err := PrepareCallInterface(&cif, types.DefaultCall, types.VoidTypeDescriptor,
+		[]*types.TypeDescriptor{
+			types.FloatTypeDescriptor,
+			types.FloatTypeDescriptor,
+			types.PointerTypeDescriptor,
+		}); err != nil {
+		t.Fatal(err)
+	}
+
+	type PairF32 struct {
+		X float32
+		Y float32
+	}
+
+	var receivedArg PairF32
+	callback := NewCallback(func(s PairF32) {
+		receivedArg = s
+	})
+
+	expected := PairF32{2.5, 3.5}
+	args := []unsafe.Pointer{
+		unsafe.Pointer(&expected.X),
+		unsafe.Pointer(&expected.Y),
+		unsafe.Pointer(&callback),
+	}
+
+	if err := CallFunction(&cif, sym, nil, args); err != nil {
+		t.Fatal(err)
+	}
+
+	if receivedArg != expected {
+		t.Errorf("expected %#v, received %#v", expected, receivedArg)
+	}
+}
+
+func TestCallbackStructArg16B(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("callback struct args not supported on Windows")
+	}
+	requireStructLib(t)
+
+	sym, err := GetSymbol(structTestLib, "callback_struct_16")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var cif types.CallInterface
+	if err := PrepareCallInterface(&cif, types.DefaultCall, types.VoidTypeDescriptor,
+		[]*types.TypeDescriptor{
+			types.SInt64TypeDescriptor,
+			types.SInt64TypeDescriptor,
+			types.PointerTypeDescriptor,
+		}); err != nil {
+		t.Fatal(err)
+	}
+
+	type PairI64 struct {
+		A int64
+		B int64
+	}
+
+	var receivedArg PairI64
+	callback := NewCallback(func(s PairI64) {
+		receivedArg = s
+	})
+
+	expected := PairI64{1000000, 2000000}
+	args := []unsafe.Pointer{
+		unsafe.Pointer(&expected.A),
+		unsafe.Pointer(&expected.B),
+		unsafe.Pointer(&callback),
+	}
+
+	if err := CallFunction(&cif, sym, nil, args); err != nil {
+		t.Fatal(err)
+	}
+
+	if receivedArg != expected {
+		t.Errorf("expected %#v, received %#v", expected, receivedArg)
+	}
+}
+
+func TestCallbackStructArg24B_MemoryClass(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("callback struct args not supported on Windows")
+	}
+	requireStructLib(t)
+
+	sym, err := GetSymbol(structTestLib, "callback_struct_24")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var cif types.CallInterface
+	if err := PrepareCallInterface(&cif, types.DefaultCall, types.VoidTypeDescriptor,
+		[]*types.TypeDescriptor{
+			types.SInt64TypeDescriptor,
+			types.SInt64TypeDescriptor,
+			types.SInt64TypeDescriptor,
+			types.PointerTypeDescriptor,
+		}); err != nil {
+		t.Fatal(err)
+	}
+
+	type TripleI64 struct {
+		A int64
+		B int64
+		C int64
+	}
+
+	var receivedArg TripleI64
+	callback := NewCallback(func(s TripleI64) {
+		receivedArg = s
+	})
+
+	expected := TripleI64{100, 200, 300}
+	args := []unsafe.Pointer{
+		unsafe.Pointer(&expected.A),
+		unsafe.Pointer(&expected.B),
+		unsafe.Pointer(&expected.C),
+		unsafe.Pointer(&callback),
+	}
+
+	if err := CallFunction(&cif, sym, nil, args); err != nil {
+		t.Fatal(err)
+	}
+
+	if receivedArg != expected {
+		t.Errorf("expected %#v, received %#v", expected, receivedArg)
+	}
+}
+
+func TestCallbackStructArgWithScalar(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("callback struct args not supported on Windows")
+	}
+	requireStructLib(t)
+
+	sym, err := GetSymbol(structTestLib, "callback_struct_and_int")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var cif types.CallInterface
+	if err := PrepareCallInterface(&cif, types.DefaultCall, types.VoidTypeDescriptor,
+		[]*types.TypeDescriptor{
+			types.SInt32TypeDescriptor,
+			types.UInt32TypeDescriptor,
+			types.SInt64TypeDescriptor,
+			types.PointerTypeDescriptor,
+		}); err != nil {
+		t.Fatal(err)
+	}
+
+	type Pair struct {
+		A int32
+		B uint32
+	}
+
+	var receivedArg1 Pair
+	var receivedArg2 int64
+	callback := NewCallback(func(s Pair, extra int64) {
+		receivedArg1 = s
+		receivedArg2 = extra
+	})
+
+	expected := Pair{10, 20}
+	extra := int64(1000)
+	args := []unsafe.Pointer{
+		unsafe.Pointer(&expected.A),
+		unsafe.Pointer(&expected.B),
+		unsafe.Pointer(&extra),
+		unsafe.Pointer(&callback),
+	}
+
+	if err := CallFunction(&cif, sym, nil, args); err != nil {
+		t.Fatal(err)
+	}
+
+	if receivedArg1 != expected || receivedArg2 != extra {
+		t.Errorf("expected %#v %d, received %#v %d", expected, extra, receivedArg1, receivedArg2)
+	}
+}
