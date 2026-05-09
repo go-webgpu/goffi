@@ -301,7 +301,7 @@ func TestCallbackStructArg8B_IntegerPair(t *testing.T) {
 	}
 
 	var cif types.CallInterface
-	if err := PrepareCallInterface(&cif, types.DefaultCall, types.SInt64TypeDescriptor,
+	if err := PrepareCallInterface(&cif, types.DefaultCall, types.VoidTypeDescriptor,
 		[]*types.TypeDescriptor{
 			types.SInt32TypeDescriptor,
 			types.UInt32TypeDescriptor,
@@ -348,7 +348,7 @@ func TestCallbackStructArg8B_FloatPair(t *testing.T) {
 	}
 
 	var cif types.CallInterface
-	if err := PrepareCallInterface(&cif, types.DefaultCall, types.SInt64TypeDescriptor,
+	if err := PrepareCallInterface(&cif, types.DefaultCall, types.VoidTypeDescriptor,
 		[]*types.TypeDescriptor{
 			types.FloatTypeDescriptor,
 			types.FloatTypeDescriptor,
@@ -395,7 +395,7 @@ func TestCallbackStructArg16B(t *testing.T) {
 	}
 
 	var cif types.CallInterface
-	if err := PrepareCallInterface(&cif, types.DefaultCall, types.SInt64TypeDescriptor,
+	if err := PrepareCallInterface(&cif, types.DefaultCall, types.VoidTypeDescriptor,
 		[]*types.TypeDescriptor{
 			types.SInt64TypeDescriptor,
 			types.SInt64TypeDescriptor,
@@ -442,7 +442,7 @@ func TestCallbackStructArg24B_MemoryClass(t *testing.T) {
 	}
 
 	var cif types.CallInterface
-	if err := PrepareCallInterface(&cif, types.DefaultCall, types.SInt64TypeDescriptor,
+	if err := PrepareCallInterface(&cif, types.DefaultCall, types.VoidTypeDescriptor,
 		[]*types.TypeDescriptor{
 			types.SInt64TypeDescriptor,
 			types.SInt64TypeDescriptor,
@@ -492,7 +492,7 @@ func TestCallbackStructArgWithScalar(t *testing.T) {
 	}
 
 	var cif types.CallInterface
-	if err := PrepareCallInterface(&cif, types.DefaultCall, types.SInt64TypeDescriptor,
+	if err := PrepareCallInterface(&cif, types.DefaultCall, types.VoidTypeDescriptor,
 		[]*types.TypeDescriptor{
 			types.SInt32TypeDescriptor,
 			types.UInt32TypeDescriptor,
