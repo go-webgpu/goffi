@@ -412,6 +412,8 @@ func isStructAllFloats(structType reflect.Type) bool {
 // classifyEightbyte returns true if all struct fields whose offset falls within
 // [startOff, endOff) are SSE types (float or double).
 // Returns false if any field in the range is INTEGER class, or if no fields lie in the range.
+//
+// CAUTION: Does not currently support nested structs.
 func classifyEightbyte(structType reflect.Type, startOff, endOff uintptr) bool {
 	allFloat := true
 	hasField := false
