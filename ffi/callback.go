@@ -409,23 +409,17 @@ func isStructAllFloats(structType reflect.Type) bool {
 // [startOff, endOff) are SSE types (float or double).
 // Returns false if any field in the range is INTEGER class, or if no fields lie in the range.
 func classifyEightbyte(structType reflect.Type, startOff, endOff uintptr) bool {
-	var offset uintptr
 	allFloat := true
 	hasField := false
 	for i := range structType.NumField() {
 		field := structType.Field(i)
-		align := uintptr(field.Type.Align())
-		if align > 0 {
-			offset = (offset + align - 1) &^ (align - 1)
-		}
-		if offset >= startOff && offset < endOff {
+		if field.Offset >= startOff && field.Offset < endOff {
 			hasField = true
 			if field.Type.Kind() != reflect.Float32 && field.Type.Kind() != reflect.Float64 {
 				allFloat = false
 				break
 			}
 		}
-		offset += field.Type.Size()
 	}
 	return hasField && allFloat
 }
