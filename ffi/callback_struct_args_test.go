@@ -170,45 +170,51 @@ func TestCallbackStruct16BIntFloat(t *testing.T) {
 
 func TestCallbackStruct17B(t *testing.T) {
 	type struct_ struct {
-		a int64
-		b int64
-		c int8 // partial chunk - 1 byte
+		a [16]byte
+		b uint8 // partial chunk - 1 byte
 	}
-	expected := struct_{a: 10, b: 20, c: 30}
+	expected := struct_{
+		a: [16]byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F},
+		b: 0x11,
+	}
 
 	frame := [128]uintptr{}
-	frame[callbackStackIndex(0)] = uintptr(expected.a)
-	frame[callbackStackIndex(1)] = uintptr(expected.b)
-	frame[callbackStackIndex(2)] = uintptr(expected.c)
+	frame[callbackStackIndex(0)] = uintptr(0x0706050403020100)
+	frame[callbackStackIndex(1)] = uintptr(0x0F0E0D0C0B0A0908)
+	frame[callbackStackIndex(2)] = uintptr(0x11)
 	testCallbackStruct(t, frame, expected)
 }
 
 func TestCallbackStruct18B(t *testing.T) {
 	type struct_ struct {
-		a int64
-		b int64
-		c int16 // partial chunk - 2 bytes
+		a [16]byte
+		b uint16 // partial chunk - 2 bytes
 	}
-	expected := struct_{a: 10, b: 20, c: 30}
+	expected := struct_{
+		a: [16]byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F},
+		b: 0x0011,
+	}
 
 	frame := [128]uintptr{}
-	frame[callbackStackIndex(0)] = uintptr(expected.a)
-	frame[callbackStackIndex(1)] = uintptr(expected.b)
-	frame[callbackStackIndex(2)] = uintptr(expected.c)
+	frame[callbackStackIndex(0)] = uintptr(0x0706050403020100)
+	frame[callbackStackIndex(1)] = uintptr(0x0F0E0D0C0B0A0908)
+	frame[callbackStackIndex(2)] = uintptr(0x0011)
 	testCallbackStruct(t, frame, expected)
 }
 
 func TestCallbackStruct20B(t *testing.T) {
 	type struct_ struct {
-		a int64
-		b int64
-		c int32 // partial chunk - 4 bytes
+		a [16]byte
+		b uint32 // partial chunk - 4 bytes
 	}
-	expected := struct_{a: 10, b: 20, c: 30}
+	expected := struct_{
+		a: [16]byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F},
+		b: 0x00000011,
+	}
 
 	frame := [128]uintptr{}
-	frame[callbackStackIndex(0)] = uintptr(expected.a)
-	frame[callbackStackIndex(1)] = uintptr(expected.b)
-	frame[callbackStackIndex(2)] = uintptr(expected.c)
+	frame[callbackStackIndex(0)] = uintptr(0x0706050403020100)
+	frame[callbackStackIndex(1)] = uintptr(0x0F0E0D0C0B0A0908)
+	frame[callbackStackIndex(2)] = uintptr(0x00000011)
 	testCallbackStruct(t, frame, expected)
 }

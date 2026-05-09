@@ -333,7 +333,7 @@ func callbackWrap(a *callbackArgs) {
 					if bytesLeft >= 8 {
 						*(*uintptr)(chunkPtr) = chunk
 					} else {
-						writePartial(chunkPtr, bytesLeft, getInt())
+						writePartial(chunkPtr, bytesLeft, chunk)
 					}
 					stackIdx++
 				}
