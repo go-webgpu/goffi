@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-05-13
+
 ### Fixed
 - **AMD64: struct-by-value argument passing** — structs passed as arguments were sent as raw pointers instead of their bytes. Now correctly handles ≤8B (single eightbyte, INTEGER/SSE classification), 9-16B (two eightbytes classified independently), and >16B (MEMORY class, copied directly to stack bypassing registers). Follows System V AMD64 ABI §3.2.3. ([#33](https://github.com/go-webgpu/goffi/issues/33))
 - **AMD64 Windows: struct argument passing** — structs of exactly 1, 2, 4, or 8 bytes are now passed by value per Win64 ABI, not by pointer
