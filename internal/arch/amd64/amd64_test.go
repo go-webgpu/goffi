@@ -60,6 +60,39 @@ func TestClassifyReturnAMD64(t *testing.T) {
 		{"Struct2B", &types.TypeDescriptor{Size: 2, Kind: types.StructType}, types.ReturnSInt16},
 		{"Struct4B", &types.TypeDescriptor{Size: 4, Kind: types.StructType}, types.ReturnSInt32},
 		{"Struct8B", &types.TypeDescriptor{Size: 8, Kind: types.StructType}, types.ReturnInt64},
+		// 9-16B: two-eightbyte classification
+		{
+			"Struct16B_TwoDoubles",
+			&types.TypeDescriptor{Size: 16, Kind: types.StructType, Members: []*types.TypeDescriptor{
+				types.DoubleTypeDescriptor,
+				types.DoubleTypeDescriptor,
+			}},
+			types.ReturnStXmm0Xmm1,
+		},
+		{
+			"Struct16B_IntFloat",
+			&types.TypeDescriptor{Size: 16, Kind: types.StructType, Members: []*types.TypeDescriptor{
+				types.SInt64TypeDescriptor,
+				types.DoubleTypeDescriptor,
+			}},
+			types.ReturnStRaxXmm0,
+		},
+		{
+			"Struct16B_FloatInt",
+			&types.TypeDescriptor{Size: 16, Kind: types.StructType, Members: []*types.TypeDescriptor{
+				types.DoubleTypeDescriptor,
+				types.SInt64TypeDescriptor,
+			}},
+			types.ReturnStXmm0Rax,
+		},
+		{
+			"Struct16B_TwoInts",
+			&types.TypeDescriptor{Size: 16, Kind: types.StructType, Members: []*types.TypeDescriptor{
+				types.SInt64TypeDescriptor,
+				types.SInt64TypeDescriptor,
+			}},
+			types.ReturnStRaxRdx,
+		},
 		{"Struct24B", &types.TypeDescriptor{Size: 24, Kind: types.StructType}, types.ReturnViaPointer | types.ReturnVoid},
 	}
 
