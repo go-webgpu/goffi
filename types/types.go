@@ -108,16 +108,16 @@ type CallInterface struct {
 
 // Return flags constants
 const (
-	ReturnVoid       = 0
-	ReturnUInt8      = 1
-	ReturnUInt16     = 2
-	ReturnUInt32     = 3
-	ReturnSInt8      = 4
-	ReturnSInt16     = 5
-	ReturnSInt32     = 6
-	ReturnInt64      = 7
-	ReturnInXMM32    = 8
-	ReturnInXMM64    = 9
+	ReturnVoid    = 0
+	ReturnUInt8   = 1
+	ReturnUInt16  = 2
+	ReturnUInt32  = 3
+	ReturnSInt8   = 4
+	ReturnSInt16  = 5
+	ReturnSInt32  = 6
+	ReturnInt64   = 7
+	ReturnInXMM32 = 8
+	ReturnInXMM64 = 9
 	// AMD64 9-16B struct return modes (SysV ABI §3.2.3).
 	// Each eightbyte is classified independently as INTEGER (GP register) or SSE (XMM register).
 	// These flags drive handleReturn to reconstruct the struct from the correct registers.
