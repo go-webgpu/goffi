@@ -4,6 +4,7 @@ package amd64
 
 import (
 	"math"
+	"runtime"
 
 	"github.com/go-webgpu/goffi/types"
 )
@@ -34,11 +35,12 @@ func classifyReturnAMD64(t *types.TypeDescriptor, abi types.CallingConvention) i
 		case 8:
 			return types.ReturnInt64
 		default:
-			if t.Size > 16 {
-				// MEMORY class (>16B): returned via hidden first argument (sret pointer).
+			if t.Size > 16 || runtime.GOOS == "windows" {
+				// MEMORY class (>16B) or Windows (all structs >8B): sret pointer.
+				// Win64 ABI: structs not exactly 1/2/4/8 bytes are returned by reference.
 				return types.ReturnViaPointer | types.ReturnVoid
 			}
-			// 9-16B: classify each eightbyte independently per ABI §3.2.3.
+			// 9-16B on Unix: classify each eightbyte independently per SysV ABI §3.2.3.
 			// INTEGER wins over SSE within an eightbyte.
 			eb0SSE := classifyEightbyte(t, 0, 8)
 			eb1SSE := classifyEightbyte(t, 8, t.Size)

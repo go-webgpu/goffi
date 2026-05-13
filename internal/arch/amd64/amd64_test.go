@@ -4,11 +4,21 @@ package amd64
 
 import (
 	"math"
+	"runtime"
 	"testing"
 	"unsafe"
 
 	"github.com/go-webgpu/goffi/types"
 )
+
+// struct16BExpected returns the expected return flag for 9-16B structs.
+// On Windows, all structs >8B use sret regardless of field types.
+func struct16BExpected(unixFlag int) int {
+	if runtime.GOOS == "windows" {
+		return types.ReturnViaPointer | types.ReturnVoid
+	}
+	return unixFlag
+}
 
 func TestAlign(t *testing.T) {
 	impl := &Implementation{}
@@ -60,14 +70,14 @@ func TestClassifyReturnAMD64(t *testing.T) {
 		{"Struct2B", &types.TypeDescriptor{Size: 2, Kind: types.StructType}, types.ReturnSInt16},
 		{"Struct4B", &types.TypeDescriptor{Size: 4, Kind: types.StructType}, types.ReturnSInt32},
 		{"Struct8B", &types.TypeDescriptor{Size: 8, Kind: types.StructType}, types.ReturnInt64},
-		// 9-16B: two-eightbyte classification
+		// 9-16B: two-eightbyte classification (Unix only; Windows uses sret for all >8B)
 		{
 			"Struct16B_TwoDoubles",
 			&types.TypeDescriptor{Size: 16, Kind: types.StructType, Members: []*types.TypeDescriptor{
 				types.DoubleTypeDescriptor,
 				types.DoubleTypeDescriptor,
 			}},
-			types.ReturnStXmm0Xmm1,
+			struct16BExpected(types.ReturnStXmm0Xmm1),
 		},
 		{
 			"Struct16B_IntFloat",
@@ -75,7 +85,7 @@ func TestClassifyReturnAMD64(t *testing.T) {
 				types.SInt64TypeDescriptor,
 				types.DoubleTypeDescriptor,
 			}},
-			types.ReturnStRaxXmm0,
+			struct16BExpected(types.ReturnStRaxXmm0),
 		},
 		{
 			"Struct16B_FloatInt",
@@ -83,7 +93,7 @@ func TestClassifyReturnAMD64(t *testing.T) {
 				types.DoubleTypeDescriptor,
 				types.SInt64TypeDescriptor,
 			}},
-			types.ReturnStXmm0Rax,
+			struct16BExpected(types.ReturnStXmm0Rax),
 		},
 		{
 			"Struct16B_TwoInts",
@@ -91,7 +101,7 @@ func TestClassifyReturnAMD64(t *testing.T) {
 				types.SInt64TypeDescriptor,
 				types.SInt64TypeDescriptor,
 			}},
-			types.ReturnStRaxRdx,
+			struct16BExpected(types.ReturnStRaxRdx),
 		},
 		{"Struct24B", &types.TypeDescriptor{Size: 24, Kind: types.StructType}, types.ReturnViaPointer | types.ReturnVoid},
 	}

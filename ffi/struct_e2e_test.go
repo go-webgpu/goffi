@@ -692,6 +692,9 @@ func TestStructReturn16B_FloatInt(t *testing.T) {
 // TestStructReturn16B_TwoInts verifies that {int64, int64} returns in RAX:RDX.
 // SysV AMD64 ABI: both eightbytes INTEGER → ReturnStRaxRdx.
 func TestStructReturn16B_TwoInts(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows: 16B struct returns use sret, not RAX:RDX (Win64 ABI)")
+	}
 	requireStructLib(t)
 
 	sym, err := GetSymbol(structTestLib, "return_struct_2ints")
