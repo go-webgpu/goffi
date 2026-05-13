@@ -219,7 +219,7 @@ func (i *Implementation) Execute(
 	copy(stackArgs[:], sysargs[6:])
 
 	// Call via syscall
-	ret, r2, fret := gosyscall.CallNFloat(uintptr(fn), gpr, sse, stackArgs, numStack)
+	ret, r2, fret, fret2 := gosyscall.CallNFloat(uintptr(fn), gpr, sse, stackArgs, numStack)
 
 	runtime.KeepAlive(avalue)
 	runtime.KeepAlive(sretBuf)
@@ -237,5 +237,5 @@ func (i *Implementation) Execute(
 		retVal = *(*uint64)(unsafe.Pointer(&fret))
 	}
 
-	return i.handleReturn(cif, rvalue, retVal, uint64(r2))
+	return i.handleReturn(cif, rvalue, retVal, uint64(r2), fret, fret2)
 }

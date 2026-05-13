@@ -40,11 +40,15 @@ func (i *Implementation) ClassifyArgument(
 // Return value handling (common for both Unix and Windows AMD64).
 // retVal  = RAX (first integer return register)
 // retVal2 = RDX (second integer return register, used for 9-16 byte struct returns)
+// fret    = XMM0 float return value (for float/double types and SSE eightbytes)
+// fret2   = XMM1 second float return value (for {SSE, SSE} 9-16B struct returns, e.g. NSPoint)
 func (i *Implementation) handleReturn(
 	cif *types.CallInterface,
 	rvalue unsafe.Pointer,
 	retVal uint64,
 	retVal2 uint64,
+	fret float64,
+	fret2 float64,
 ) error {
 	if rvalue == nil || cif.ReturnType.Kind == types.VoidType {
 		return nil
@@ -83,23 +87,42 @@ func (i *Implementation) handleReturn(
 		*(*uint64)(rvalue) = retVal
 	case types.StructType:
 		// System V AMD64 ABI struct return rules:
-		//   <= 8 bytes : returned in RAX
-		//   9-16 bytes : returned in RAX (low 8) + RDX (high 8)
-		//   > 16 bytes : returned via hidden sret pointer (handled above)
+		//   <= 8 bytes : returned in RAX (any eightbyte class, since there is only one)
+		//   9-16 bytes : two eightbytes, each classified as INTEGER or SSE independently.
+		//                The return flag encodes which register pair was used:
+		//                  ReturnStRaxRdx   → {INTEGER, INTEGER} — RAX  : RDX
+		//                  ReturnStRaxXmm0  → {INTEGER, SSE}     — RAX  : XMM0
+		//                  ReturnStXmm0Rax  → {SSE, INTEGER}     — XMM0 : RAX
+		//                  ReturnStXmm0Xmm1 → {SSE, SSE}         — XMM0 : XMM1  (e.g. NSPoint)
+		//   > 16 bytes : returned via hidden sret pointer (handled above before the switch)
 		size := cif.ReturnType.Size
-		switch {
-		case size <= 8:
+		if size <= 8 {
 			*(*uint64)(rvalue) = retVal
-		case size <= 16:
-			// Copy RAX into first 8 bytes, RDX into remaining bytes
+			break
+		}
+		// 9-16B: reconstruct from the correct register pair.
+		remaining := size - 8
+		switch cif.Flags {
+		case types.ReturnStXmm0Xmm1:
+			// eightbyte0 from XMM0, eightbyte1 from XMM1
+			fretBits := *(*uint64)(unsafe.Pointer(&fret))
+			*(*uint64)(rvalue) = fretBits
+			fret2Bits := *(*uint64)(unsafe.Pointer(&fret2))
+			copy((*[8]byte)(unsafe.Add(rvalue, 8))[:remaining], (*[8]byte)(unsafe.Pointer(&fret2Bits))[:remaining])
+		case types.ReturnStXmm0Rax:
+			// eightbyte0 from XMM0, eightbyte1 from RAX
+			fretBits := *(*uint64)(unsafe.Pointer(&fret))
+			*(*uint64)(rvalue) = fretBits
+			copy((*[8]byte)(unsafe.Add(rvalue, 8))[:remaining], (*[8]byte)(unsafe.Pointer(&retVal))[:remaining])
+		case types.ReturnStRaxXmm0:
+			// eightbyte0 from RAX, eightbyte1 from XMM0
 			*(*uint64)(rvalue) = retVal
-			// Remaining bytes are in RDX; copy only what is needed
-			remaining := size - 8
-			src := (*[8]byte)(unsafe.Pointer(&retVal2))
-			dst := (*[8]byte)(unsafe.Add(rvalue, 8))
-			copy(dst[:remaining], src[:remaining])
+			fretBits := *(*uint64)(unsafe.Pointer(&fret))
+			copy((*[8]byte)(unsafe.Add(rvalue, 8))[:remaining], (*[8]byte)(unsafe.Pointer(&fretBits))[:remaining])
 		default:
-			return types.ErrUnsupportedReturnType
+			// ReturnStRaxRdx (and legacy/unset Flags): {INTEGER, INTEGER} — RAX : RDX
+			*(*uint64)(rvalue) = retVal
+			copy((*[8]byte)(unsafe.Add(rvalue, 8))[:remaining], (*[8]byte)(unsafe.Pointer(&retVal2))[:remaining])
 		}
 	default:
 		return types.ErrUnsupportedReturnType

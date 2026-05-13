@@ -4,6 +4,7 @@ package amd64
 
 import (
 	"math"
+	"runtime"
 
 	"github.com/go-webgpu/goffi/types"
 )
@@ -13,7 +14,8 @@ type classification struct {
 	SSECount int
 }
 
-// classifyReturnAMD64 for x86_64
+// classifyReturnAMD64 for x86_64.
+// Implements SysV AMD64 ABI §3.2.3 return-value classification.
 func classifyReturnAMD64(t *types.TypeDescriptor, abi types.CallingConvention) int {
 	switch t.Kind {
 	case types.VoidType:
@@ -33,7 +35,25 @@ func classifyReturnAMD64(t *types.TypeDescriptor, abi types.CallingConvention) i
 		case 8:
 			return types.ReturnInt64
 		default:
-			return types.ReturnViaPointer | types.ReturnVoid
+			if t.Size > 16 || runtime.GOOS == "windows" {
+				// MEMORY class (>16B) or Windows (all structs >8B): sret pointer.
+				// Win64 ABI: structs not exactly 1/2/4/8 bytes are returned by reference.
+				return types.ReturnViaPointer | types.ReturnVoid
+			}
+			// 9-16B on Unix: classify each eightbyte independently per SysV ABI §3.2.3.
+			// INTEGER wins over SSE within an eightbyte.
+			eb0SSE := classifyEightbyte(t, 0, 8)
+			eb1SSE := classifyEightbyte(t, 8, t.Size)
+			switch {
+			case eb0SSE && eb1SSE:
+				return types.ReturnStXmm0Xmm1 // {SSE, SSE}     — XMM0 : XMM1
+			case eb0SSE:
+				return types.ReturnStXmm0Rax // {SSE, INTEGER} — XMM0 : RAX
+			case eb1SSE:
+				return types.ReturnStRaxXmm0 // {INTEGER, SSE} — RAX  : XMM0
+			default:
+				return types.ReturnStRaxRdx // {INTEGER, INTEGER} — RAX : RDX
+			}
 		}
 	default:
 		if t.Size <= 8 {

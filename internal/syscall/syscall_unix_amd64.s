@@ -106,6 +106,7 @@ TEXT syscallN(SB), NOSPLIT|NOFRAME, $0
 	MOVQ AX, 192(DI) // r1: integer return in RAX
 	MOVQ DX, 200(DI) // r2: second integer return in RDX (9-16 byte structs)
 	MOVQ X0, 128(DI) // f1: float return in XMM0
+	MOVQ X1, 136(DI) // f2: XMM1 — second SSE return for 9-16B all-float struct returns
 
 	// Restore stack and return
 	XORL AX, AX          // no error (ignored by runtime.cgocall)

@@ -49,7 +49,8 @@ var syscallNABI0 uintptr
 //   - r1: RAX integer return value
 //   - r2: RDX second integer return value (9-16 byte struct returns)
 //   - f1: XMM0 float return value (bit pattern)
-func CallNFloat(fn uintptr, gpr [6]uintptr, sse [8]float64, stackArgs [9]uintptr, numStack int) (r1 uintptr, r2 uintptr, f1 float64) {
+//   - f2: XMM1 second float return value — for {SSE, SSE} 9-16B struct returns (e.g. NSPoint)
+func CallNFloat(fn uintptr, gpr [6]uintptr, sse [8]float64, stackArgs [9]uintptr, numStack int) (r1 uintptr, r2 uintptr, f1 float64, f2 float64) {
 	args := syscallArgs{
 		fn: fn,
 		a1: gpr[0], a2: gpr[1], a3: gpr[2],
@@ -79,5 +80,6 @@ func CallNFloat(fn uintptr, gpr [6]uintptr, sse [8]float64, stackArgs [9]uintptr
 	r1 = args.r1
 	r2 = args.r2
 	f1 = *(*float64)(unsafe.Pointer(&args.f1))
+	f2 = *(*float64)(unsafe.Pointer(&args.f2))
 	return
 }

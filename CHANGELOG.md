@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Classification: >16B structs** — `classifyArgumentAMD64` now correctly returns zero register usage for MEMORY class structs (previously claimed GP registers)
 - **Classification: mixed eightbyte** — per-eightbyte SSE/INTEGER classification now walks all members with INTEGER-wins merge rule per System V ABI
 - **Deprecated `reflect.Ptr`** — replaced with `reflect.Pointer` in callback validation (PR [#38](https://github.com/go-webgpu/goffi/pull/38), flagged by golangci-lint v2.12.1)
+- **AMD64: 9-16B struct return via XMM registers** — structs like `{float64, float64}` (NSPoint, NSSize, CGPoint, CGSize) now correctly return via XMM0:XMM1 per System V ABI. Previously misclassified as sret (hidden pointer), producing corrupted values on macOS Intel. Four return modes now supported: RAX:RDX, RAX:XMM0, XMM0:RAX, XMM0:XMM1 (TASK-045)
 
 ### Added
 - `CGO_ENABLED=1` support ([#13](https://github.com/go-webgpu/goffi/issues/13), PR [#37](https://github.com/go-webgpu/goffi/pull/37) by [@jiyeyuran](https://github.com/jiyeyuran)) — goffi now builds and tests under both `CGO_ENABLED=0` (fakecgo) and `CGO_ENABLED=1` (real `runtime/cgo`). Enables race detector, coexistence with CGO libraries (gocv, database drivers, etc.), and resolves [#22](https://github.com/go-webgpu/goffi/issues/22) duplicate symbol conflict as alternative workaround

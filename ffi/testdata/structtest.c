@@ -54,3 +54,33 @@ void callback_struct_and_int(int32_t a, uint32_t b, int64_t extra,
     struct pair_i32_u32 s = {.a = a, .b = b};
     callback(s, extra);
 }
+
+// Struct RETURN functions — test XMM0:XMM1 / RAX:RDX register pair selection.
+// {double, double}: SysV AMD64 ABI returns this in XMM0:XMM1 (SSE, SSE).
+// Models NSPoint / NSSize on macOS Intel.
+struct pair_f64 { double a; double b; };
+struct pair_f64 return_struct_2doubles(double a, double b) {
+    struct pair_f64 s = {.a = a, .b = b};
+    return s;
+}
+
+// {int64, double}: eightbyte0 INTEGER (RAX), eightbyte1 SSE (XMM0).
+struct mixed_int_float { int64_t a; double b; };
+struct mixed_int_float return_struct_int_float(int64_t a, double b) {
+    struct mixed_int_float s = {.a = a, .b = b};
+    return s;
+}
+
+// {double, int64}: eightbyte0 SSE (XMM0), eightbyte1 INTEGER (RAX).
+struct mixed_float_int { double a; int64_t b; };
+struct mixed_float_int return_struct_float_int(double a, int64_t b) {
+    struct mixed_float_int s = {.a = a, .b = b};
+    return s;
+}
+
+// {int64, int64}: both INTEGER, returned in RAX:RDX.
+struct return_pair_i64 { int64_t a; int64_t b; };
+struct return_pair_i64 return_struct_2ints(int64_t a, int64_t b) {
+    struct return_pair_i64 s = {.a = a, .b = b};
+    return s;
+}

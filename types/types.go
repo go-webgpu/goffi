@@ -108,16 +108,23 @@ type CallInterface struct {
 
 // Return flags constants
 const (
-	ReturnVoid       = 0
-	ReturnUInt8      = 1
-	ReturnUInt16     = 2
-	ReturnUInt32     = 3
-	ReturnSInt8      = 4
-	ReturnSInt16     = 5
-	ReturnSInt32     = 6
-	ReturnInt64      = 7
-	ReturnInXMM32    = 8
-	ReturnInXMM64    = 9
+	ReturnVoid    = 0
+	ReturnUInt8   = 1
+	ReturnUInt16  = 2
+	ReturnUInt32  = 3
+	ReturnSInt8   = 4
+	ReturnSInt16  = 5
+	ReturnSInt32  = 6
+	ReturnInt64   = 7
+	ReturnInXMM32 = 8
+	ReturnInXMM64 = 9
+	// AMD64 9-16B struct return modes (SysV ABI §3.2.3).
+	// Each eightbyte is classified independently as INTEGER (GP register) or SSE (XMM register).
+	// These flags drive handleReturn to reconstruct the struct from the correct registers.
+	ReturnStRaxRdx   = 10 // {INTEGER, INTEGER} — eightbyte0 in RAX,  eightbyte1 in RDX
+	ReturnStRaxXmm0  = 11 // {INTEGER, SSE}     — eightbyte0 in RAX,  eightbyte1 in XMM0
+	ReturnStXmm0Rax  = 12 // {SSE, INTEGER}     — eightbyte0 in XMM0, eightbyte1 in RAX
+	ReturnStXmm0Xmm1 = 13 // {SSE, SSE}         — eightbyte0 in XMM0, eightbyte1 in XMM1 (e.g. NSPoint/NSSize)
 	ReturnViaPointer = 1 << 10
 	// ARM64 HFA (Homogeneous Floating-point Aggregate) return flags.
 	// HFA structs with 2-4 float/double members are returned in D0-D3.

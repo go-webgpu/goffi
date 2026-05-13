@@ -79,5 +79,7 @@ func (i *Implementation) Execute(
 	// XMM0. Since this requires significant additional infrastructure and matches purego's
 	// documented limitation, it is recorded as a known limitation for v0.4.1.
 	// See: TASK-019, GAP-7. Workaround: use integer return type and reinterpret bits.
-	return i.handleReturn(cif, rvalue, uint64(ret), 0)
+	// fret and fret2 are zero: Windows syscall.SyscallN does not capture XMM returns.
+	// Float-returning functions on Windows require a custom assembly wrapper (known limitation).
+	return i.handleReturn(cif, rvalue, uint64(ret), 0, 0, 0)
 }

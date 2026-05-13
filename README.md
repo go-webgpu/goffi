@@ -35,7 +35,7 @@ ffi.CallFunction(cif, sym, unsafe.Pointer(&result), args)
 | **Cross-platform** | 7 targets | Windows, Linux, macOS, FreeBSD × AMD64 + ARM64 |
 | **Callbacks** | C→Go safe | `crosscall2` integration, struct args, works from any C thread |
 | **Type-safe** | Runtime validation | 5 typed error types with `errors.As()` support |
-| **Struct pass/return** | Full ABI | Args: INTEGER/SSE classification. Returns: ≤8B (RAX), 9–16B (RAX+RDX), >16B (sret) |
+| **Struct pass/return** | Full ABI | Args: INTEGER/SSE classification. Returns: ≤8B (RAX/XMM0), 9–16B (4 modes: RAX/XMM × RAX/XMM), >16B (sret) |
 | **Context** | Timeouts | `CallFunctionContext(ctx, ...)` cancellation |
 | **Race detector** | `-race` compatible | `CGO_ENABLED=1 go test -race` works cleanly |
 | **Tested** | 89% coverage | CI on Linux, Windows, macOS (CGO=0 and CGO=1) |
