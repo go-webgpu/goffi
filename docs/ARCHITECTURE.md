@@ -191,8 +191,17 @@ Classification uses `reflect.Type` (not `types.TypeDescriptor`) since callback s
 
 ABI rules for returning structs depend on size:
 
-- **≤ 8 bytes**: returned in RAX (AMD64) or X0 (ARM64)
-- **9-16 bytes** (AMD64): split across RAX (low 8) + RDX (high 8)
+- **≤ 8 bytes**: returned in RAX (INTEGER) or XMM0 (SSE) on AMD64, X0 or D0 on ARM64
+- **9-16 bytes** (AMD64): two eightbytes, each returned in GP or XMM per classification. Four modes:
+
+| Struct layout | Eightbyte 0 | Eightbyte 1 | Registers | Flag |
+|---|---|---|---|---|
+| `{int64, int64}` | INTEGER | INTEGER | RAX + RDX | `ReturnStRaxRdx` |
+| `{int64, float64}` | INTEGER | SSE | RAX + XMM0 | `ReturnStRaxXmm0` |
+| `{float64, int64}` | SSE | INTEGER | XMM0 + RAX | `ReturnStXmm0Rax` |
+| `{float64, float64}` | SSE | SSE | XMM0 + XMM1 | `ReturnStXmm0Xmm1` |
+
+Classification is computed at CIF-prepare time (`classifyReturnAMD64` using `classifyEightbyte`), stored in `cif.Flags`, and dispatched in `handleReturn`. This matches libffi's `UNIX64_RET_ST_*` pattern.
 - **> 16 bytes**: caller passes a hidden pointer as the first argument (sret)
 
 Implementation in `internal/arch/amd64/implementation.go`:

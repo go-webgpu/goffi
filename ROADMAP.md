@@ -3,7 +3,7 @@
 > **Strategic Approach**: Build production-ready Zero-CGO FFI with benchmarked performance
 > **Philosophy**: Performance first, usability second, platform coverage third
 
-**Last Updated**: 2026-03-02 | **Current Version**: v0.4.1 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → API → v1.0 LTS | **Milestone**: v0.4.1 (ABI compliance) → v0.5.0 Usability → v1.0.0 LTS
+**Last Updated**: 2026-05-13 | **Current Version**: v0.5.0 (v0.5.1 pending) | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → ABI → v1.0 LTS | **Milestone**: v0.5.1 (struct ABI + CGO=1) → v0.6.0 Variadic/Builder → v1.0.0 LTS
 
 ---
 
@@ -56,11 +56,15 @@ v0.3.9 (CALLBACK FIXES) ✅ RELEASED 2026-02-18
          ↓ (runtime integration)
 v0.4.0 (CROSSCALL2 INTEGRATION) ✅ RELEASED 2026-02-27
          ↓ (usability)
-v0.5.0 (USABILITY + VARIADIC) → 2026 Q2-Q3
+v0.5.0 (PLATFORM COVERAGE) ✅ RELEASED 2026-03-29
+         ↓ (struct ABI + CGO support)
+v0.5.1 (STRUCT ABI + CGO_ENABLED=1) → 2026-05 (pending tag)
+         ↓ (variadic + builder API)
+v0.6.0 (VARIADIC + BUILDER API) → 2026 Q3
          ↓ (advanced features)
 v0.8.0 (ADVANCED FEATURES) → 2026 Q3-Q4
          ↓ (community adoption + validation)
-v1.0.0 LTS → Long-term support release (Q1 2026)
+v1.0.0 LTS → Long-term support release (2027 Q1)
 ```
 
 ### Critical Milestones
@@ -119,12 +123,26 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 - Struct return 9-16 bytes, sret hidden pointer, HFA stack spill
 - Overflow detection, `runtime.KeepAlive` safety
 
-**v0.5.0** = Usability + Variadic (2026 Q2-Q3)
-- Builder pattern API
-- Platform-specific struct handling
-- **Variadic function support** (printf, sprintf, etc.)
+**v0.5.0** = Platform coverage ✅ RELEASED (2026-03-29)
+- **Windows ARM64** support (Snapdragon X Elite, tested by @SideFx)
+- **FreeBSD amd64** support (cross-compile verified)
+- 7 platform targets (Linux/Windows/macOS/FreeBSD × amd64 + ARM64)
 
-**v1.0.0** = Long-term support release (Q1 2026)
+**v0.5.1** = Struct ABI + CGO_ENABLED=1 (2026-05, pending tag)
+- **CGO_ENABLED=1 support** (PR #37 by @jiyeyuran) — dual-mode build, race detector compatible
+- **Struct by-value argument passing** (PR #39, closes #33) — ≤8B/9-16B/>16B, INTEGER/SSE classification
+- **Callback struct arguments** (PR #42 by @pekim, closes #41) — C→Go callbacks with struct args
+- **9-16B struct return via XMM** (TASK-045) — 4 return modes: RAX:RDX, RAX:XMM0, XMM0:RAX, XMM0:XMM1
+- **Race detector** — checkptr double-indirection fix (Go #58625), `-race` clean
+- **E2E test infrastructure** — gcc-compiled C test library for struct passing verification
+- Contributors: @jiyeyuran (CGO path maintainer), @pekim (callback structs)
+
+**v0.6.0** = Variadic + Builder API (2026 Q3)
+- Builder pattern API
+- **Variadic function support** (printf, sprintf, etc.)
+- RegisterFunc convenience API
+
+**v1.0.0** = Long-term support release (2027 Q1)
 - API stability guarantee
 - Security audit
 - Published benchmarks vs CGO/purego
@@ -132,9 +150,9 @@ v1.0.0 LTS → Long-term support release (Q1 2026)
 
 ---
 
-## 📊 Current Status (v0.4.1)
+## 📊 Current Status (v0.5.1)
 
-**Phase**: ABI compliance audit complete, forward call path fully verified
+**Phase**: Struct ABI complete, CGO_ENABLED=1 supported, SSE struct return fixed
 
 **What Works**:
 - ✅ Dynamic library loading (`LoadLibrary`, `GetSymbol`, `FreeLibrary`)
