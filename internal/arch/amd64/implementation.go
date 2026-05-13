@@ -40,11 +40,15 @@ func (i *Implementation) ClassifyArgument(
 // Return value handling (common for both Unix and Windows AMD64).
 // retVal  = RAX (first integer return register)
 // retVal2 = RDX (second integer return register, used for 9-16 byte struct returns)
+// fret    = XMM0 float return value (for float/double types and SSE eightbytes)
+// fret2   = XMM1 second float return value (for {SSE, SSE} 9-16B struct returns, e.g. NSPoint)
 func (i *Implementation) handleReturn(
 	cif *types.CallInterface,
 	rvalue unsafe.Pointer,
 	retVal uint64,
 	retVal2 uint64,
+	fret float64,
+	fret2 float64,
 ) error {
 	if rvalue == nil || cif.ReturnType.Kind == types.VoidType {
 		return nil

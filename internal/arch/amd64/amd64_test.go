@@ -137,7 +137,7 @@ func TestHandleReturn(t *testing.T) {
 
 	t.Run("Void", func(t *testing.T) {
 		cif := &types.CallInterface{ReturnType: types.VoidTypeDescriptor}
-		err := impl.handleReturn(cif, nil, 0, 0)
+		err := impl.handleReturn(cif, nil, 0, 0, 0, 0)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -145,7 +145,7 @@ func TestHandleReturn(t *testing.T) {
 
 	t.Run("NilRvalue", func(t *testing.T) {
 		cif := &types.CallInterface{ReturnType: types.UInt64TypeDescriptor}
-		err := impl.handleReturn(cif, nil, 42, 0)
+		err := impl.handleReturn(cif, nil, 42, 0, 0, 0)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -154,7 +154,7 @@ func TestHandleReturn(t *testing.T) {
 	t.Run("UInt8", func(t *testing.T) {
 		var result uint8
 		cif := &types.CallInterface{ReturnType: types.UInt8TypeDescriptor}
-		err := impl.handleReturn(cif, unsafe.Pointer(&result), 0xFF, 0)
+		err := impl.handleReturn(cif, unsafe.Pointer(&result), 0xFF, 0, 0, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -166,7 +166,7 @@ func TestHandleReturn(t *testing.T) {
 	t.Run("SInt8", func(t *testing.T) {
 		var result int8
 		cif := &types.CallInterface{ReturnType: types.SInt8TypeDescriptor}
-		err := impl.handleReturn(cif, unsafe.Pointer(&result), uint64(0xFE), 0) // -2
+		err := impl.handleReturn(cif, unsafe.Pointer(&result), uint64(0xFE), 0, 0, 0) // -2
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -178,7 +178,7 @@ func TestHandleReturn(t *testing.T) {
 	t.Run("UInt16", func(t *testing.T) {
 		var result uint16
 		cif := &types.CallInterface{ReturnType: types.UInt16TypeDescriptor}
-		err := impl.handleReturn(cif, unsafe.Pointer(&result), 0xBEEF, 0)
+		err := impl.handleReturn(cif, unsafe.Pointer(&result), 0xBEEF, 0, 0, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -190,7 +190,7 @@ func TestHandleReturn(t *testing.T) {
 	t.Run("SInt16", func(t *testing.T) {
 		var result int16
 		cif := &types.CallInterface{ReturnType: types.SInt16TypeDescriptor}
-		err := impl.handleReturn(cif, unsafe.Pointer(&result), uint64(0xFFFF), 0) // -1
+		err := impl.handleReturn(cif, unsafe.Pointer(&result), uint64(0xFFFF), 0, 0, 0) // -1
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -202,7 +202,7 @@ func TestHandleReturn(t *testing.T) {
 	t.Run("UInt32", func(t *testing.T) {
 		var result uint32
 		cif := &types.CallInterface{ReturnType: types.UInt32TypeDescriptor}
-		err := impl.handleReturn(cif, unsafe.Pointer(&result), 0xDEADBEEF, 0)
+		err := impl.handleReturn(cif, unsafe.Pointer(&result), 0xDEADBEEF, 0, 0, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -214,7 +214,7 @@ func TestHandleReturn(t *testing.T) {
 	t.Run("SInt32", func(t *testing.T) {
 		var result int32
 		cif := &types.CallInterface{ReturnType: types.SInt32TypeDescriptor}
-		err := impl.handleReturn(cif, unsafe.Pointer(&result), uint64(0xFFFFFFFF), 0) // -1
+		err := impl.handleReturn(cif, unsafe.Pointer(&result), uint64(0xFFFFFFFF), 0, 0, 0) // -1
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -226,7 +226,7 @@ func TestHandleReturn(t *testing.T) {
 	t.Run("UInt64", func(t *testing.T) {
 		var result uint64
 		cif := &types.CallInterface{ReturnType: types.UInt64TypeDescriptor}
-		err := impl.handleReturn(cif, unsafe.Pointer(&result), 0x123456789ABCDEF0, 0)
+		err := impl.handleReturn(cif, unsafe.Pointer(&result), 0x123456789ABCDEF0, 0, 0, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -238,7 +238,7 @@ func TestHandleReturn(t *testing.T) {
 	t.Run("SInt64", func(t *testing.T) {
 		var result uint64
 		cif := &types.CallInterface{ReturnType: types.SInt64TypeDescriptor}
-		err := impl.handleReturn(cif, unsafe.Pointer(&result), 42, 0)
+		err := impl.handleReturn(cif, unsafe.Pointer(&result), 42, 0, 0, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -250,7 +250,7 @@ func TestHandleReturn(t *testing.T) {
 	t.Run("Pointer", func(t *testing.T) {
 		var result uint64
 		cif := &types.CallInterface{ReturnType: types.PointerTypeDescriptor}
-		err := impl.handleReturn(cif, unsafe.Pointer(&result), 0xCAFEBABE, 0)
+		err := impl.handleReturn(cif, unsafe.Pointer(&result), 0xCAFEBABE, 0, 0, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -264,7 +264,7 @@ func TestHandleReturn(t *testing.T) {
 		expected := float32(3.14)
 		bits := uint64(math.Float32bits(expected))
 		cif := &types.CallInterface{ReturnType: types.FloatTypeDescriptor}
-		err := impl.handleReturn(cif, unsafe.Pointer(&result), bits, 0)
+		err := impl.handleReturn(cif, unsafe.Pointer(&result), bits, 0, 0, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -278,7 +278,7 @@ func TestHandleReturn(t *testing.T) {
 		expected := 2.71828
 		bits := math.Float64bits(expected)
 		cif := &types.CallInterface{ReturnType: types.DoubleTypeDescriptor}
-		err := impl.handleReturn(cif, unsafe.Pointer(&result), bits, 0)
+		err := impl.handleReturn(cif, unsafe.Pointer(&result), bits, 0, 0, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -292,7 +292,7 @@ func TestHandleReturn(t *testing.T) {
 		cif := &types.CallInterface{
 			ReturnType: &types.TypeDescriptor{Size: 8, Kind: types.StructType},
 		}
-		err := impl.handleReturn(cif, unsafe.Pointer(&result), 0xDEADCAFE, 0)
+		err := impl.handleReturn(cif, unsafe.Pointer(&result), 0xDEADCAFE, 0, 0, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -302,14 +302,22 @@ func TestHandleReturn(t *testing.T) {
 	})
 
 	t.Run("Struct9to16", func(t *testing.T) {
-		// 12-byte struct: RAX=low 8 bytes, RDX=high 4 bytes
+		// 12-byte struct {int64, int32}: RAX=low 8 bytes, RDX=high 4 bytes (ReturnStRaxRdx)
 		var buf [16]byte
 		cif := &types.CallInterface{
-			ReturnType: &types.TypeDescriptor{Size: 12, Kind: types.StructType},
+			ReturnType: &types.TypeDescriptor{
+				Size: 12,
+				Kind: types.StructType,
+				Members: []*types.TypeDescriptor{
+					types.SInt64TypeDescriptor,
+					types.SInt32TypeDescriptor,
+				},
+			},
+			Flags: types.ReturnStRaxRdx,
 		}
 		retVal := uint64(0x0807060504030201)
 		retVal2 := uint64(0x0000000C0B0A09)
-		err := impl.handleReturn(cif, unsafe.Pointer(&buf[0]), retVal, retVal2)
+		err := impl.handleReturn(cif, unsafe.Pointer(&buf[0]), retVal, retVal2, 0, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -334,7 +342,7 @@ func TestHandleReturn(t *testing.T) {
 		cif := &types.CallInterface{
 			ReturnType: &types.TypeDescriptor{Size: 24, Kind: types.StructType},
 		}
-		err := impl.handleReturn(cif, unsafe.Pointer(&buf[0]), 0, 0)
+		err := impl.handleReturn(cif, unsafe.Pointer(&buf[0]), 0, 0, 0, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -350,7 +358,7 @@ func TestHandleReturn(t *testing.T) {
 			ReturnType: types.PointerTypeDescriptor,
 			Flags:      types.ReturnViaPointer,
 		}
-		err := impl.handleReturn(cif, unsafe.Pointer(&result), uint64(uintptr(unsafe.Pointer(&dummy))), 0)
+		err := impl.handleReturn(cif, unsafe.Pointer(&result), uint64(uintptr(unsafe.Pointer(&dummy))), 0, 0, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
