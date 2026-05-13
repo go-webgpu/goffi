@@ -401,6 +401,126 @@ func TestHandleReturn(t *testing.T) {
 	})
 }
 
+func TestHandleReturnSSEStructs(t *testing.T) {
+	impl := &Implementation{}
+
+	t.Run("ReturnStXmm0Xmm1_TwoDoubles", func(t *testing.T) {
+		// {double, double} returned in XMM0 : XMM1 — the NSPoint/NSSize case.
+		type PairF64 struct{ A, B float64 }
+		var result PairF64
+		cif := &types.CallInterface{
+			ReturnType: &types.TypeDescriptor{
+				Size: 16, Kind: types.StructType,
+				Members: []*types.TypeDescriptor{
+					types.DoubleTypeDescriptor,
+					types.DoubleTypeDescriptor,
+				},
+			},
+			Flags: types.ReturnStXmm0Xmm1,
+		}
+		a := 1.5
+		b := 2.5
+		fret := a
+		fret2 := b
+		err := impl.handleReturn(cif, unsafe.Pointer(&result), 0, 0, fret, fret2)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result.A != a || result.B != b {
+			t.Errorf("got {%f, %f}, want {%f, %f}", result.A, result.B, a, b)
+		}
+	})
+
+	t.Run("ReturnStXmm0Rax_FloatInt", func(t *testing.T) {
+		// {double, int64} returned in XMM0 : RAX
+		type MixedFloatInt struct {
+			A float64
+			B int64
+		}
+		var result MixedFloatInt
+		cif := &types.CallInterface{
+			ReturnType: &types.TypeDescriptor{
+				Size: 16, Kind: types.StructType,
+				Members: []*types.TypeDescriptor{
+					types.DoubleTypeDescriptor,
+					types.SInt64TypeDescriptor,
+				},
+			},
+			Flags: types.ReturnStXmm0Rax,
+		}
+		a := 3.14
+		b := int64(42)
+		fret := a
+		// eightbyte1 (B) comes from RAX which maps to retVal in handleReturn
+		// but ReturnStXmm0Rax uses retVal for the second slot
+		bBits := *(*uint64)(unsafe.Pointer(&b))
+		err := impl.handleReturn(cif, unsafe.Pointer(&result), bBits, 0, fret, 0)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result.A != a || result.B != b {
+			t.Errorf("got {%f, %d}, want {%f, %d}", result.A, result.B, a, b)
+		}
+	})
+
+	t.Run("ReturnStRaxXmm0_IntFloat", func(t *testing.T) {
+		// {int64, double} returned in RAX : XMM0
+		type MixedIntFloat struct {
+			A int64
+			B float64
+		}
+		var result MixedIntFloat
+		cif := &types.CallInterface{
+			ReturnType: &types.TypeDescriptor{
+				Size: 16, Kind: types.StructType,
+				Members: []*types.TypeDescriptor{
+					types.SInt64TypeDescriptor,
+					types.DoubleTypeDescriptor,
+				},
+			},
+			Flags: types.ReturnStRaxXmm0,
+		}
+		a := int64(100)
+		b := 2.71828
+		aBits := *(*uint64)(unsafe.Pointer(&a))
+		fret := b
+		err := impl.handleReturn(cif, unsafe.Pointer(&result), aBits, 0, fret, 0)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result.A != a || result.B != b {
+			t.Errorf("got {%d, %f}, want {%d, %f}", result.A, result.B, a, b)
+		}
+	})
+
+	t.Run("ReturnStRaxRdx_TwoInts", func(t *testing.T) {
+		// {int64, int64} returned in RAX : RDX
+		type PairI64 struct{ A, B int64 }
+		var result PairI64
+		cif := &types.CallInterface{
+			ReturnType: &types.TypeDescriptor{
+				Size: 16, Kind: types.StructType,
+				Members: []*types.TypeDescriptor{
+					types.SInt64TypeDescriptor,
+					types.SInt64TypeDescriptor,
+				},
+			},
+			Flags: types.ReturnStRaxRdx,
+		}
+		a := int64(0xDEAD)
+		b := int64(0xBEEF)
+		aBits := *(*uint64)(unsafe.Pointer(&a))
+		bBits := *(*uint64)(unsafe.Pointer(&b))
+		err := impl.handleReturn(cif, unsafe.Pointer(&result), aBits, bBits, 0, 0)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result.A != a || result.B != b {
+			t.Errorf("got {%d, %d}, want {%d, %d}", result.A, result.B, a, b)
+		}
+	})
+}
+
 func TestClassifyReturnViaInterface(t *testing.T) {
 	impl := &Implementation{}
 	got := impl.ClassifyReturn(types.FloatTypeDescriptor, types.UnixCallingConvention)
