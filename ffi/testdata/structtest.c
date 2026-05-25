@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdarg.h>
 
 // ≤ 8 bytes: {int32, uint32} — INTEGER class, single GP register
 struct pair_i32_u32 { int32_t a; uint32_t b; };
@@ -83,4 +84,29 @@ struct return_pair_i64 { int64_t a; int64_t b; };
 struct return_pair_i64 return_struct_2ints(int64_t a, int64_t b) {
     struct return_pair_i64 s = {.a = a, .b = b};
     return s;
+}
+
+// Variadic: sum N int64_t values.
+// Prototype: int64_t sum_variadic(int64_t count, ...)
+// nfixedargs = 1 (only 'count' is fixed).
+int64_t sum_variadic(int64_t count, ...) {
+    va_list ap;
+    va_start(ap, count);
+    int64_t sum = 0;
+    for (int64_t i = 0; i < count; i++) {
+        sum += va_arg(ap, int64_t);
+    }
+    va_end(ap);
+    return sum;
+}
+
+// Variadic: two fixed args plus one variadic int64_t.
+// Prototype: int64_t variadic_two_fixed(int64_t a, int64_t b, ...)
+// nfixedargs = 2 (a and b are fixed).
+int64_t variadic_two_fixed(int64_t a, int64_t b, ...) {
+    va_list ap;
+    va_start(ap, b);
+    int64_t extra = va_arg(ap, int64_t);
+    va_end(ap);
+    return a + b + extra;
 }
