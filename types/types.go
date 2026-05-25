@@ -96,14 +96,15 @@ var (
 	PointerTypeDescriptor = &TypeDescriptor{Size: 8, Alignment: 8, Kind: PointerType}
 )
 
-// CallInterface represents a prepared function call interface
+// CallInterface represents a prepared function call interface.
 type CallInterface struct {
-	Convention CallingConvention
-	ArgCount   int
-	ArgTypes   []*TypeDescriptor
-	ReturnType *TypeDescriptor
-	Flags      int     // Return flags
-	StackBytes uintptr // Required stack space
+	Convention    CallingConvention
+	ArgCount      int
+	ArgTypes      []*TypeDescriptor
+	ReturnType    *TypeDescriptor
+	Flags         int     // Return flags.
+	StackBytes    uintptr // Required stack space.
+	FixedArgCount int     // 0 = non-variadic; >0 = number of fixed args before '...'
 }
 
 // Return flags constants
