@@ -57,8 +57,8 @@ func SyscallN(fn uintptr, args ...uintptr) (r1 uintptr, err error) {
 
 // syscallStub will be implemented in assembly
 //
-//nolint:unused // Called from assembly (syscall_linux_amd64.s)
-func syscallStub(args unsafe.Pointer) uint64
+//nolint:unused // Called from assembly (syscall_linux_stub.s) — returns via args.r1, not Go return
+func syscallStub(args unsafe.Pointer)
 
 // Get address of syscallStub
 //

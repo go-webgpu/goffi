@@ -5,7 +5,7 @@
 // syscallStub is called by runtime.asmcgocall on g0 stack
 // It receives pointer to callArgs struct in DI register
 //
-// func syscallStub(args unsafe.Pointer) uint64
+// func syscallStub(args unsafe.Pointer)
 TEXT ·syscallStub(SB), NOSPLIT|NOFRAME, $0
 	// DI contains pointer to callArgs struct
 	// Load function pointer
