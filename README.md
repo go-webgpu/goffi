@@ -280,7 +280,9 @@ if err != nil {
 
 **Choose purego** for general-purpose bindings: string auto-marshaling, broad architecture support, less boilerplate.
 
-**See also:** [JupiterRider/ffi](https://github.com/JupiterRider/ffi) — pure Go binding for libffi via purego. Supports struct pass/return and variadic functions; requires libffi at runtime.
+**See also:** 
+- [JupiterRider/ffi](https://github.com/JupiterRider/ffi) — pure Go binding for libffi via purego. Supports struct pass/return and variadic functions; requires libffi at runtime.
+- [unxed/pureffi](https://github.com/unxed/pureffi) — A 1:1 API-compatible drop-in replacement for `purego` implemented entirely on top of `goffi`. It resolves `fakecgo` linker conflicts without build tags, correctly handles macOS ARM64 variadic stack-packing ABI requirements under the hood, and provides a zero-code-change migration path.
 
 ---
 
@@ -303,11 +305,13 @@ if err != nil {
 
 **Unix: duplicate symbol conflict with purego** ([#22](https://github.com/go-webgpu/goffi/issues/22))
 - When using goffi and purego in the same binary with `CGO_ENABLED=0`, the linker reports `duplicated definition of symbol _cgo_init`. Both libraries include `internal/fakecgo` which defines identical runtime symbols.
-- Workaround A: build with `-tags nofakecgo` to disable goffi's fakecgo, relying on purego's copy:
+- **Workaround A:** Build with `-tags nofakecgo` to disable goffi's fakecgo, relying on purego's copy:
   ```bash
   CGO_ENABLED=0 go build -tags nofakecgo ./...
   ```
-- Workaround B: build with `CGO_ENABLED=1`. In cgo mode the real `runtime/cgo` supplies the symbols and both libraries' `fakecgo` packages are gated out by `//go:build !cgo`.
+- **Workaround B:** Build with `CGO_ENABLED=1`. In cgo mode the real `runtime/cgo` supplies the symbols and both libraries' `fakecgo` packages are gated out by `//go:build !cgo`.
+- **Workaround C (Recommended for complete integration):** Use [pureffi](https://github.com/unxed/pureffi).
+  `pureffi` is a 1:1, drop-in API-compatible wrapper over `goffi` that acts as a transparent replacement for `purego` via Go's `replace` directive. It completely eliminates the need for compilation tags, resolves the duplicate symbol conflict, and natively fixes Apple Silicon variadic ABI stack-packing.
 
 ---
 
