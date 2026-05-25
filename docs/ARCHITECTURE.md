@@ -321,6 +321,77 @@ Five typed error types for precise error handling: `InvalidCallInterfaceError`, 
 
 ---
 
+## Variadic Function Support
+
+### Overview
+
+C variadic functions (`printf`, `sprintf`, `sum(count, ...)`) require a different CIF preparation path because the fixed and variadic argument regions may be handled differently by the hardware ABI.
+
+Use `PrepareVariadicCallInterface` in place of `PrepareCallInterface`:
+
+```go
+// C prototype: int64_t sum_variadic(int64_t count, ...)
+var cif types.CallInterface
+err := ffi.PrepareVariadicCallInterface(
+    &cif,
+    types.DefaultCall,
+    1, // nfixedargs: only 'count' is fixed
+    types.SInt64TypeDescriptor,
+    []*types.TypeDescriptor{
+        types.SInt64TypeDescriptor, // count (fixed)
+        types.SInt64TypeDescriptor, // variadic arg 1
+        types.SInt64TypeDescriptor, // variadic arg 2
+    },
+)
+```
+
+A new CIF must be prepared for each unique combination of variadic argument types, matching `libffi`'s `ffi_prep_cif_var()` requirement.
+
+### Platform Differences
+
+**System V AMD64 (Linux, macOS Intel, FreeBSD):**  
+Standard AAPCS64 and System V ABI pass variadic arguments in the same registers as fixed arguments, up to the register count limit. `PrepareVariadicCallInterface` on these platforms is functionally identical to `PrepareCallInterface` — `FixedArgCount` is stored in `CallInterface` but the argument marshalling loop is unchanged.
+
+**Win64 (Windows AMD64/ARM64):**  
+Same as System V for integer arguments — variadic args use the same 4 GP registers. `PrepareVariadicCallInterface` behaves identically to `PrepareCallInterface`.
+
+**Apple ARM64 (macOS/iOS, `GOOS=darwin`, `GOARCH=arm64`):**  
+Apple's AAPCS64 extension mandates that **variadic arguments must be passed on the stack**, even when GP or FP registers are still available. This differs from the standard AAPCS64 used on Linux ARM64, where variadic args may be placed in X1-X7.
+
+Implementation in `internal/arch/arm64/call_arm64.go` (`Execute` method):
+
+```go
+// At the fixed/variadic boundary on Apple ARM64, exhaust both
+// register allocators so all variadic args land on the stack.
+if cif.FixedArgCount > 0 && runtime.GOOS == "darwin" && idx == cif.FixedArgCount {
+    gprIdx = 8 // exhaust GP registers (X0-X7)
+    fprIdx = 8 // exhaust FP registers (D0-D7)
+}
+```
+
+This matches the behaviour of Apple's `clang` and `libffi`'s `ffi_prep_cif_var()` on Darwin ARM64.
+
+### CallInterface.FixedArgCount
+
+The `FixedArgCount` field in `CallInterface` stores the variadic boundary:
+
+- `FixedArgCount == 0` — non-variadic CIF (zero value, backward compatible)
+- `FixedArgCount > 0` — number of fixed parameters; args at index `FixedArgCount` and beyond are variadic
+
+### Verification
+
+Run `cmd/variadic-test` on Apple Silicon to confirm:
+
+```bash
+go run github.com/go-webgpu/goffi/cmd/variadic-test
+# Platform: darwin/arm64
+#   sum_variadic(3, 10, 20, 30) = 60 (want 60) OK
+#   variadic_two_fixed(100, 200, 300) = 600 (want 600) OK
+# PASS — variadic functions work on this platform
+```
+
+---
+
 ## Platform Support
 
 | Platform | Architecture | ABI | Status |

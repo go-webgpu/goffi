@@ -139,7 +139,7 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 
 **v0.6.0** = Variadic + Builder API (2026 Q3)
 - Builder pattern API
-- **Variadic function support** (printf, sprintf, etc.)
+- **Variadic function support** — `PrepareVariadicCallInterface` (in progress: ARM64 Darwin stack-force implemented, AMD64/other platforms complete)
 - RegisterFunc convenience API
 
 **v1.0.0** = Long-term support release (2027 Q1)
