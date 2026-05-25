@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-05-25
+
 ### Added
 - **Variadic function support** — `PrepareVariadicCallInterface(cif, convention, nfixedargs, returnType, argTypes)` enables calling C variadic functions such as `printf`, `sprintf`, and custom variadic APIs. On Apple ARM64, variadic arguments are forced onto the stack at the fixed/variadic boundary per Apple's AAPCS64 extension (differs from standard AAPCS64 used on Linux ARM64). On all other platforms the call is functionally identical to `PrepareCallInterface`. Closes [#47](https://github.com/go-webgpu/goffi/issues/47)
 - **ARM64 Darwin variadic ABI** — register allocators (GP and FP) are exhausted at `nfixedargs` boundary on `GOOS=darwin`, matching Apple's `clang` and `libffi ffi_prep_cif_var()` behaviour. This fixes incorrect variadic calls on Apple Silicon (M1/M2/M3/M4) where variadic arguments were incorrectly placed in X1-X7 instead of the stack

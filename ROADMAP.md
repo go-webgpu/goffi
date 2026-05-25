@@ -3,7 +3,7 @@
 > **Strategic Approach**: Build production-ready Zero-CGO FFI with benchmarked performance
 > **Philosophy**: Performance first, usability second, platform coverage third
 
-**Last Updated**: 2026-05-13 | **Current Version**: v0.5.0 (v0.5.1 pending) | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → ABI → v1.0 LTS | **Milestone**: v0.5.1 (struct ABI + CGO=1) → v0.6.0 Variadic/Builder → v1.0.0 LTS
+**Last Updated**: 2026-05-25 | **Current Version**: v0.5.2 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → ABI → v1.0 LTS | **Milestone**: v0.5.2 (variadic) → v0.6.0 RegisterFunc/Builder → v1.0.0 LTS
 
 ---
 
@@ -58,9 +58,11 @@ v0.4.0 (CROSSCALL2 INTEGRATION) ✅ RELEASED 2026-02-27
          ↓ (usability)
 v0.5.0 (PLATFORM COVERAGE) ✅ RELEASED 2026-03-29
          ↓ (struct ABI + CGO support)
-v0.5.1 (STRUCT ABI + CGO_ENABLED=1) → 2026-05 (pending tag)
-         ↓ (variadic + builder API)
-v0.6.0 (VARIADIC + BUILDER API) → 2026 Q3
+v0.5.1 (STRUCT ABI + CGO_ENABLED=1) ✅ RELEASED 2026-05-13
+         ↓ (variadic + vet fixes)
+v0.5.2 (VARIADIC FUNCTIONS) ✅ RELEASED 2026-05-25
+         ↓ (RegisterFunc + builder API)
+v0.6.0 (REGISTERFUNC + BUILDER API) → 2026 Q3
          ↓ (advanced features)
 v0.8.0 (ADVANCED FEATURES) → 2026 Q3-Q4
          ↓ (community adoption + validation)
@@ -128,7 +130,7 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 - **FreeBSD amd64** support (cross-compile verified)
 - 7 platform targets (Linux/Windows/macOS/FreeBSD × amd64 + ARM64)
 
-**v0.5.1** = Struct ABI + CGO_ENABLED=1 (2026-05, pending tag)
+**v0.5.1** = Struct ABI + CGO_ENABLED=1 ✅ RELEASED (2026-05-13)
 - **CGO_ENABLED=1 support** (PR #37 by @jiyeyuran) — dual-mode build, race detector compatible
 - **Struct by-value argument passing** (PR #39, closes #33) — ≤8B/9-16B/>16B, INTEGER/SSE classification
 - **Callback struct arguments** (PR #42 by @pekim, closes #41) — C→Go callbacks with struct args
@@ -137,10 +139,16 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 - **E2E test infrastructure** — gcc-compiled C test library for struct passing verification
 - Contributors: @jiyeyuran (CGO path maintainer), @pekim (callback structs)
 
-**v0.6.0** = Variadic + Builder API (2026 Q3)
-- Builder pattern API
-- **Variadic function support** — `PrepareVariadicCallInterface` (in progress: ARM64 Darwin stack-force implemented, AMD64/other platforms complete)
-- RegisterFunc convenience API
+**v0.5.2** = Variadic functions ✅ RELEASED (2026-05-25)
+- **Variadic function support** — `PrepareVariadicCallInterface` with Apple ARM64 stack-force
+- `go vet` clean — fixed dl_unix.go unsafe.Pointer warnings, syscall_linux_stub.s return signature
+- `cmd/variadic-test` — standalone verification binary for Apple Silicon
+- E2E variadic tests with gcc-compiled C test functions
+
+**v0.6.0** = RegisterFunc + Builder API (2026 Q3)
+- RegisterFunc convenience API (ADR-008)
+- Library struct + OpenLibraryBytes (ADR-009)
+- NewFunc/Call/CallCtx ergonomic wrappers (ADR-009)
 
 **v1.0.0** = Long-term support release (2027 Q1)
 - API stability guarantee
@@ -150,9 +158,9 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 
 ---
 
-## 📊 Current Status (v0.5.1)
+## 📊 Current Status (v0.5.2)
 
-**Phase**: Struct ABI complete, CGO_ENABLED=1 supported, SSE struct return fixed
+**Phase**: Variadic functions supported, go vet clean, planning v0.6.0 (RegisterFunc)
 
 **What Works**:
 - ✅ Dynamic library loading (`LoadLibrary`, `GetSymbol`, `FreeLibrary`)
