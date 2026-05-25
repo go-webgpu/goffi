@@ -45,7 +45,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "FAIL: LoadLibrary(%q): %v\n", soPath, err)
 		os.Exit(1)
 	}
-	defer ffi.FreeLibrary(lib)
+	defer func() { _ = ffi.FreeLibrary(lib) }()
 
 	pass := true
 	pass = testSumVariadic(lib) && pass
