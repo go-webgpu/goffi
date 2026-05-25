@@ -522,7 +522,7 @@ ffi.CallFunction(&cif, wgpuRequestAdapter, nil,
 - Added comprehensive package documentation with usage examples
 - Documented all exported functions with parameters, returns, and examples
 - Added safety guidelines for `unsafe.Pointer` usage
-- Created API audit documentation in `docs/dev/`
+- Created API audit documentation
 - **NEW**: [docs/PERFORMANCE.md](docs/PERFORMANCE.md) - 650+ lines comprehensive performance guide
 - **NEW**: [ROADMAP.md](ROADMAP.md) - Development roadmap to v1.0.0
 - **NEW**: [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
@@ -753,7 +753,7 @@ if errors.As(err, &icErr) {
 
 ### Roadmap
 
-See [API_TODO.md](docs/dev/API_TODO.md) for detailed roadmap to v1.0.
+See [ROADMAP.md](ROADMAP.md) for detailed roadmap to v1.0.
 
 **v0.3.0** (ARM64 Support) - Q1 2025
 - ARM64 support (Linux + macOS AAPCS64 ABI)
