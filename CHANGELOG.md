@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-05-25
+
+### Added
+- **Variadic function support** — `PrepareVariadicCallInterface(cif, convention, nfixedargs, returnType, argTypes)` enables calling C variadic functions such as `printf`, `sprintf`, and custom variadic APIs. On Apple ARM64, variadic arguments are forced onto the stack at the fixed/variadic boundary per Apple's AAPCS64 extension (differs from standard AAPCS64 used on Linux ARM64). On all other platforms the call is functionally identical to `PrepareCallInterface`. Closes [#47](https://github.com/go-webgpu/goffi/issues/47)
+- **ARM64 Darwin variadic ABI** — register allocators (GP and FP) are exhausted at `nfixedargs` boundary on `GOOS=darwin`, matching Apple's `clang` and `libffi ffi_prep_cif_var()` behaviour. This fixes incorrect variadic calls on Apple Silicon (M1/M2/M3/M4) where variadic arguments were incorrectly placed in X1-X7 instead of the stack
+- `cmd/variadic-test` — standalone verification program that @unxed and others can run on Apple Silicon to confirm variadic function calls produce correct results: `go run github.com/go-webgpu/goffi/cmd/variadic-test`
+- E2E variadic tests (`ffi/variadic_e2e_test.go`) — two gcc-compiled test functions (`sum_variadic`, `variadic_two_fixed`) exercised on Linux, macOS, FreeBSD, and Windows (amd64 + arm64) where gcc is available
+
 ## [0.5.1] - 2026-05-13
 
 ### Fixed
@@ -516,7 +524,7 @@ ffi.CallFunction(&cif, wgpuRequestAdapter, nil,
 - Added comprehensive package documentation with usage examples
 - Documented all exported functions with parameters, returns, and examples
 - Added safety guidelines for `unsafe.Pointer` usage
-- Created API audit documentation in `docs/dev/`
+- Created API audit documentation
 - **NEW**: [docs/PERFORMANCE.md](docs/PERFORMANCE.md) - 650+ lines comprehensive performance guide
 - **NEW**: [ROADMAP.md](ROADMAP.md) - Development roadmap to v1.0.0
 - **NEW**: [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
@@ -747,7 +755,7 @@ if errors.As(err, &icErr) {
 
 ### Roadmap
 
-See [API_TODO.md](docs/dev/API_TODO.md) for detailed roadmap to v1.0.
+See [ROADMAP.md](ROADMAP.md) for detailed roadmap to v1.0.
 
 **v0.3.0** (ARM64 Support) - Q1 2025
 - ARM64 support (Linux + macOS AAPCS64 ABI)

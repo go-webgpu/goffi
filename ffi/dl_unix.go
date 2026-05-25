@@ -60,7 +60,8 @@ func LoadLibrary(name string) (unsafe.Pointer, error) {
 		}
 	}
 
-	return unsafe.Pointer(handle), nil
+	//nolint:govet // handle is a dlopen result (non-Go memory); double-indirection per go.dev/issue/58625
+	return *(*unsafe.Pointer)(unsafe.Pointer(&handle)), nil
 }
 
 // GetSymbol retrieves a function pointer from a loaded library using dlsym.
@@ -102,7 +103,8 @@ func GetSymbol(handle unsafe.Pointer, name string) (unsafe.Pointer, error) {
 		}
 	}
 
-	return unsafe.Pointer(fnPtr), nil
+	//nolint:govet // fnPtr is a dlsym result (non-Go memory); double-indirection per go.dev/issue/58625
+	return *(*unsafe.Pointer)(unsafe.Pointer(&fnPtr)), nil
 }
 
 // FreeLibrary unloads a previously loaded library using dlclose.

@@ -208,6 +208,17 @@ func (i *Implementation) Execute(
 			break
 		}
 
+		// Apple ARM64 ABI extension for variadic functions:
+		// At the fixed/variadic boundary, exhaust both register allocators so
+		// that every variadic argument is placed on the stack, even when GP or
+		// FP registers are still available.  This matches the behaviour of
+		// Apple's clang and libffi's ffi_prep_cif_var() on Darwin ARM64.
+		// Non-variadic CIFs (FixedArgCount == 0) skip this branch entirely.
+		if cif.FixedArgCount > 0 && runtime.GOOS == "darwin" && idx == cif.FixedArgCount {
+			gprIdx = 8 // exhaust GP registers (X0-X7)
+			fprIdx = 8 // exhaust FP registers (D0-D7)
+		}
+
 		switch argType.Kind {
 		case types.FloatType:
 			// Use math.Float32bits to preserve exact 32-bit IEEE-754 pattern.

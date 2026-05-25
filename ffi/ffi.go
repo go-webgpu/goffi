@@ -88,6 +88,7 @@ package ffi
 
 import (
 	"context"
+	"errors"
 	"unsafe"
 
 	"github.com/go-webgpu/goffi/types"
@@ -148,6 +149,54 @@ func PrepareCallInterface(
 
 	argCount := len(argTypes)
 	return prepareCallInterfaceCore(cif, convention, argCount, returnType, argTypes)
+}
+
+// PrepareVariadicCallInterface prepares a call interface for a C variadic function.
+//
+// nfixedargs is the count of fixed parameters before '...' in the C prototype.
+// argTypes must contain ALL arguments (fixed + variadic) for this specific call.
+// A new CIF must be prepared for each unique combination of variadic argument types.
+//
+// On Apple ARM64, variadic arguments are forced to the stack per Apple's AAPCS64
+// extension. The register allocators are exhausted at the fixed/variadic boundary
+// so that variadic arguments land on the stack even when registers are available.
+// On all other platforms, this function behaves identically to PrepareCallInterface.
+//
+// Example:
+//
+//	// Prepare for: int64_t sum_variadic(int64_t count, ...)
+//	// Called with count=3 and three int64_t variadic args.
+//	var cif types.CallInterface
+//	err := ffi.PrepareVariadicCallInterface(
+//	    &cif,
+//	    types.DefaultCall,
+//	    1, // nfixedargs: only 'count' is fixed
+//	    types.SInt64TypeDescriptor,
+//	    []*types.TypeDescriptor{
+//	        types.SInt64TypeDescriptor, // count
+//	        types.SInt64TypeDescriptor, // arg1 (variadic)
+//	        types.SInt64TypeDescriptor, // arg2 (variadic)
+//	        types.SInt64TypeDescriptor, // arg3 (variadic)
+//	    },
+//	)
+func PrepareVariadicCallInterface(
+	cif *types.CallInterface,
+	convention types.CallingConvention,
+	nfixedargs int,
+	returnType *types.TypeDescriptor,
+	argTypes []*types.TypeDescriptor,
+) error {
+	if nfixedargs < 0 {
+		return errors.New("goffi: nfixedargs must be non-negative")
+	}
+	if nfixedargs > len(argTypes) {
+		return errors.New("goffi: nfixedargs exceeds total argument count")
+	}
+	if err := PrepareCallInterface(cif, convention, returnType, argTypes); err != nil {
+		return err
+	}
+	cif.FixedArgCount = nfixedargs
+	return nil
 }
 
 // CallFunctionContext executes a C function call with context support.

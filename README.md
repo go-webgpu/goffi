@@ -36,6 +36,7 @@ ffi.CallFunction(cif, sym, unsafe.Pointer(&result), args)
 | **Callbacks** | C→Go safe | `crosscall2` integration, struct args, works from any C thread |
 | **Type-safe** | Runtime validation | 5 typed error types with `errors.As()` support |
 | **Struct pass/return** | Full ABI | Args: INTEGER/SSE classification. Returns: ≤8B (RAX/XMM0), 9–16B (4 modes: RAX/XMM × RAX/XMM), >16B (sret) |
+| **Variadic** | `printf`/`sprintf` | `PrepareVariadicCallInterface` — Apple ARM64 stack-force included |
 | **Context** | Timeouts | `CallFunctionContext(ctx, ...)` cancellation |
 | **Race detector** | `-race` compatible | `CGO_ENABLED=1 go test -race` works cleanly |
 | **Tested** | 89% coverage | CI on Linux, Windows, macOS (CGO=0 and CGO=1) |
@@ -123,6 +124,47 @@ func main() {
 	// Output: strlen("Hello, goffi!") = 13
 }
 ```
+
+### Example: Calling a Variadic C Function
+
+Use `PrepareVariadicCallInterface` instead of `PrepareCallInterface` for C variadic functions
+(`printf`, `sprintf`, custom variadic APIs). Specify `nfixedargs` — the count of fixed parameters
+before `...` in the C prototype. goffi automatically applies Apple's ARM64 stack-force rule on
+`darwin/arm64` so the same Go code works correctly on all platforms.
+
+```go
+// C prototype: int64_t sum_variadic(int64_t count, ...)
+// Call as: sum_variadic(3, 10, 20, 30) → 60
+
+var cif types.CallInterface
+err := ffi.PrepareVariadicCallInterface(
+    &cif,
+    types.DefaultCall,
+    1, // nfixedargs: only 'count' is fixed; 10/20/30 are variadic
+    types.SInt64TypeDescriptor,
+    []*types.TypeDescriptor{
+        types.SInt64TypeDescriptor, // count (fixed)
+        types.SInt64TypeDescriptor, // arg1 (variadic)
+        types.SInt64TypeDescriptor, // arg2 (variadic)
+        types.SInt64TypeDescriptor, // arg3 (variadic)
+    },
+)
+
+count := int64(3)
+a1, a2, a3 := int64(10), int64(20), int64(30)
+var result int64
+ffi.CallFunction(&cif, sym, unsafe.Pointer(&result), []unsafe.Pointer{
+    unsafe.Pointer(&count),
+    unsafe.Pointer(&a1),
+    unsafe.Pointer(&a2),
+    unsafe.Pointer(&a3),
+})
+// result == 60
+```
+
+A new CIF must be prepared for each unique combination of variadic argument types. The fixed-arg
+portion of the CIF can be reused by re-calling `PrepareVariadicCallInterface` with different
+variadic arg type slices.
 
 ---
 
@@ -251,8 +293,8 @@ if err != nil {
 **Windows: float return values not captured from XMM0**
 - `syscall.SyscallN` returns RAX only. Go `syscall` package limitation.
 
-**Variadic functions not supported** (`printf`, `sprintf`)
-- Use non-variadic wrappers. Planned for v0.5.0.
+**Apple ARM64: variadic args always go on stack**
+- Per Apple's AAPCS64 extension, variadic arguments must be passed on the stack even when GP/FP registers are available. Use `PrepareVariadicCallInterface` (not `PrepareCallInterface`) for variadic C functions on all platforms — goffi handles the Darwin-specific register flush automatically.
 
 **Struct packing follows System V ABI only**
 - Windows `#pragma pack` not honored. Manually specify `Size`/`Alignment` in `TypeDescriptor`.
@@ -292,7 +334,8 @@ if err != nil {
 | v0.4.0 | Released | crosscall2 for C-thread callbacks |
 | v0.4.1 | Released | ABI compliance audit — 10/11 gaps fixed |
 | v0.4.2 | Released | purego compatibility (`-tags nofakecgo`) |
-| **v0.5.0** | **Next** | Windows ARM64, FreeBSD, variadic functions, builder API |
+| v0.5.1 | Released | Struct ABI, CGO_ENABLED=1, 9-16B XMM return |
+| **v0.6.0** | **In progress** | Variadic functions (`PrepareVariadicCallInterface`), builder API |
 | v1.0.0 | Planned | API stability (SemVer 2.0), security audit |
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and [ROADMAP.md](ROADMAP.md) for the full plan.
