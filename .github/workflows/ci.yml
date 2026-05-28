@@ -124,21 +124,23 @@ jobs:
           done
 
           # FreeBSD requires -gcflags="-std" for fakecgo's //go:cgo_export_dynamic
-          echo "Building freebsd/amd64 (with -gcflags for fakecgo)..."
-          if GOOS=freebsd GOARCH=amd64 go build \
-            -gcflags="github.com/go-webgpu/goffi/internal/fakecgo=-std" \
-            ./... 2>&1; then
-            echo "  ✅ freebsd/amd64"
-          else
-            echo "  ❌ freebsd/amd64 FAILED"
-            FAILED=1
-          fi
+          for fbsd_arch in amd64 arm64; do
+            echo "Building freebsd/${fbsd_arch} (with -gcflags for fakecgo)..."
+            if GOOS=freebsd GOARCH=${fbsd_arch} go build \
+              -gcflags="github.com/go-webgpu/goffi/internal/fakecgo=-std" \
+              ./... 2>&1; then
+              echo "  ✅ freebsd/${fbsd_arch}"
+            else
+              echo "  ❌ freebsd/${fbsd_arch} FAILED"
+              FAILED=1
+            fi
+          done
 
           if [ $FAILED -eq 1 ]; then
             echo "❌ Cross-compilation check FAILED"
             exit 1
           fi
-          echo "✅ All 7 platforms compile successfully"
+          echo "✅ All 8 platforms compile successfully"
 
   # Unit tests - Platform-specific (Linux + Windows + macOS AMD64)
   # Tested under both CGO_ENABLED=0 (fakecgo path) and CGO_ENABLED=1 (real

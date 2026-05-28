@@ -402,6 +402,7 @@ go run github.com/go-webgpu/goffi/cmd/variadic-test
 | **macOS** | AMD64 | System V | Production |
 | **macOS** | ARM64 | AAPCS64 | Production (tested on M3 Pro) |
 | **FreeBSD** | AMD64 | System V | Cross-compile verified |
+| **FreeBSD** | ARM64 | AAPCS64 | Cross-compile verified |
 | **Linux** | ARM64 | AAPCS64 | Production |
 
 ---

@@ -49,8 +49,8 @@ func LoadLibrary(name string) (unsafe.Pointer, error) {
 		}
 	}
 
-	// Safe: handle is immediately converted from uintptr to unsafe.Pointer
-	// without intermediate storage, keeping it reachable by GC.
+	// go vet: "possible misuse of unsafe.Pointer" — false positive.
+	// Windows DLL handles are opaque OS values, not Go heap pointers.
 	return unsafe.Pointer(handle), nil
 }
 
@@ -81,8 +81,8 @@ func GetSymbol(handle unsafe.Pointer, name string) (unsafe.Pointer, error) {
 		}
 	}
 
-	// Safe: proc is immediately converted from uintptr to unsafe.Pointer
-	// without intermediate storage, keeping it reachable by GC.
+	// go vet: "possible misuse of unsafe.Pointer" — false positive.
+	// GetProcAddress returns a function pointer, not a Go heap pointer.
 	return unsafe.Pointer(proc), nil
 }
 

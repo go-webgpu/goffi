@@ -1,6 +1,6 @@
-//go:build (linux || darwin || windows) && arm64
+//go:build (linux || darwin || windows || freebsd) && arm64
 
-// AAPCS64 ABI syscall implementation (Linux, macOS, Windows on ARM64)
+// AAPCS64 ABI syscall implementation (Linux, macOS, Windows, FreeBSD on ARM64)
 // ARM64 Procedure Call Standard - identical across all platforms.
 package syscall
 
