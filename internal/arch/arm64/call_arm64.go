@@ -1,7 +1,7 @@
-//go:build arm64 && (linux || darwin || windows)
+//go:build arm64 && (linux || darwin || windows || freebsd)
 
-// AAPCS64 ABI implementation (Linux, macOS, Windows on ARM64)
-// Windows ARM64 uses the same calling convention as Unix ARM64 for non-variadic functions.
+// AAPCS64 ABI implementation (Linux, macOS, Windows, FreeBSD on ARM64)
+// All ARM64 platforms use the same AAPCS64 calling convention for non-variadic functions.
 // See: https://learn.microsoft.com/en-us/cpp/build/arm64-windows-abi-conventions
 
 package arm64

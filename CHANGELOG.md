@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-05-28
+
+### Fixed
+- **FreeBSD ARM64 build failure** — added `freebsd` to build tags in `internal/arch/arm64/call_arm64.go`, `internal/syscall/syscall_arm64.go`, `internal/syscall/syscall_arm64.s`, and `ffi/callback_arm64.s`. FreeBSD ARM64 uses identical AAPCS64 calling convention as Linux ARM64 — no code changes needed, only build tag additions. Requires same `-gcflags="github.com/go-webgpu/goffi/internal/fakecgo=-std"` workaround as FreeBSD AMD64. Closes [#52](https://github.com/go-webgpu/goffi/issues/52)
+- **FreeBSD ARM64 callback trampoline** — `ffi/callback_arm64.s` was missing `freebsd` in build tags while `ffi/callback_arm64.go` (Go side) already included it, causing `NewCallback()` to silently return invalid addresses on FreeBSD ARM64
+
+### Changed
+- Platform count: 7 → 8 targets (added FreeBSD ARM64)
+- CI cross-compilation check now validates all 8 platforms including `freebsd/arm64`
+
 ## [0.5.2] - 2026-05-25
 
 ### Added

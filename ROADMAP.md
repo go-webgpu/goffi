@@ -128,7 +128,7 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 **v0.5.0** = Platform coverage ✅ RELEASED (2026-03-29)
 - **Windows ARM64** support (Snapdragon X Elite, tested by @SideFx)
 - **FreeBSD amd64** support (cross-compile verified)
-- 7 platform targets (Linux/Windows/macOS/FreeBSD × amd64 + ARM64)
+- 7 platform targets (Linux/Windows/macOS/FreeBSD × amd64 + Linux/macOS/Windows ARM64)
 
 **v0.5.1** = Struct ABI + CGO_ENABLED=1 ✅ RELEASED (2026-05-13)
 - **CGO_ENABLED=1 support** (PR #37 by @jiyeyuran) — dual-mode build, race detector compatible
