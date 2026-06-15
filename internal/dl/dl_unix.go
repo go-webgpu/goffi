@@ -22,6 +22,7 @@ import (
 // RTLD constants are platform-specific - see dl_linux.go and dl_darwin.go
 
 //go:linkname runtime_cgocall runtime.cgocall
+//go:noescape
 func runtime_cgocall(fn uintptr, arg unsafe.Pointer) int32
 
 // Assembly stubs (JMP to dynamic symbols)

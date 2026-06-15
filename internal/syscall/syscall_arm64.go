@@ -9,6 +9,7 @@ import (
 )
 
 //go:linkname runtime_cgocall runtime.cgocall
+//go:noescape
 func runtime_cgocall(fn uintptr, arg unsafe.Pointer) int32
 
 // syscallArgs matches the layout expected by syscallN assembly.
