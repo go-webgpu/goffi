@@ -74,8 +74,10 @@ func main() {
 		}
 
 	} else {
-		arg := unsafe.Pointer(unsafe.StringData(str))
-		args := []unsafe.Pointer{arg}
+		cstr := unsafe.Pointer(unsafe.StringData(str))
+
+		// IMPORTANT: args contains pointers to argument *storage*
+		args := []unsafe.Pointer{unsafe.Pointer(&cstr)}
 
 		// Execute function call
 		err = ffi.CallFunction(cif, sym, nil, args)
