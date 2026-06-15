@@ -142,6 +142,28 @@ jobs:
           fi
           echo "✅ All 8 platforms compile successfully"
 
+          # Verify examples compile
+          echo ""
+          echo "Building examples..."
+          for example_dir in examples/*/; do
+            if [ -f "${example_dir}go.mod" ]; then
+              example_name=$(basename "$example_dir")
+              echo "Building example: ${example_name}..."
+              if (cd "$example_dir" && go build . 2>&1); then
+                echo "  ✅ ${example_name}"
+              else
+                echo "  ❌ ${example_name} FAILED"
+                FAILED=1
+              fi
+            fi
+          done
+
+          if [ $FAILED -eq 1 ]; then
+            echo "❌ Examples build check FAILED"
+            exit 1
+          fi
+          echo "✅ All examples compile successfully"
+
   # Unit tests - Platform-specific (Linux + Windows + macOS AMD64)
   # Tested under both CGO_ENABLED=0 (fakecgo path) and CGO_ENABLED=1 (real
   # runtime/cgo path). Both modes must pass identically; CGO_ENABLED=0 is the

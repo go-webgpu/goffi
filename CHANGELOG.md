@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-06-15
+
+### Fixed
+- **Example: avalue pointer bug** — `examples/simple/main.go` passed string pointer directly as avalue instead of pointer-to-pointer on Windows/Linux path. Darwin path was correct. avalue elements must be pointers TO argument values (`unsafe.Pointer(&cstr)`), not values directly. Reported by @lkmavi on Windows 11 ARM64
+- **CI: examples not verified** — added examples build check to cross-compile CI job. All `examples/*/go.mod` modules are now compiled as part of CI pipeline
+
 ## [0.5.4] - 2026-06-15
 
 ### Changed
