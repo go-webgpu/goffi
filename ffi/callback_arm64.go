@@ -7,6 +7,7 @@ package ffi
 
 import (
 	"reflect"
+	"structs"
 	"sync"
 	"unsafe"
 )
@@ -25,6 +26,7 @@ var callbacks struct {
 // callbackArgs represents the argument block passed from assembly to callbackWrap.
 // ARM64 AAPCS64 layout: D0-D7 (float), X0-X7 (integer)
 type callbackArgs struct {
+	_      structs.HostLayout
 	index  uintptr        // Callback index (0-1999)
 	args   unsafe.Pointer // Pointer to register/stack argument block
 	result uintptr        // Return value from Go callback

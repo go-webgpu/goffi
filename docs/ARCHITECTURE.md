@@ -72,6 +72,8 @@ ffi.PrepareCallInterface(cif, types.DefaultCall,
 1. Switches to system stack (g0)
 2. Marks goroutine as "in syscall" — allows GC to proceed
 3. Calls our assembly wrapper
+
+Since v0.5.4, the `runtime_cgocall` linkname declaration has `//go:noescape`, keeping `syscallArgs` on the goroutine stack (zero heap allocations). All ABI-boundary structs use `structs.HostLayout` (Go 1.23+) to guarantee C-compatible memory layout.
 4. Restores Go stack on return
 
 We access it via `//go:linkname`:

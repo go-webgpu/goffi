@@ -174,9 +174,11 @@ variadic arg type slices.
 
 | Benchmark | Time | Allocations |
 |-----------|------|-------------|
-| Empty function (`getpid`) | 88 ns | 2 allocs |
-| Integer argument (`abs`) | 114 ns | 3 allocs |
-| String processing (`strlen`) | 98 ns | 3 allocs |
+| Empty function (`getpid`) | 88 ns | 0 allocs (Unix) / 2 allocs (Windows) |
+| Integer argument (`abs`) | 114 ns | 0 allocs (Unix) / 3 allocs (Windows) |
+| String processing (`strlen`) | 98 ns | 0 allocs (Unix) / 3 allocs (Windows) |
+
+Since v0.5.4, `//go:noescape` on `runtime_cgocall` keeps `syscallArgs` on the goroutine stack — true zero-allocation FFI on Unix platforms. Windows uses `syscall.SyscallN` (runtime-managed).
 
 At 60 FPS with ~50 FFI calls per frame, overhead is **5 µs per frame** — 0.03% of the 16.6 ms budget. Unmeasurable in profiling.
 

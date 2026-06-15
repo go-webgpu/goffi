@@ -7,6 +7,7 @@ package ffi
 
 import (
 	"reflect"
+	"structs"
 	"sync"
 	"unsafe"
 )
@@ -30,6 +31,7 @@ var callbacks struct {
 // The assembly code saves all CPU registers (both integer and SSE) into a contiguous
 // memory block following this structure.
 type callbackArgs struct {
+	_      structs.HostLayout
 	index  uintptr        // Callback index (0-1999)
 	args   unsafe.Pointer // Pointer to register/stack argument block
 	result uintptr        // Return value from Go callback
