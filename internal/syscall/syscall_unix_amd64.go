@@ -5,6 +5,7 @@
 package syscall
 
 import (
+	"structs"
 	"unsafe"
 )
 
@@ -24,6 +25,7 @@ func runtime_cgocall(fn uintptr, arg unsafe.Pointer) int32
 //	r1:    192      (RAX return)
 //	r2:    200      (RDX return, used for 9-16 byte struct returns)
 type syscallArgs struct {
+	_                                                                structs.HostLayout
 	fn                                                               uintptr
 	a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15 uintptr
 	f1, f2, f3, f4, f5, f6, f7, f8                                   uintptr

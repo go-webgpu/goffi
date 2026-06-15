@@ -5,6 +5,7 @@
 package syscall
 
 import (
+	"structs"
 	"unsafe"
 )
 
@@ -30,6 +31,7 @@ func runtime_cgocall(fn uintptr, arg unsafe.Pointer) int32
 // NOTE: f1-f8 and fr1-fr4 are raw bit patterns. For float32 values, the
 // lower 32 bits contain the float32 representation (upper 32 bits are ignored).
 type syscallArgs struct {
+	_                                structs.HostLayout
 	fn                               uintptr
 	a1, a2, a3, a4, a5, a6, a7, a8   uintptr // X0-X7 (offsets 8-64)
 	a9, a10, a11, a12, a13, a14, a15 uintptr // stack spill (offsets 72-120)

@@ -16,6 +16,7 @@ package dl
 
 import (
 	"fmt"
+	"structs"
 	"unsafe"
 )
 
@@ -42,6 +43,7 @@ var dlerror_stubABI0 = uintptr(unsafe.Pointer(&dlerror_stub))
 
 // dlopenArgs is the argument struct for dlopen_wrapper
 type dlopenArgs struct {
+	_      structs.HostLayout
 	fn     uintptr // offset 0 - function pointer
 	path   *byte   // offset 8 - C string path
 	mode   int     // offset 16 - mode flags
@@ -51,6 +53,7 @@ type dlopenArgs struct {
 
 // dlsymArgs is the argument struct for dlsym_wrapper
 type dlsymArgs struct {
+	_      structs.HostLayout
 	fn     uintptr // offset 0 - function pointer
 	handle uintptr // offset 8 - library handle
 	symbol *byte   // offset 16 - C string symbol name
@@ -60,6 +63,7 @@ type dlsymArgs struct {
 
 // dlerrorArgs is the argument struct for dlerror_wrapper
 type dlerrorArgs struct {
+	_      structs.HostLayout
 	fn     uintptr // offset 0 - function pointer
 	result *byte   // offset 8 - return value (char*)
 }

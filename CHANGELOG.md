@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-06-15
+
+### Changed
+- **Zero-allocation FFI calls** — added `//go:noescape` to `runtime_cgocall` linkname declarations, eliminating 1 heap allocation (208–248 bytes) per call on all Unix platforms. `syscallArgs` now stays on the goroutine stack. Expected 10–25% performance improvement on the hot path ([#54](https://github.com/go-webgpu/goffi/issues/54))
+- **ABI-safe struct layout** — added `structs.HostLayout` (Go 1.23+) to all 8 assembly-interface structures (`syscallArgs`, `callbackArgs`, `dlopenArgs`, `dlsymArgs`, `dlerrorArgs`, `G`, `ThreadStart`). Guarantees C ABI-compatible memory layout regardless of future Go compiler optimizations ([#55](https://github.com/go-webgpu/goffi/issues/55))
+
 ## [0.5.3] - 2026-05-28
 
 ### Fixed
