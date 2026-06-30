@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 	"unsafe"
+
+	"github.com/go-webgpu/goffi/types"
 )
 
 const callbackFloatRegCount = 8
@@ -732,5 +734,66 @@ func BenchmarkCallbackFloat(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		callbackWrap(args)
+	}
+}
+
+// growStack makes the calling goroutine's stack grow, and so move (copystack), by
+// recursing with frames big enough to matter. It returns 0. The //go:noinline
+// keeps every frame real so the recursion actually uses up stack.
+//
+//go:noinline
+func growStack(n int) int {
+	if n == 0 {
+		return 0
+	}
+	var pad [4096]byte
+	pad[0] = byte(n)
+	pad[len(pad)-1] = byte(n)
+	return int(pad[0]) - int(pad[len(pad)-1]) + growStack(n-1)
+}
+
+// TestCallbackGrowStack guards against a callback from C into Go losing its
+// argument or return value when the goroutine stack moves during the call.
+//
+// CallNFloat builds the argument and return block, and syscallN (on g0) writes
+// the C return value back into it after the call. If that block sits on the
+// goroutine stack and the callback grows the stack, the stack moves and
+// syscallN's write lands at the old, pre-move address, so the return value is
+// lost.
+//
+// The test makes this deterministic instead of relying on process-global warmup
+// state. It runs on a fresh goroutine with a small starting stack and forces a
+// large stack growth from inside the callback, right while syscallN is holding
+// the pre-move address. growStack adds 0, so passing arg=42 must yield 42 back.
+func TestCallbackGrowStack(t *testing.T) {
+	u := types.UInt64TypeDescriptor
+	var cif types.CallInterface
+	if err := PrepareCallInterface(&cif, types.DefaultCall, u, []*types.TypeDescriptor{u}); err != nil {
+		t.Fatal(err)
+	}
+	cb := NewCallback(func(arg uintptr) uintptr {
+		// About 2 MiB of stack growth, enough to force a copystack mid-call.
+		// growStack returns 0.
+		return arg + uintptr(growStack(512))
+	})
+
+	done := make(chan uintptr, 1)
+	go func() {
+		arg, ret := uintptr(42), uintptr(0)
+		// cb is the trampoline's code address as a uintptr. Reinterpret its bits as
+		// an unsafe.Pointer rather than converting directly: a direct unsafe.Pointer(cb)
+		// trips vet's unsafeptr guard against conversions that hide a heap address from
+		// the GC, and the trampoline is code that is never GC-managed and never moved.
+		fn := *(*unsafe.Pointer)(unsafe.Pointer(&cb))
+		if err := CallFunction(&cif, fn, unsafe.Pointer(&ret), []unsafe.Pointer{unsafe.Pointer(&arg)}); err != nil {
+			t.Error(err)
+			done <- ^uintptr(0)
+			return
+		}
+		done <- ret
+	}()
+
+	if got := <-done; got != 42 {
+		t.Fatalf("callback returned %d, want 42 (argument or return value lost when the stack moved during the call)", got)
 	}
 }
