@@ -86,6 +86,15 @@ struct return_pair_i64 return_struct_2ints(int64_t a, int64_t b) {
     return s;
 }
 
+// 24-byte struct (> 16 bytes) returned by value through the sret ABI: the caller
+// passes a hidden destination pointer (RDI on SysV AMD64, X8 on AAPCS64) and the
+// callee writes the struct into it. The Go test calls this with a real rvalue
+// buffer and checks the returned fields. triple_i64 is defined above.
+struct triple_i64 return_struct_24(void) {
+    struct triple_i64 s = {.a = 11, .b = 22, .c = 33};
+    return s;
+}
+
 // Variadic: sum N int64_t values.
 // Prototype: int64_t sum_variadic(int64_t count, ...)
 // nfixedargs = 1 (only 'count' is fixed).

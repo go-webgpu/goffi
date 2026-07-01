@@ -5,13 +5,20 @@
 package syscall
 
 import (
+	"runtime"
 	"structs"
+	"sync"
 	"unsafe"
 )
 
 //go:linkname runtime_cgocall runtime.cgocall
 //go:noescape
 func runtime_cgocall(fn uintptr, arg unsafe.Pointer) int32
+
+// syscallArgsPool recycles the per-call argument/return block. The block must
+// live in non-moving memory (see callNFloat): pooling keeps it heap-resident and
+// reused, so the move-safe path costs no per-call allocation in steady state.
+var syscallArgsPool = sync.Pool{New: func() any { return new(syscallArgs) }}
 
 // syscallArgs matches the layout expected by syscallN assembly.
 // AAPCS64 uses X0-X7 (8 GPRs) and D0-D7 (8 FPRs) for arguments.
@@ -63,7 +70,17 @@ func CallNFloat(fn uintptr, gpr [8]uintptr, fpr [8]uint64, stackArgs [7]uintptr,
 }
 
 func callNFloat(fn uintptr, gpr [8]uintptr, fpr [8]uint64, stackArgs [7]uintptr, numStack int, r8 uintptr) (r1 uintptr, r2 uintptr, fret [4]uint64) {
-	args := syscallArgs{
+	// args holds both the call arguments and the C function's return values.
+	// syscallN runs on g0 and writes the return values back into args after the
+	// call returns. That call can run a callback that re-enters Go and grows this
+	// goroutine's stack, which moves it. If args lived on the stack it would move
+	// too, syscallN's write would land at the old address, and the first such call
+	// would lose its return value. So args has to live in non-moving memory: we
+	// take it from the heap-backed pool and pin it for the cgocall. The heap does
+	// not move on today's Go; the pin keeps this correct if that ever changes.
+	args := syscallArgsPool.Get().(*syscallArgs)
+	defer syscallArgsPool.Put(args)
+	*args = syscallArgs{
 		fn: fn,
 		a1: gpr[0], a2: gpr[1], a3: gpr[2], a4: gpr[3],
 		a5: gpr[4], a6: gpr[5], a7: gpr[6], a8: gpr[7],
@@ -87,7 +104,12 @@ func callNFloat(fn uintptr, gpr [8]uintptr, fpr [8]uint64, stackArgs [7]uintptr,
 		r8: r8, // X8 for large struct returns
 	}
 	_ = numStack // informational; assembly always pushes all 7 stack slots
-	runtime_cgocall(syscallNABI0, unsafe.Pointer(&args))
+
+	var pinner runtime.Pinner
+	pinner.Pin(args)
+	runtime_cgocall(syscallNABI0, unsafe.Pointer(args))
+	pinner.Unpin()
+
 	r1 = args.r1
 	r2 = args.r2
 	fret[0] = uint64(args.fr1)

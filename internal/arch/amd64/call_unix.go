@@ -73,14 +73,9 @@ func (i *Implementation) Execute(
 	// Detect sret: struct > 16 bytes requires hidden first argument in RDI.
 	// The caller's rvalue buffer is passed as the first integer argument and
 	// callee writes the return value directly into it.
-	sretBuf := unsafe.Pointer(nil)
-	if cif.ReturnType.Kind == types.StructType && cif.ReturnType.Size > 16 {
-		if rvalue != nil {
-			sretBuf = rvalue
-		} else {
-			sretBuf = unsafe.Pointer(&[128]byte{})
-		}
-		addInt(uintptr(sretBuf))
+	sret := cif.ReturnType.Kind == types.StructType && cif.ReturnType.Size > 16
+	if sret {
+		addInt(uintptr(rvalue))
 	}
 
 	// Map arguments to registers or stack
@@ -222,10 +217,10 @@ func (i *Implementation) Execute(
 	ret, r2, fret, fret2 := gosyscall.CallNFloat(uintptr(fn), gpr, sse, stackArgs, numStack)
 
 	runtime.KeepAlive(avalue)
-	runtime.KeepAlive(sretBuf)
+	runtime.KeepAlive(rvalue)
 
 	// If sret, the callee wrote directly into rvalue — no further copy needed.
-	if sretBuf != nil {
+	if sret {
 		return nil
 	}
 
