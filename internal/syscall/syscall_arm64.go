@@ -5,14 +5,12 @@
 package syscall
 
 import (
-	"runtime"
 	"structs"
 	"sync"
 	"unsafe"
 )
 
 //go:linkname runtime_cgocall runtime.cgocall
-//go:noescape
 func runtime_cgocall(fn uintptr, arg unsafe.Pointer) int32
 
 // syscallArgsPool recycles the per-call argument/return block. The block must
@@ -76,8 +74,9 @@ func callNFloat(fn uintptr, gpr [8]uintptr, fpr [8]uint64, stackArgs [7]uintptr,
 	// goroutine's stack, which moves it. If args lived on the stack it would move
 	// too, syscallN's write would land at the old address, and the first such call
 	// would lose its return value. So args has to live in non-moving memory: we
-	// take it from the heap-backed pool and pin it for the cgocall. The heap does
-	// not move on today's Go; the pin keeps this correct if that ever changes.
+	// take it from the heap-backed pool. The heap does not move on today's Go
+	// (non-compacting GC, confirmed through Go 1.27). If a compacting GC ever
+	// lands, add runtime.Pinner here.
 	args := syscallArgsPool.Get().(*syscallArgs)
 	defer syscallArgsPool.Put(args)
 	*args = syscallArgs{
@@ -105,10 +104,7 @@ func callNFloat(fn uintptr, gpr [8]uintptr, fpr [8]uint64, stackArgs [7]uintptr,
 	}
 	_ = numStack // informational; assembly always pushes all 7 stack slots
 
-	var pinner runtime.Pinner
-	pinner.Pin(args)
 	runtime_cgocall(syscallNABI0, unsafe.Pointer(args))
-	pinner.Unpin()
 
 	r1 = args.r1
 	r2 = args.r2
