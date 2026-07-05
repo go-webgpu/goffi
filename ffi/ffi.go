@@ -248,6 +248,7 @@ func PrepareVariadicCallInterface(
 //   - All argument pointers must remain valid during the call
 //   - Return value buffer must be large enough for the result type
 //   - Use runtime.KeepAlive() if needed to prevent premature GC of arguments
+//   - Use runtime.Pinner to pin pointers under a moving GC
 func CallFunctionContext(
 	ctx context.Context,
 	cif *types.CallInterface,

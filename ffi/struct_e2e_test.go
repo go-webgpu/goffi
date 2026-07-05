@@ -531,3 +531,47 @@ func TestCallbackStructArgWithScalar(t *testing.T) {
 		t.Errorf("expected %#v %d, received %#v %d", expected, extra, receivedArg1, receivedArg2)
 	}
 }
+
+// TestStructReturn24B exercises the sret path for a struct larger than 16 bytes.
+// The caller provides a buffer in rvalue, goffi points the hidden return pointer
+// (RDI on amd64, X8 on arm64) at it, and the callee writes the struct directly
+// into that buffer. This covers the >16B struct return ABI, which the other
+// struct-return tests (all <= 16 bytes) do not reach.
+func TestStructReturn24B(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows struct returns use a separate ABI path (call_windows.go), not covered here")
+	}
+	requireStructLib(t)
+
+	sym, err := GetSymbol(structTestLib, "return_struct_24")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tripleI64 := &types.TypeDescriptor{
+		Kind:      types.StructType,
+		Size:      24,
+		Alignment: 8,
+		Members: []*types.TypeDescriptor{
+			types.SInt64TypeDescriptor,
+			types.SInt64TypeDescriptor,
+			types.SInt64TypeDescriptor,
+		},
+	}
+
+	var cif types.CallInterface
+	if err := PrepareCallInterface(&cif, types.DefaultCall, tripleI64, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	type TripleI64 struct{ A, B, C int64 }
+	var result TripleI64
+	if err := CallFunction(&cif, sym, unsafe.Pointer(&result), nil); err != nil {
+		t.Fatal(err)
+	}
+
+	want := TripleI64{11, 22, 33}
+	if result != want {
+		t.Fatalf("return_struct_24() = %+v, want %+v", result, want)
+	}
+}

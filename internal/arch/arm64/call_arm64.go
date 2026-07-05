@@ -197,7 +197,7 @@ func (i *Implementation) Execute(
 
 	// Determine if we need to pass X8 for large struct return (sret)
 	var r8 uintptr
-	if cif.Flags&types.ReturnViaPointer != 0 && rvalue != nil {
+	if cif.Flags&types.ReturnViaPointer != 0 {
 		// For sret, pass rvalue pointer in X8 - callee writes directly to it
 		r8 = uintptr(rvalue)
 	}

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-07-05
+
+### Fixed
+- **Critical: callback stack-move corruption** — when a C callback re-enters Go and grows the goroutine stack (`copystack`), `syscallArgs` on the goroutine stack would move but `syscallN` on g0 still held the old address, writing return values to freed memory. Fix: `syscallArgs` is now heap-allocated via `sync.Pool`, immune to `copystack`. Reverts the unsafe `//go:noescape` optimization from v0.5.4. Discovered and fixed by [@tie](https://github.com/tie) with `TestCallbackGrowStack` reproducer. ([PR #59](https://github.com/go-webgpu/goffi/pull/59))
+- **sret cleanup** — simplified >16B struct return path in `call_unix.go`, removed redundant `sretBuf` variable
+- **Added `TestStructReturn24B`** — end-to-end test for >16B struct return via sret hidden pointer
+
 ## [0.5.5] - 2026-06-15
 
 ### Fixed
