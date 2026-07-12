@@ -785,7 +785,7 @@ func TestCallbackGrowStack(t *testing.T) {
 		// trips vet's unsafeptr guard against conversions that hide a heap address from
 		// the GC, and the trampoline is code that is never GC-managed and never moved.
 		fn := *(*unsafe.Pointer)(unsafe.Pointer(&cb))
-		if err := CallFunction(&cif, fn, unsafe.Pointer(&ret), []unsafe.Pointer{unsafe.Pointer(&arg)}); err != nil {
+		if _, err := CallFunction(&cif, fn, unsafe.Pointer(&ret), []unsafe.Pointer{unsafe.Pointer(&arg)}); err != nil {
 			t.Error(err)
 			done <- ^uintptr(0)
 			return

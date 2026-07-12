@@ -108,7 +108,7 @@ func TestStructArg8B_IntegerPair(t *testing.T) {
 	s := Pair{A: 42, B: 19}
 	args := []unsafe.Pointer{unsafe.Pointer(&s)}
 	var result int64
-	if err := CallFunction(&cif, sym, unsafe.Pointer(&result), args); err != nil {
+	if _, err := CallFunction(&cif, sym, unsafe.Pointer(&result), args); err != nil {
 		t.Fatal(err)
 	}
 
@@ -153,7 +153,7 @@ func TestStructArg8B_FloatPair(t *testing.T) {
 	s := PairF32{X: 2.5, Y: 3.5}
 	args := []unsafe.Pointer{unsafe.Pointer(&s)}
 	var result float32
-	if err := CallFunction(&cif, sym, unsafe.Pointer(&result), args); err != nil {
+	if _, err := CallFunction(&cif, sym, unsafe.Pointer(&result), args); err != nil {
 		t.Fatal(err)
 	}
 
@@ -194,7 +194,7 @@ func TestStructArg16B(t *testing.T) {
 	s := PairI64{A: 1000000, B: 2000000}
 	args := []unsafe.Pointer{unsafe.Pointer(&s)}
 	var result int64
-	if err := CallFunction(&cif, sym, unsafe.Pointer(&result), args); err != nil {
+	if _, err := CallFunction(&cif, sym, unsafe.Pointer(&result), args); err != nil {
 		t.Fatal(err)
 	}
 
@@ -237,7 +237,7 @@ func TestStructArg24B_MemoryClass(t *testing.T) {
 	s := TripleI64{A: 100, B: 200, C: 300}
 	args := []unsafe.Pointer{unsafe.Pointer(&s)}
 	var result int64
-	if err := CallFunction(&cif, sym, unsafe.Pointer(&result), args); err != nil {
+	if _, err := CallFunction(&cif, sym, unsafe.Pointer(&result), args); err != nil {
 		t.Fatal(err)
 	}
 
@@ -279,7 +279,7 @@ func TestStructArgWithScalar(t *testing.T) {
 	extra := int64(1000)
 	args := []unsafe.Pointer{unsafe.Pointer(&s), unsafe.Pointer(&extra)}
 	var result int64
-	if err := CallFunction(&cif, sym, unsafe.Pointer(&result), args); err != nil {
+	if _, err := CallFunction(&cif, sym, unsafe.Pointer(&result), args); err != nil {
 		t.Fatal(err)
 	}
 
@@ -327,7 +327,7 @@ func TestCallbackStructArg8B_IntegerPair(t *testing.T) {
 		unsafe.Pointer(&callback),
 	}
 
-	if err := CallFunction(&cif, sym, nil, args); err != nil {
+	if _, err := CallFunction(&cif, sym, nil, args); err != nil {
 		t.Fatal(err)
 	}
 
@@ -374,7 +374,7 @@ func TestCallbackStructArg8B_FloatPair(t *testing.T) {
 		unsafe.Pointer(&callback),
 	}
 
-	if err := CallFunction(&cif, sym, nil, args); err != nil {
+	if _, err := CallFunction(&cif, sym, nil, args); err != nil {
 		t.Fatal(err)
 	}
 
@@ -421,7 +421,7 @@ func TestCallbackStructArg16B(t *testing.T) {
 		unsafe.Pointer(&callback),
 	}
 
-	if err := CallFunction(&cif, sym, nil, args); err != nil {
+	if _, err := CallFunction(&cif, sym, nil, args); err != nil {
 		t.Fatal(err)
 	}
 
@@ -471,7 +471,7 @@ func TestCallbackStructArg24B_MemoryClass(t *testing.T) {
 		unsafe.Pointer(&callback),
 	}
 
-	if err := CallFunction(&cif, sym, nil, args); err != nil {
+	if _, err := CallFunction(&cif, sym, nil, args); err != nil {
 		t.Fatal(err)
 	}
 
@@ -523,7 +523,7 @@ func TestCallbackStructArgWithScalar(t *testing.T) {
 		unsafe.Pointer(&callback),
 	}
 
-	if err := CallFunction(&cif, sym, nil, args); err != nil {
+	if _, err := CallFunction(&cif, sym, nil, args); err != nil {
 		t.Fatal(err)
 	}
 
@@ -566,7 +566,7 @@ func TestStructReturn24B(t *testing.T) {
 
 	type TripleI64 struct{ A, B, C int64 }
 	var result TripleI64
-	if err := CallFunction(&cif, sym, unsafe.Pointer(&result), nil); err != nil {
+	if _, err := CallFunction(&cif, sym, unsafe.Pointer(&result), nil); err != nil {
 		t.Fatal(err)
 	}
 

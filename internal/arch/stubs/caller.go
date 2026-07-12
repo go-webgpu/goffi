@@ -20,8 +20,9 @@ func (c *unsupportedCaller) Execute(
 	fn unsafe.Pointer,
 	rvalue unsafe.Pointer,
 	avalue []unsafe.Pointer,
-) error {
-	return types.ErrUnsupportedArchitecture
+	errnoFn uintptr,
+) (cerrno uintptr, err error) {
+	return 0, types.ErrUnsupportedArchitecture
 }
 
 func (c *unsupportedCaller) ClassifyReturn(

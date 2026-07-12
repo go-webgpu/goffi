@@ -149,7 +149,7 @@ func (rt *objcRuntime) getClass(t *testing.T, name string) uintptr {
 	namePtr := unsafe.Pointer(&cname[0])
 
 	var result uintptr
-	err := CallFunction(
+	_, err := CallFunction(
 		&rt.cifCStringToPtr,
 		rt.objcGetClass,
 		unsafe.Pointer(&result),
@@ -172,7 +172,7 @@ func (rt *objcRuntime) sel(t *testing.T, name string) uintptr {
 	namePtr := unsafe.Pointer(&cname[0])
 
 	var result uintptr
-	err := CallFunction(
+	_, err := CallFunction(
 		&rt.cifCStringToPtr,
 		rt.selRegisterName,
 		unsafe.Pointer(&result),
@@ -254,7 +254,7 @@ func objcCall(t *testing.T, rt *objcRuntime, retType *types.TypeDescriptor, rval
 		argPtrs = append(argPtrs, arg.ptr)
 	}
 
-	if err := CallFunction(cif, rt.objcMsgSend, rvalue, argPtrs); err != nil {
+	if _, err := CallFunction(cif, rt.objcMsgSend, rvalue, argPtrs); err != nil {
 		t.Fatalf("objc_msgSend failed: %v", err)
 	}
 	runtime.KeepAlive(args)
@@ -606,7 +606,7 @@ func TestDarwinCoreGraphicsStructs(t *testing.T) {
 		t.Fatalf("PrepareCallInterface(CGMainDisplayID) failed: %v", err)
 	}
 	var displayID uint32
-	err = CallFunction(displayIDCIF, mainDisplayID, unsafe.Pointer(&displayID), nil)
+	_, err = CallFunction(displayIDCIF, mainDisplayID, unsafe.Pointer(&displayID), nil)
 	if err != nil {
 		t.Fatalf("CGMainDisplayID call failed: %v", err)
 	}
@@ -623,7 +623,7 @@ func TestDarwinCoreGraphicsStructs(t *testing.T) {
 	}
 
 	var bounds nsRect
-	err = CallFunction(boundsCIF, displayBounds, unsafe.Pointer(&bounds), []unsafe.Pointer{
+	_, err = CallFunction(boundsCIF, displayBounds, unsafe.Pointer(&bounds), []unsafe.Pointer{
 		unsafe.Pointer(&displayID),
 	})
 	if err != nil {
@@ -648,7 +648,7 @@ func TestDarwinCoreGraphicsStructs(t *testing.T) {
 	}
 	var transform uintptr
 	var path uintptr
-	err = CallFunction(pathCIF, pathCreateRect, unsafe.Pointer(&path), []unsafe.Pointer{
+	_, err = CallFunction(pathCIF, pathCreateRect, unsafe.Pointer(&path), []unsafe.Pointer{
 		unsafe.Pointer(&rect),
 		unsafe.Pointer(&transform),
 	})
@@ -666,7 +666,7 @@ func TestDarwinCoreGraphicsStructs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PrepareCallInterface(CGPathRelease) failed: %v", err)
 	}
-	err = CallFunction(releaseCIF, pathRelease, nil, []unsafe.Pointer{
+	_, err = CallFunction(releaseCIF, pathRelease, nil, []unsafe.Pointer{
 		unsafe.Pointer(&path),
 	})
 	if err != nil {
@@ -699,7 +699,7 @@ func TestDarwinCAMetalLayerProperties(t *testing.T) {
 		t.Fatalf("PrepareCallInterface(MTLCreateSystemDefaultDevice) failed: %v", err)
 	}
 	var device uintptr
-	if err := CallFunction(cifDevice, createDevice, unsafe.Pointer(&device), nil); err != nil {
+	if _, err := CallFunction(cifDevice, createDevice, unsafe.Pointer(&device), nil); err != nil {
 		t.Fatalf("MTLCreateSystemDefaultDevice call failed: %v", err)
 	}
 	if device == 0 {

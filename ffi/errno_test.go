@@ -11,12 +11,12 @@ import (
 	"github.com/go-webgpu/goffi/types"
 )
 
-// TestCallFunctionErrnoBasic verifies that CallFunctionErrno captures a
+// TestCallFunctionCapturesErrno verifies that CallFunction captures a
 // non-zero errno when a POSIX function fails.
 //
 // Strategy: call open(2) with a path that does not exist. POSIX mandates that
 // open returns -1 and sets errno = ENOENT in this case.
-func TestCallFunctionErrnoBasic(t *testing.T) {
+func TestCallFunctionCapturesErrno(t *testing.T) {
 	var libName string
 	switch runtime.GOOS {
 	case "linux":
@@ -56,26 +56,26 @@ func TestCallFunctionErrnoBasic(t *testing.T) {
 	flags := int32(0) // O_RDONLY
 
 	var result int32
-	cerrno, err := CallFunctionErrno(cif, openFn,
+	cerrno, err := CallFunction(cif, openFn,
 		unsafe.Pointer(&result),
 		[]unsafe.Pointer{unsafe.Pointer(&pathPtr), unsafe.Pointer(&flags)},
 	)
 	if err != nil {
-		t.Fatalf("CallFunctionErrno failed: %v", err)
+		t.Fatalf("CallFunction failed: %v", err)
 	}
 
 	if result != -1 {
 		t.Fatalf("expected open() to return -1, got %d", result)
 	}
-	if cerrno != uintptr(syscall.ENOENT) {
+	if cerrno != syscall.ENOENT {
 		t.Errorf("expected errno=ENOENT(%d), got %d (%v)",
-			syscall.ENOENT, cerrno, syscall.Errno(cerrno))
+			syscall.ENOENT, cerrno, cerrno)
 	}
 }
 
-// TestCallFunctionErrnoSuccess verifies that errno is 0 after a successful call.
+// TestCallFunctionZeroErrnoOnSuccess verifies that errno is 0 after a successful call.
 // We use strlen(3) which always succeeds and does not set errno.
-func TestCallFunctionErrnoSuccess(t *testing.T) {
+func TestCallFunctionZeroErrnoOnSuccess(t *testing.T) {
 	var libName string
 	switch runtime.GOOS {
 	case "linux":
@@ -112,12 +112,12 @@ func TestCallFunctionErrnoSuccess(t *testing.T) {
 	ptr := unsafe.Pointer(unsafe.StringData(input))
 
 	var result uint64
-	cerrno, err := CallFunctionErrno(cif, strlenFn,
+	cerrno, err := CallFunction(cif, strlenFn,
 		unsafe.Pointer(&result),
 		[]unsafe.Pointer{unsafe.Pointer(&ptr)},
 	)
 	if err != nil {
-		t.Fatalf("CallFunctionErrno failed: %v", err)
+		t.Fatalf("CallFunction failed: %v", err)
 	}
 	if result != 5 {
 		t.Errorf("strlen returned %d, want 5", result)
@@ -129,31 +129,31 @@ func TestCallFunctionErrnoSuccess(t *testing.T) {
 	}
 }
 
-// TestCallFunctionErrnoNilCIF verifies that a nil CIF returns an error.
-func TestCallFunctionErrnoNilCIF(t *testing.T) {
-	_, err := CallFunctionErrno(nil, nil, nil, nil)
+// TestCallFunctionNilCIF verifies that a nil CIF returns an error.
+func TestCallFunctionNilCIF(t *testing.T) {
+	_, err := CallFunction(nil, nil, nil, nil)
 	if err == nil {
 		t.Error("expected error for nil CIF, got nil")
 	}
 }
 
-// TestCallFunctionErrnoNilFn verifies that a nil function pointer returns an error.
-func TestCallFunctionErrnoNilFn(t *testing.T) {
+// TestCallFunctionNilFn verifies that a nil function pointer returns an error.
+func TestCallFunctionNilFn(t *testing.T) {
 	cif := &types.CallInterface{}
 	prepErr := PrepareCallInterface(cif, types.UnixCallingConvention,
 		types.VoidTypeDescriptor, nil)
 	if prepErr != nil {
 		t.Fatalf("PrepareCallInterface failed: %v", prepErr)
 	}
-	_, err := CallFunctionErrno(cif, nil, nil, nil)
+	_, err := CallFunction(cif, nil, nil, nil)
 	if err == nil {
 		t.Error("expected error for nil fn, got nil")
 	}
 }
 
-// BenchmarkCallFunctionErrno measures the overhead of CallFunctionErrno
-// relative to CallFunction by calling strlen on a short string.
-func BenchmarkCallFunctionErrno(b *testing.B) {
+// BenchmarkCallFunctionErrnoOverhead measures the errno capture overhead inside
+// CallFunction relative to a baseline by calling strlen on a short string.
+func BenchmarkCallFunctionErrnoOverhead(b *testing.B) {
 	var libName string
 	switch runtime.GOOS {
 	case "linux":
@@ -191,7 +191,7 @@ func BenchmarkCallFunctionErrno(b *testing.B) {
 	var result uint64
 	b.ResetTimer()
 	for b.Loop() {
-		_, _ = CallFunctionErrno(cif, strlenFn,
+		_, _ = CallFunction(cif, strlenFn,
 			unsafe.Pointer(&result),
 			[]unsafe.Pointer{unsafe.Pointer(&ptr)},
 		)

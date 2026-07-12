@@ -136,7 +136,7 @@ func TestCallback_FromCThread(t *testing.T) {
 		unsafe.Pointer(&argVal),
 	}
 	var rcCreate int32
-	if err := CallFunction(cifCreate, create, unsafe.Pointer(&rcCreate), avalueCreate); err != nil {
+	if _, err := CallFunction(cifCreate, create, unsafe.Pointer(&rcCreate), avalueCreate); err != nil {
 		t.Fatalf("CallFunction(pthread_create): %v", err)
 	}
 	if rcCreate != 0 {
@@ -153,7 +153,7 @@ func TestCallback_FromCThread(t *testing.T) {
 		unsafe.Pointer(&retvalAddr),
 	}
 	var rcJoin int32
-	if err := CallFunction(cifJoin, join, unsafe.Pointer(&rcJoin), avalueJoin); err != nil {
+	if _, err := CallFunction(cifJoin, join, unsafe.Pointer(&rcJoin), avalueJoin); err != nil {
 		t.Fatalf("CallFunction(pthread_join): %v", err)
 	}
 	if rcJoin != 0 {

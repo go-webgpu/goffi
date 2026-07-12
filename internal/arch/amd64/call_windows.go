@@ -11,12 +11,15 @@ import (
 	"github.com/go-webgpu/goffi/types"
 )
 
+// Execute implements arch.FunctionCaller for Windows AMD64.
+// errnoFn is always 0 on Windows (ErrnoFnAddr returns 0); cerrno is always 0.
 func (i *Implementation) Execute(
 	cif *types.CallInterface,
 	fn unsafe.Pointer,
 	rvalue unsafe.Pointer,
 	avalue []unsafe.Pointer,
-) error {
+	errnoFn uintptr,
+) (cerrno uintptr, err error) {
 	// Win64 ABI: arguments are passed in numbered slots.
 	// First 4 args: RCX, RDX, R8, R9 (integer) or XMM0-XMM3 (float).
 	// Args 5+: on the stack.
@@ -81,5 +84,8 @@ func (i *Implementation) Execute(
 	// See: TASK-019, GAP-7. Workaround: use integer return type and reinterpret bits.
 	// fret and fret2 are zero: Windows syscall.SyscallN does not capture XMM returns.
 	// Float-returning functions on Windows require a custom assembly wrapper (known limitation).
-	return i.handleReturn(cif, rvalue, uint64(ret), 0, 0, 0)
+	//
+	// cerrno is always 0 on Windows: errno capture via __errno_location is not applicable.
+	// Windows Win32 errors use GetLastError(); CRT errno is rarely used for Win32 APIs.
+	return 0, i.handleReturn(cif, rvalue, uint64(ret), 0, 0, 0)
 }

@@ -89,6 +89,7 @@ package ffi
 import (
 	"context"
 	"errors"
+	"syscall"
 	"unsafe"
 
 	"github.com/go-webgpu/goffi/types"
@@ -206,6 +207,11 @@ func PrepareVariadicCallInterface(
 // context before executing to prevent starting expensive operations when the
 // context is already cancelled or has exceeded its deadline.
 //
+// errno is captured inside the assembly trampoline immediately after the C
+// function returns, before the Go runtime can migrate the goroutine to a
+// different OS thread. On Windows, errno is always 0 (use syscall.GetLastError()
+// for Win32 error codes).
+//
 // Parameters:
 //   - ctx: Context for cancellation and timeout control (use context.Background() if not needed)
 //   - cif: Prepared call interface (from PrepareCallInterface)
@@ -214,10 +220,8 @@ func PrepareVariadicCallInterface(
 //   - avalue: Slice of pointers to argument values (length must match argCount from PrepareCallInterface)
 //
 // Returns:
-//   - nil on success
-//   - ctx.Err() if context is cancelled or deadline exceeded before call starts
-//   - ErrInvalidCallInterface if cif or fn is nil
-//   - ErrFunctionCallFailed if the call execution fails
+//   - errno: C errno captured after the call (0 on success or Windows)
+//   - err: nil on success; ctx.Err() if context cancelled; ErrInvalidCallInterface if cif or fn is nil
 //
 // Example:
 //
@@ -227,7 +231,7 @@ func PrepareVariadicCallInterface(
 //
 //	var result float64
 //	arg := 16.0
-//	err := ffi.CallFunctionContext(
+//	errno, err := ffi.CallFunctionContext(
 //	    ctx,
 //	    &cif,
 //	    sqrtPtr,
@@ -255,34 +259,39 @@ func CallFunctionContext(
 	fn unsafe.Pointer,
 	rvalue unsafe.Pointer,
 	avalue []unsafe.Pointer,
-) error {
+) (syscall.Errno, error) {
 	// Check context before expensive call
-	if err := ctx.Err(); err != nil {
-		return err
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return 0, ctxErr
 	}
 
 	if cif == nil {
-		return &InvalidCallInterfaceError{
+		return 0, &InvalidCallInterfaceError{
 			Field:  "cif",
 			Reason: "must not be nil",
 			Index:  -1,
 		}
 	}
 	if fn == nil {
-		return &InvalidCallInterfaceError{
+		return 0, &InvalidCallInterfaceError{
 			Field:  "fn",
 			Reason: "function pointer must not be nil",
 			Index:  -1,
 		}
 	}
 
-	return executeFunction(cif, fn, rvalue, avalue)
+	cerrno, err := executeFunction(cif, fn, rvalue, avalue)
+	return syscall.Errno(cerrno), err
 }
 
 // CallFunction executes a C function call without context support.
 //
 // This is equivalent to CallFunctionContext(context.Background(), cif, fn, rvalue, avalue).
 // For operations that need cancellation or timeout control, use CallFunctionContext instead.
+//
+// errno is captured inside the assembly trampoline immediately after the C
+// function returns, before the Go runtime can migrate the goroutine to a
+// different OS thread. On Windows, errno is always 0.
 //
 // Parameters:
 //   - cif: Prepared call interface (from PrepareCallInterface)
@@ -291,21 +300,24 @@ func CallFunctionContext(
 //   - avalue: Slice of pointers to argument values (length must match argCount from PrepareCallInterface)
 //
 // Returns:
-//   - nil on success
-//   - ErrInvalidCallInterface if cif or fn is nil
-//   - ErrFunctionCallFailed if the call execution fails
+//   - errno: C errno captured after the call (0 on success or Windows)
+//   - err: nil on success; ErrInvalidCallInterface if cif or fn is nil
 //
 // Example:
 //
-//	// Calling strlen(const char *str)
-//	var result uintptr
-//	str := "Hello"
-//	err := ffi.CallFunction(
+//	// Calling open(2) and checking errno on failure:
+//	errno, err := ffi.CallFunction(
 //	    &cif,
-//	    strlenPtr,
+//	    openFn,
 //	    unsafe.Pointer(&result),
-//	    []unsafe.Pointer{unsafe.Pointer(&str)},
+//	    []unsafe.Pointer{unsafe.Pointer(&pathPtr), unsafe.Pointer(&flags)},
 //	)
+//	if result == -1 {
+//	    log.Printf("open failed: %v", errno)
+//	}
+//
+//	// When errno is not needed:
+//	_, err := ffi.CallFunction(&cif, strlenFn, unsafe.Pointer(&result), avalue)
 //
 // For context-aware calls with timeout support, see CallFunctionContext.
 func CallFunction(
@@ -313,6 +325,6 @@ func CallFunction(
 	fn unsafe.Pointer,
 	rvalue unsafe.Pointer,
 	avalue []unsafe.Pointer,
-) error {
+) (syscall.Errno, error) {
 	return CallFunctionContext(context.Background(), cif, fn, rvalue, avalue)
 }
