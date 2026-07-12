@@ -32,6 +32,8 @@ var syscallArgsPool = sync.Pool{New: func() any { return new(syscallArgs) }}
 //	r2:      200     (X1 integer return, 9-16 byte struct returns)
 //	fr1-fr4: 208-232 (D0-D3 float returns for HFA)
 //	r8:      240     (X8 - large struct return pointer)
+//	errno:   248     (captured C errno value; 0 if errnoFn == 0)
+//	errnoFn: 256     (address of __errno_location/__error; 0 = skip errno capture)
 //
 // NOTE: f1-f8 and fr1-fr4 are raw bit patterns. For float32 values, the
 // lower 32 bits contain the float32 representation (upper 32 bits are ignored).
@@ -44,6 +46,8 @@ type syscallArgs struct {
 	r1, r2                           uintptr // X0-X1 integer returns (offsets 192-200)
 	fr1, fr2, fr3, fr4               uintptr // D0-D3 float returns for HFA (offsets 208-232)
 	r8                               uintptr // X8 - large struct return pointer (offset 240)
+	errno                            uintptr // captured C errno (offset 248)
+	errnoFn                          uintptr // address of __errno_location/__error (offset 256)
 }
 
 // syscallN is implemented in syscall_unix_arm64.s
@@ -112,5 +116,53 @@ func callNFloat(fn uintptr, gpr [8]uintptr, fpr [8]uint64, stackArgs [7]uintptr,
 	fret[1] = uint64(args.fr2)
 	fret[2] = uint64(args.fr3)
 	fret[3] = uint64(args.fr4)
+	return
+}
+
+// CallNFloatErrno is like CallNFloat but also captures the C errno value set
+// by the called function. The errno function address (errnoFn) must be the
+// address of __errno_location (Linux/FreeBSD) or __error (macOS), obtained
+// from ErrnoFnAddr(). When errnoFn is 0, errno capture is skipped and the
+// returned errno value is always 0.
+//
+// The errno is read inside the assembly trampoline immediately after the C
+// function returns, before the Go runtime can migrate the goroutine to a
+// different OS thread. This is the only safe window for errno capture.
+func CallNFloatErrno(fn uintptr, gpr [8]uintptr, fpr [8]uint64, stackArgs [7]uintptr, numStack int, r8 uintptr, errnoFn uintptr) (r1 uintptr, r2 uintptr, fret [4]uint64, cerrno uintptr) {
+	args := syscallArgsPool.Get().(*syscallArgs)
+	defer syscallArgsPool.Put(args)
+	*args = syscallArgs{
+		fn: fn,
+		a1: gpr[0], a2: gpr[1], a3: gpr[2], a4: gpr[3],
+		a5: gpr[4], a6: gpr[5], a7: gpr[6], a8: gpr[7],
+		a9:      stackArgs[0],
+		a10:     stackArgs[1],
+		a11:     stackArgs[2],
+		a12:     stackArgs[3],
+		a13:     stackArgs[4],
+		a14:     stackArgs[5],
+		a15:     stackArgs[6],
+		f1:      uintptr(fpr[0]),
+		f2:      uintptr(fpr[1]),
+		f3:      uintptr(fpr[2]),
+		f4:      uintptr(fpr[3]),
+		f5:      uintptr(fpr[4]),
+		f6:      uintptr(fpr[5]),
+		f7:      uintptr(fpr[6]),
+		f8:      uintptr(fpr[7]),
+		r8:      r8,
+		errnoFn: errnoFn,
+	}
+	_ = numStack
+
+	runtime_cgocall(syscallNABI0, unsafe.Pointer(args))
+
+	r1 = args.r1
+	r2 = args.r2
+	fret[0] = uint64(args.fr1)
+	fret[1] = uint64(args.fr2)
+	fret[2] = uint64(args.fr3)
+	fret[3] = uint64(args.fr4)
+	cerrno = args.errno
 	return
 }

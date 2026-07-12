@@ -234,3 +234,190 @@ func (i *Implementation) Execute(
 
 	return i.handleReturn(cif, rvalue, retVal, uint64(r2), fret, fret2)
 }
+
+// ExecuteErrno implements arch.FunctionCallerErrno for Unix AMD64.
+// It is identical to Execute but uses CallNFloatErrno to capture C errno
+// immediately after the C function returns, inside the assembly trampoline.
+func (i *Implementation) ExecuteErrno(
+	cif *types.CallInterface,
+	fn unsafe.Pointer,
+	rvalue unsafe.Pointer,
+	avalue []unsafe.Pointer,
+	errnoFn uintptr,
+) (cerrno uintptr, err error) {
+	var sysargs [maxTotalArgs]uintptr
+	var floats [8]uintptr
+
+	numInts := 0
+	numFloats := 0
+	numStack := 0
+
+	addInt := func(x uintptr) {
+		const maxGPRegs = 6
+		if numInts < maxGPRegs {
+			sysargs[numInts] = x
+			numInts++
+		} else {
+			sysargs[maxGPRegs+numStack] = x
+			numStack++
+		}
+	}
+
+	addStack := func(x uintptr) {
+		const maxGPRegs = 6
+		sysargs[maxGPRegs+numStack] = x
+		numStack++
+	}
+
+	addFloat := func(x uintptr) {
+		if numFloats < 8 {
+			floats[numFloats] = x
+			numFloats++
+		} else {
+			const maxGPRegs = 6
+			sysargs[maxGPRegs+numStack] = x
+			numStack++
+		}
+	}
+
+	sret := cif.ReturnType.Kind == types.StructType && cif.ReturnType.Size > 16
+	if sret {
+		addInt(uintptr(rvalue))
+	}
+
+	for idx, argType := range cif.ArgTypes {
+		if idx >= len(avalue) {
+			break
+		}
+		switch argType.Kind {
+		case types.FloatType:
+			addFloat(uintptr(math.Float32bits(*(*float32)(avalue[idx]))))
+		case types.DoubleType:
+			addFloat(*(*uintptr)(avalue[idx]))
+		case types.PointerType:
+			addInt(*(*uintptr)(avalue[idx]))
+		case types.SInt8Type, types.UInt8Type:
+			addInt(uintptr(*(*uint8)(avalue[idx])))
+		case types.SInt16Type, types.UInt16Type:
+			addInt(uintptr(*(*uint16)(avalue[idx])))
+		case types.SInt32Type, types.UInt32Type:
+			addInt(uintptr(*(*uint32)(avalue[idx])))
+		case types.SInt64Type, types.UInt64Type:
+			addInt(uintptr(*(*uint64)(avalue[idx])))
+		case types.StructType:
+			argPtr := avalue[idx]
+			sz := argType.Size
+			switch {
+			case sz == 0:
+				// Zero-size struct: pass nothing.
+			case sz <= 8:
+				if isStructAllFloats(argType) {
+					addFloat(*(*uintptr)(argPtr))
+				} else {
+					var v uintptr
+					switch {
+					case sz == 1:
+						v = uintptr(*(*uint8)(argPtr))
+					case sz == 2:
+						v = uintptr(*(*uint16)(argPtr))
+					case sz <= 4:
+						v = uintptr(*(*uint32)(argPtr))
+					default:
+						v = *(*uintptr)(argPtr)
+					}
+					addInt(v)
+				}
+			case sz <= 16:
+				if classifyEightbyte(argType, 0, 8) {
+					addFloat(*(*uintptr)(argPtr))
+				} else {
+					addInt(*(*uintptr)(argPtr))
+				}
+				remaining := sz - 8
+				secondPtr := unsafe.Add(argPtr, 8)
+				if classifyEightbyte(argType, 8, sz) {
+					var v uintptr
+					switch {
+					case remaining == 1:
+						v = uintptr(*(*uint8)(secondPtr))
+					case remaining == 2:
+						v = uintptr(*(*uint16)(secondPtr))
+					case remaining <= 4:
+						v = uintptr(*(*uint32)(secondPtr))
+					default:
+						v = *(*uintptr)(secondPtr)
+					}
+					addFloat(v)
+				} else {
+					var v uintptr
+					switch {
+					case remaining == 1:
+						v = uintptr(*(*uint8)(secondPtr))
+					case remaining == 2:
+						v = uintptr(*(*uint16)(secondPtr))
+					case remaining <= 4:
+						v = uintptr(*(*uint32)(secondPtr))
+					default:
+						v = *(*uintptr)(secondPtr)
+					}
+					addInt(v)
+				}
+			default:
+				nChunks := (sz + 7) / 8
+				for k := uintptr(0); k < nChunks; k++ {
+					chunkPtr := unsafe.Add(argPtr, k*8)
+					bytesLeft := sz - k*8
+					var v uintptr
+					if bytesLeft >= 8 {
+						v = *(*uintptr)(chunkPtr)
+					} else {
+						switch {
+						case bytesLeft == 1:
+							v = uintptr(*(*uint8)(chunkPtr))
+						case bytesLeft == 2:
+							v = uintptr(*(*uint16)(chunkPtr))
+						case bytesLeft <= 4:
+							v = uintptr(*(*uint32)(chunkPtr))
+						default:
+							v = *(*uintptr)(chunkPtr)
+						}
+					}
+					addStack(v)
+				}
+			}
+		default:
+			addInt(uintptr(avalue[idx]))
+		}
+	}
+
+	if numStack > maxTotalArgs-6 {
+		return 0, fmt.Errorf("goffi: %d stack arguments exceed platform limit of %d", numStack, maxTotalArgs-6)
+	}
+
+	var gpr [6]uintptr
+	copy(gpr[:], sysargs[:6])
+
+	var sse [8]float64
+	for k := range floats {
+		sse[k] = *(*float64)(unsafe.Pointer(&floats[k]))
+	}
+
+	var stackArgs [9]uintptr
+	copy(stackArgs[:], sysargs[6:])
+
+	ret, r2, fret, fret2, capturedErrno := gosyscall.CallNFloatErrno(uintptr(fn), gpr, sse, stackArgs, numStack, errnoFn)
+
+	runtime.KeepAlive(avalue)
+	runtime.KeepAlive(rvalue)
+
+	if sret {
+		return capturedErrno, nil
+	}
+
+	retVal := uint64(ret)
+	if cif.ReturnType.Kind == types.FloatType || cif.ReturnType.Kind == types.DoubleType {
+		retVal = *(*uint64)(unsafe.Pointer(&fret))
+	}
+
+	return capturedErrno, i.handleReturn(cif, rvalue, retVal, uint64(r2), fret, fret2)
+}

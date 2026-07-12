@@ -318,3 +318,145 @@ func (i *Implementation) Execute(
 	// Handle return value based on type
 	return i.handleReturn(cif, rvalue, uint64(ret1), uint64(ret2), fret)
 }
+
+// ExecuteErrno implements arch.FunctionCallerErrno for ARM64.
+// It is identical to Execute but uses CallNFloatErrno to capture C errno
+// immediately after the C function returns, inside the assembly trampoline.
+// On Windows ARM64, errnoFn is always 0 and cerrno is always 0.
+func (i *Implementation) ExecuteErrno(
+	cif *types.CallInterface,
+	fn unsafe.Pointer,
+	rvalue unsafe.Pointer,
+	avalue []unsafe.Pointer,
+	errnoFn uintptr,
+) (cerrno uintptr, err error) {
+	var gpr [8]uintptr
+	var fpr [8]uint64
+	var stackArgs [maxStackArgs]uintptr
+
+	gprIdx := 0
+	fprIdx := 0
+	stackIdx := 0
+
+	addInt := func(x uintptr) bool {
+		if gprIdx < 8 {
+			gpr[gprIdx] = x
+			gprIdx++
+			return true
+		}
+		if stackIdx < maxStackArgs {
+			stackArgs[stackIdx] = x
+			stackIdx++
+			return true
+		}
+		return false
+	}
+
+	addFloat := func(x uint64) bool {
+		if fprIdx < 8 {
+			fpr[fprIdx] = x
+			fprIdx++
+			return true
+		}
+		if stackIdx < maxStackArgs {
+			stackArgs[stackIdx] = uintptr(x)
+			stackIdx++
+			return true
+		}
+		return false
+	}
+
+	var r8 uintptr
+	if cif.Flags&types.ReturnViaPointer != 0 {
+		r8 = uintptr(rvalue)
+	}
+
+	for idx, argType := range cif.ArgTypes {
+		if idx >= len(avalue) {
+			break
+		}
+		if cif.FixedArgCount > 0 && runtime.GOOS == "darwin" && idx == cif.FixedArgCount {
+			gprIdx = 8
+			fprIdx = 8
+		}
+		switch argType.Kind {
+		case types.FloatType:
+			addFloat(uint64(math.Float32bits(*(*float32)(avalue[idx]))))
+		case types.DoubleType:
+			addFloat(math.Float64bits(*(*float64)(avalue[idx])))
+		case types.PointerType:
+			addInt(*(*uintptr)(avalue[idx]))
+		case types.SInt8Type:
+			addInt(uintptr(int64(*(*int8)(avalue[idx]))))
+		case types.UInt8Type:
+			addInt(uintptr(*(*uint8)(avalue[idx])))
+		case types.SInt16Type:
+			addInt(uintptr(int64(*(*int16)(avalue[idx]))))
+		case types.UInt16Type:
+			addInt(uintptr(*(*uint16)(avalue[idx])))
+		case types.SInt32Type:
+			addInt(uintptr(int64(*(*int32)(avalue[idx]))))
+		case types.UInt32Type:
+			addInt(uintptr(*(*uint32)(avalue[idx])))
+		case types.SInt64Type:
+			addInt(uintptr(*(*int64)(avalue[idx])))
+		case types.UInt64Type:
+			addInt(uintptr(*(*uint64)(avalue[idx])))
+		case types.StructType:
+			ensureStructLayout(argType)
+			isHFA, hfaCount, _ := isHomogeneousFloatAggregate(argType)
+			if isHFA && hfaCount > 0 && hfaCount <= 4 {
+				if fprIdx+hfaCount <= 8 {
+					ok := placeStructRegisters(
+						avalue[idx],
+						argType,
+						func(v uint64) bool { return addInt(uintptr(v)) },
+						func(v uint64) bool { return addFloat(v) },
+					)
+					if ok {
+						break
+					}
+				}
+				hfaOverflow := false
+				for k := 0; k < int(argType.Size/4) && !hfaOverflow; k++ {
+					slot := *(*uint32)(unsafe.Add(avalue[idx], uintptr(k)*4))
+					if !addFloat(uint64(slot)) {
+						hfaOverflow = true
+					}
+				}
+				if !hfaOverflow {
+					break
+				}
+				addInt(uintptr(avalue[idx]))
+				break
+			}
+			if argType.Size <= 16 {
+				intCount, floatCount := countStructRegUsage(argType)
+				if gprIdx+intCount <= 8 && fprIdx+floatCount <= 8 {
+					ok := placeStructRegisters(
+						avalue[idx],
+						argType,
+						func(v uint64) bool { return addInt(uintptr(v)) },
+						func(v uint64) bool { return addFloat(v) },
+					)
+					if ok {
+						break
+					}
+				}
+			}
+			addInt(uintptr(avalue[idx]))
+		default:
+			addInt(uintptr(avalue[idx]))
+		}
+	}
+
+	if stackIdx > maxStackArgs {
+		return 0, fmt.Errorf("goffi: %d stack arguments exceed platform limit of %d", stackIdx, maxStackArgs)
+	}
+
+	ret1, ret2, fret, capturedErrno := gosyscall.CallNFloatErrno(uintptr(fn), gpr, fpr, stackArgs, stackIdx, r8, errnoFn)
+
+	runtime.KeepAlive(avalue)
+
+	return capturedErrno, i.handleReturn(cif, rvalue, uint64(ret1), uint64(ret2), fret)
+}
