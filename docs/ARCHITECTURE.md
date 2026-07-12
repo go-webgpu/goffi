@@ -37,7 +37,8 @@ Every goffi call traverses four layers:
 ┌──────────────────────────────────────────────┐
 │  Layer 3: Assembly Wrapper                   │
 │  Load registers per ABI (GP + SSE/FP)       │
-│  Call target function, save return values    │
+│  Call target function, capture errno,        │
+│  save return values                          │
 └──────────────────┬───────────────────────────┘
                    │
                    ▼
@@ -74,6 +75,8 @@ ffi.PrepareCallInterface(cif, types.DefaultCall,
 3. Calls our assembly wrapper
 
 Since v0.5.6, `syscallArgs` is heap-allocated via `sync.Pool` — goroutine stacks may move during C→Go callbacks (`copystack`), and assembly on g0 holds the args pointer across the call. All ABI-boundary structs use `structs.HostLayout` (Go 1.23+) to guarantee C-compatible memory layout.
+
+Since v0.6.0, `CallFunction` always captures C `errno` inside the assembly trampoline — the only thread-safe window (before `exitsyscall` can migrate the goroutine). Returns `(syscall.Errno, error)`. Uses `__errno_location` (Linux) / `__error` (macOS/FreeBSD) resolved via `//go:cgo_import_dynamic`.
 4. Restores Go stack on return
 
 We access it via `//go:linkname`:

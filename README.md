@@ -21,7 +21,7 @@ sym, _ := ffi.GetSymbol(handle, "wgpuCreateInstance")
 
 cif := &types.CallInterface{}
 ffi.PrepareCallInterface(cif, types.DefaultCall, returnType, argTypes)
-ffi.CallFunction(cif, sym, unsafe.Pointer(&result), args)
+_, _ = ffi.CallFunction(cif, sym, unsafe.Pointer(&result), args)
 ```
 
 ---
@@ -37,6 +37,7 @@ ffi.CallFunction(cif, sym, unsafe.Pointer(&result), args)
 | **Type-safe** | Runtime validation | 5 typed error types with `errors.As()` support |
 | **Struct pass/return** | Full ABI | Args: INTEGER/SSE classification. Returns: ≤8B (RAX/XMM0), 9–16B (4 modes: RAX/XMM × RAX/XMM), >16B (sret) |
 | **Variadic** | `printf`/`sprintf` | `PrepareVariadicCallInterface` — Apple ARM64 stack-force included |
+| **errno** | Always captured | Thread-safe assembly-level capture — first pure-Go FFI on Linux |
 | **Context** | Timeouts | `CallFunctionContext(ctx, ...)` cancellation |
 | **Race detector** | `-race` compatible | `CGO_ENABLED=1 go test -race` works cleanly |
 | **Tested** | 89% coverage | CI on Linux, Windows, macOS (CGO=0 and CGO=1) |
@@ -115,7 +116,7 @@ func main() {
 	strPtr := uintptr(unsafe.Pointer(unsafe.StringData(testStr)))
 	var length uint64
 
-	err = ffi.CallFunction(cif, strlen, unsafe.Pointer(&length), []unsafe.Pointer{unsafe.Pointer(&strPtr)})
+	_, err = ffi.CallFunction(cif, strlen, unsafe.Pointer(&length), []unsafe.Pointer{unsafe.Pointer(&strPtr)})
 	if err != nil {
 		panic(err)
 	}
@@ -153,7 +154,7 @@ err := ffi.PrepareVariadicCallInterface(
 count := int64(3)
 a1, a2, a3 := int64(10), int64(20), int64(30)
 var result int64
-ffi.CallFunction(&cif, sym, unsafe.Pointer(&result), []unsafe.Pointer{
+_, _ = ffi.CallFunction(&cif, sym, unsafe.Pointer(&result), []unsafe.Pointer{
     unsafe.Pointer(&count),
     unsafe.Pointer(&a1),
     unsafe.Pointer(&a2),
@@ -228,7 +229,7 @@ cb := ffi.NewCallback(func(status uint32, adapter uintptr, msg uintptr, ud uintp
     close(done)
 })
 
-ffi.CallFunction(cif, wgpuRequestAdapter, nil, args)
+_, _ = ffi.CallFunction(cif, wgpuRequestAdapter, nil, args)
 <-done // Wait for GPU driver callback
 ```
 
