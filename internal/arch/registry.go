@@ -6,30 +6,33 @@ import (
 	"github.com/go-webgpu/goffi/types"
 )
 
-// FunctionCaller defines the contract for function execution
+// FunctionCaller defines the contract for function execution.
+// Execute always captures C errno inside the assembly trampoline immediately
+// after the C function returns. On platforms without errno support (Windows),
+// errnoFn is 0 and the returned cerrno is always 0.
 type FunctionCaller interface {
-	Execute(cif *types.CallInterface, fn unsafe.Pointer, rvalue unsafe.Pointer, avalue []unsafe.Pointer) error
+	Execute(cif *types.CallInterface, fn unsafe.Pointer, rvalue unsafe.Pointer, avalue []unsafe.Pointer, errnoFn uintptr) (cerrno uintptr, err error)
 }
 
-// ArgumentClassifier defines the contract for argument classification
+// ArgumentClassifier defines the contract for argument classification.
 type ArgumentClassifier interface {
 	ClassifyReturn(t *types.TypeDescriptor, abi types.CallingConvention) int
 	ClassifyArgument(t *types.TypeDescriptor, abi types.CallingConvention) ArgumentClassification
 }
 
-// ArgumentClassification contains argument passing information
+// ArgumentClassification contains argument passing information.
 type ArgumentClassification struct {
 	GPRCount int
 	SSECount int
 }
 
-// Registry contains registered implementations
+// Registry contains registered implementations.
 var Registry struct {
 	Caller     FunctionCaller
 	Classifier ArgumentClassifier
 }
 
-// Register registers implementations for the current architecture
+// Register registers implementations for the current architecture.
 func Register(caller FunctionCaller, classifier ArgumentClassifier) {
 	Registry.Caller = caller
 	Registry.Classifier = classifier

@@ -54,7 +54,7 @@ func TestStructReturn16B_TwoDoubles(t *testing.T) {
 	b := 2.5
 	args := []unsafe.Pointer{unsafe.Pointer(&a), unsafe.Pointer(&b)}
 	var result PairF64
-	if err := CallFunction(&cif, sym, unsafe.Pointer(&result), args); err != nil {
+	if _, err := CallFunction(&cif, sym, unsafe.Pointer(&result), args); err != nil {
 		t.Fatal(err)
 	}
 
@@ -107,7 +107,7 @@ func TestStructReturn16B_IntFloat(t *testing.T) {
 	b := 3.14
 	args := []unsafe.Pointer{unsafe.Pointer(&a), unsafe.Pointer(&b)}
 	var result MixedIntFloat
-	if err := CallFunction(&cif, sym, unsafe.Pointer(&result), args); err != nil {
+	if _, err := CallFunction(&cif, sym, unsafe.Pointer(&result), args); err != nil {
 		t.Fatal(err)
 	}
 
@@ -160,7 +160,7 @@ func TestStructReturn16B_FloatInt(t *testing.T) {
 	b := int64(100)
 	args := []unsafe.Pointer{unsafe.Pointer(&a), unsafe.Pointer(&b)}
 	var result MixedFloatInt
-	if err := CallFunction(&cif, sym, unsafe.Pointer(&result), args); err != nil {
+	if _, err := CallFunction(&cif, sym, unsafe.Pointer(&result), args); err != nil {
 		t.Fatal(err)
 	}
 
@@ -210,7 +210,7 @@ func TestStructReturn16B_TwoInts(t *testing.T) {
 	b := int64(2000000)
 	args := []unsafe.Pointer{unsafe.Pointer(&a), unsafe.Pointer(&b)}
 	var result PairI64
-	if err := CallFunction(&cif, sym, unsafe.Pointer(&result), args); err != nil {
+	if _, err := CallFunction(&cif, sym, unsafe.Pointer(&result), args); err != nil {
 		t.Fatal(err)
 	}
 

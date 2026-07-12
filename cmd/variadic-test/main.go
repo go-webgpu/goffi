@@ -135,7 +135,7 @@ func testSumVariadic(lib unsafe.Pointer) bool {
 	}
 
 	var result int64
-	if err := ffi.CallFunction(&cif, sym, unsafe.Pointer(&result), avalue); err != nil {
+	if _, err := ffi.CallFunction(&cif, sym, unsafe.Pointer(&result), avalue); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: CallFunction(sum_variadic): %v\n", err)
 		return false
 	}
@@ -188,7 +188,7 @@ func testTwoFixed(lib unsafe.Pointer) bool {
 	}
 
 	var result int64
-	if err := ffi.CallFunction(&cif, sym, unsafe.Pointer(&result), avalue); err != nil {
+	if _, err := ffi.CallFunction(&cif, sym, unsafe.Pointer(&result), avalue); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: CallFunction(variadic_two_fixed): %v\n", err)
 		return false
 	}

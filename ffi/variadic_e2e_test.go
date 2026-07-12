@@ -58,7 +58,7 @@ func TestVariadic_SumIntegers(t *testing.T) {
 	}
 
 	var result int64
-	if err := CallFunction(&cif, sym, unsafe.Pointer(&result), avalue); err != nil {
+	if _, err := CallFunction(&cif, sym, unsafe.Pointer(&result), avalue); err != nil {
 		t.Fatal(err)
 	}
 
@@ -109,7 +109,7 @@ func TestVariadic_TwoFixed(t *testing.T) {
 	}
 
 	var result int64
-	if err := CallFunction(&cif, sym, unsafe.Pointer(&result), avalue); err != nil {
+	if _, err := CallFunction(&cif, sym, unsafe.Pointer(&result), avalue); err != nil {
 		t.Fatal(err)
 	}
 

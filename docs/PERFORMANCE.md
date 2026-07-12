@@ -38,6 +38,7 @@
 - **Typical overhead**: ~100-115 ns (with arguments)
 - **Overhead ratio**: ~400-500x vs direct Go call
 - **Allocations**: 0 in steady state. `syscallArgs` is heap-allocated via `sync.Pool` for callback safety (goroutine stack may move during C→Go callbacks). Pool reuse eliminates per-call allocations after warmup.
+- **errno capture**: +3-5 ns per call (always-on since v0.6.0). `CALL __errno_location` + `MOVL (AX), EAX` in assembly — captures errno before thread migration can lose it.
 
 ### 2. One-Time Costs
 

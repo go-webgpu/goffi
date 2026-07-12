@@ -9,32 +9,34 @@
 //
 // syscallN takes a pointer to syscallArgs struct:
 // struct {
-//	fn    uintptr  // offset 0
-//	a1    uintptr  // offset 8   (RDI)
-//	a2    uintptr  // offset 16  (RSI)
-//	a3    uintptr  // offset 24  (RDX)
-//	a4    uintptr  // offset 32  (RCX)
-//	a5    uintptr  // offset 40  (R8)
-//	a6    uintptr  // offset 48  (R9)
-//	a7    uintptr  // offset 56  (stack[0])
-//	a8    uintptr  // offset 64  (stack[1])
-//	a9    uintptr  // offset 72  (stack[2])
-//	a10   uintptr  // offset 80  (stack[3])
-//	a11   uintptr  // offset 88  (stack[4])
-//	a12   uintptr  // offset 96  (stack[5])
-//	a13   uintptr  // offset 104 (stack[6])
-//	a14   uintptr  // offset 112 (stack[7])
-//	a15   uintptr  // offset 120 (stack[8])
-//	f1    uintptr  // offset 128 (XMM0 bit pattern)
-//	f2    uintptr  // offset 136 (XMM1)
-//	f3    uintptr  // offset 144 (XMM2)
-//	f4    uintptr  // offset 152 (XMM3)
-//	f5    uintptr  // offset 160 (XMM4)
-//	f6    uintptr  // offset 168 (XMM5)
-//	f7    uintptr  // offset 176 (XMM6)
-//	f8    uintptr  // offset 184 (XMM7)
-//	r1    uintptr  // offset 192 (RAX return)
-//	r2    uintptr  // offset 200 (RDX return, 9-16 byte struct)
+//	fn      uintptr  // offset 0
+//	a1      uintptr  // offset 8   (RDI)
+//	a2      uintptr  // offset 16  (RSI)
+//	a3      uintptr  // offset 24  (RDX)
+//	a4      uintptr  // offset 32  (RCX)
+//	a5      uintptr  // offset 40  (R8)
+//	a6      uintptr  // offset 48  (R9)
+//	a7      uintptr  // offset 56  (stack[0])
+//	a8      uintptr  // offset 64  (stack[1])
+//	a9      uintptr  // offset 72  (stack[2])
+//	a10     uintptr  // offset 80  (stack[3])
+//	a11     uintptr  // offset 88  (stack[4])
+//	a12     uintptr  // offset 96  (stack[5])
+//	a13     uintptr  // offset 104 (stack[6])
+//	a14     uintptr  // offset 112 (stack[7])
+//	a15     uintptr  // offset 120 (stack[8])
+//	f1      uintptr  // offset 128 (XMM0 bit pattern)
+//	f2      uintptr  // offset 136 (XMM1)
+//	f3      uintptr  // offset 144 (XMM2)
+//	f4      uintptr  // offset 152 (XMM3)
+//	f5      uintptr  // offset 160 (XMM4)
+//	f6      uintptr  // offset 168 (XMM5)
+//	f7      uintptr  // offset 176 (XMM6)
+//	f8      uintptr  // offset 184 (XMM7)
+//	r1      uintptr  // offset 192 (RAX return)
+//	r2      uintptr  // offset 200 (RDX return, 9-16 byte struct)
+//	errno   uintptr  // offset 208 (captured C errno; 0 if errnoFn == 0)
+//	errnoFn uintptr  // offset 216 (address of __errno_location/__error; 0 = skip)
 // }
 //
 // syscallN must be called on the g0 stack with runtime.cgocall.
@@ -101,13 +103,27 @@ TEXT syscallN(SB), NOSPLIT|NOFRAME, $0
 	MOVQ 0(R11), R10
 	CALL R10
 
-	// Restore pointer and save return values
+	// Restore args pointer and save C function return values.
+	// DI was clobbered by the CALL (it held a1/RDI before the call).
 	MOVQ PTR_ADDRESS(BP), DI
 	MOVQ AX, 192(DI) // r1: integer return in RAX
 	MOVQ DX, 200(DI) // r2: second integer return in RDX (9-16 byte structs)
 	MOVQ X0, 128(DI) // f1: float return in XMM0
 	MOVQ X1, 136(DI) // f2: XMM1 — second SSE return for 9-16B all-float struct returns
 
+	// Errno capture (conditional): only when errnoFn (offset 216) is non-zero.
+	// Safe window: we are still on g0, same OS thread as the C call.
+	// R12 and R13 are callee-saved under the System V AMD64 ABI, so they
+	// survive the CALL R13 to __errno_location/__error below.
+	MOVQ 216(DI), R13  // R13 = errnoFn address
+	TESTQ R13, R13
+	JZ   errno_done
+	MOVQ DI, R12       // R12 = save args pointer across the errno call
+	CALL R13           // __errno_location()/__error() → RAX = &errno (int*)
+	MOVL (AX), AX      // AX = *(&errno) as int32, zero-extended to 64 bits
+	MOVQ AX, 208(R12)  // args->errno = captured errno value
+
+errno_done:
 	// Restore stack and return
 	XORL AX, AX          // no error (ignored by runtime.cgocall)
 	ADDQ $STACK_SIZE, SP

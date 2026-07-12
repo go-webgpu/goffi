@@ -24,7 +24,8 @@ func (i *Implementation) Execute(
 	fn unsafe.Pointer,
 	rvalue unsafe.Pointer,
 	avalue []unsafe.Pointer,
-) error {
+	errnoFn uintptr,
+) (cerrno uintptr, err error) {
 	// System V AMD64 ABI:
 	// - GP registers: RDI, RSI, RDX, RCX, R8, R9 (6 registers, indices 0-5)
 	// - SSE registers: XMM0-XMM7 (8 registers)
@@ -196,7 +197,7 @@ func (i *Implementation) Execute(
 
 	// Validate we haven't exceeded platform maximum
 	if numStack > maxTotalArgs-6 {
-		return fmt.Errorf("goffi: %d stack arguments exceed platform limit of %d", numStack, maxTotalArgs-6)
+		return 0, fmt.Errorf("goffi: %d stack arguments exceed platform limit of %d", numStack, maxTotalArgs-6)
 	}
 
 	// Build GP register array (first 6 slots)
@@ -213,15 +214,16 @@ func (i *Implementation) Execute(
 	var stackArgs [9]uintptr
 	copy(stackArgs[:], sysargs[6:])
 
-	// Call via syscall
-	ret, r2, fret, fret2 := gosyscall.CallNFloat(uintptr(fn), gpr, sse, stackArgs, numStack)
+	// Call via syscall; errnoFn is non-zero on Unix, 0 on Windows.
+	// When errnoFn is 0, the assembly skips errno capture (TESTQ/JZ).
+	ret, r2, fret, fret2, capturedErrno := gosyscall.CallNFloatErrno(uintptr(fn), gpr, sse, stackArgs, numStack, errnoFn)
 
 	runtime.KeepAlive(avalue)
 	runtime.KeepAlive(rvalue)
 
 	// If sret, the callee wrote directly into rvalue — no further copy needed.
 	if sret {
-		return nil
+		return capturedErrno, nil
 	}
 
 	// Handle return value based on type
@@ -232,5 +234,5 @@ func (i *Implementation) Execute(
 		retVal = *(*uint64)(unsafe.Pointer(&fret))
 	}
 
-	return i.handleReturn(cif, rvalue, retVal, uint64(r2), fret, fret2)
+	return capturedErrno, i.handleReturn(cif, rvalue, retVal, uint64(r2), fret, fret2)
 }

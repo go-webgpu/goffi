@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-12
+
+### Added
+- **errno capture in assembly trampoline** — `CallFunction` now always captures C `errno` inside the assembly trampoline immediately after the C function returns, before the Go runtime can migrate the goroutine to a different OS thread. This is the only thread-safe window for errno capture. goffi is the first pure-Go FFI with correct errno capture on Linux. ([#60](https://github.com/go-webgpu/goffi/issues/60))
+- Platform-specific errno resolution: `__errno_location` (Linux glibc/musl), `__error` (macOS/FreeBSD) via `//go:cgo_import_dynamic`
+
+### Changed
+- **BREAKING: `CallFunction` returns `(syscall.Errno, error)`** — errno is always captured and returned. Callers that don't need errno use `_, err := ffi.CallFunction(...)`. This replaces the opt-in `CallFunctionErrno` which was a pit of failure (you don't know you need errno until the function fails)
+- **BREAKING: `CallFunctionContext` returns `(syscall.Errno, error)`** — same change with context support
+- **BREAKING: `FunctionCaller.Execute` interface changed** — now accepts `errnoFn uintptr` parameter and returns `(cerrno uintptr, err error)`
+- Removed `CallFunctionErrno` / `CallFunctionErrnoContext` (superseded by always-capture)
+- Removed `FunctionCallerErrno` interface (merged into `FunctionCaller`)
+- Reduced code by 429 lines (eliminated Execute/ExecuteErrno duplication)
+
+### Migration Guide
+
+```go
+// Before (v0.5.x):
+err := ffi.CallFunction(cif, fn, &result, args)
+
+// After (v0.6.0):
+errno, err := ffi.CallFunction(cif, fn, &result, args)
+// Or if errno not needed:
+_, err := ffi.CallFunction(cif, fn, &result, args)
+```
+
 ## [0.5.6] - 2026-07-05
 
 ### Fixed

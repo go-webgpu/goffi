@@ -152,7 +152,8 @@ func (i *Implementation) Execute(
 	fn unsafe.Pointer,
 	rvalue unsafe.Pointer,
 	avalue []unsafe.Pointer,
-) error {
+	errnoFn uintptr,
+) (cerrno uintptr, err error) {
 	// AAPCS64 ABI:
 	// - X0-X7: 8 integer/pointer GP registers
 	// - D0-D7: 8 floating-point registers
@@ -307,14 +308,15 @@ func (i *Implementation) Execute(
 
 	// Validate we haven't exceeded platform maximum
 	if stackIdx > maxStackArgs {
-		return fmt.Errorf("goffi: %d stack arguments exceed platform limit of %d", stackIdx, maxStackArgs)
+		return 0, fmt.Errorf("goffi: %d stack arguments exceed platform limit of %d", stackIdx, maxStackArgs)
 	}
 
-	// Call via our ARM64 syscall wrapper
-	ret1, ret2, fret := gosyscall.CallNFloat(uintptr(fn), gpr, fpr, stackArgs, stackIdx, r8)
+	// Call via our ARM64 syscall wrapper; errnoFn is non-zero on Unix, 0 on Windows.
+	// When errnoFn is 0, the assembly skips errno capture (CBZ).
+	ret1, ret2, fret, capturedErrno := gosyscall.CallNFloatErrno(uintptr(fn), gpr, fpr, stackArgs, stackIdx, r8, errnoFn)
 
 	runtime.KeepAlive(avalue)
 
 	// Handle return value based on type
-	return i.handleReturn(cif, rvalue, uint64(ret1), uint64(ret2), fret)
+	return capturedErrno, i.handleReturn(cif, rvalue, uint64(ret1), uint64(ret2), fret)
 }

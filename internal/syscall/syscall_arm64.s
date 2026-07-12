@@ -9,37 +9,39 @@
 //
 // syscallN takes a pointer to syscallArgs struct (offsets verified by check_arm64.go):
 // struct {
-//	fn    uintptr  // offset 0
-//	a1    uintptr  // offset 8   (X0)
-//	a2    uintptr  // offset 16  (X1)
-//	a3    uintptr  // offset 24  (X2)
-//	a4    uintptr  // offset 32  (X3)
-//	a5    uintptr  // offset 40  (X4)
-//	a6    uintptr  // offset 48  (X5)
-//	a7    uintptr  // offset 56  (X6)
-//	a8    uintptr  // offset 64  (X7)
-//	a9    uintptr  // offset 72  (stack[0])
-//	a10   uintptr  // offset 80  (stack[1])
-//	a11   uintptr  // offset 88  (stack[2])
-//	a12   uintptr  // offset 96  (stack[3])
-//	a13   uintptr  // offset 104 (stack[4])
-//	a14   uintptr  // offset 112 (stack[5])
-//	a15   uintptr  // offset 120 (stack[6])
-//	f1    uintptr  // offset 128 (D0 input)
-//	f2    uintptr  // offset 136 (D1 input)
-//	f3    uintptr  // offset 144 (D2 input)
-//	f4    uintptr  // offset 152 (D3 input)
-//	f5    uintptr  // offset 160 (D4 input)
-//	f6    uintptr  // offset 168 (D5 input)
-//	f7    uintptr  // offset 176 (D6 input)
-//	f8    uintptr  // offset 184 (D7 input)
-//	r1    uintptr  // offset 192 (return X0)
-//	r2    uintptr  // offset 200 (return X1)
-//	fr1   uintptr  // offset 208 (return D0 for HFA or float)
-//	fr2   uintptr  // offset 216 (return D1 for HFA)
-//	fr3   uintptr  // offset 224 (return D2 for HFA)
-//	fr4   uintptr  // offset 232 (return D3 for HFA)
-//	r8    uintptr  // offset 240 (X8 - large struct return pointer)
+//	fn      uintptr  // offset 0
+//	a1      uintptr  // offset 8   (X0)
+//	a2      uintptr  // offset 16  (X1)
+//	a3      uintptr  // offset 24  (X2)
+//	a4      uintptr  // offset 32  (X3)
+//	a5      uintptr  // offset 40  (X4)
+//	a6      uintptr  // offset 48  (X5)
+//	a7      uintptr  // offset 56  (X6)
+//	a8      uintptr  // offset 64  (X7)
+//	a9      uintptr  // offset 72  (stack[0])
+//	a10     uintptr  // offset 80  (stack[1])
+//	a11     uintptr  // offset 88  (stack[2])
+//	a12     uintptr  // offset 96  (stack[3])
+//	a13     uintptr  // offset 104 (stack[4])
+//	a14     uintptr  // offset 112 (stack[5])
+//	a15     uintptr  // offset 120 (stack[6])
+//	f1      uintptr  // offset 128 (D0 input)
+//	f2      uintptr  // offset 136 (D1 input)
+//	f3      uintptr  // offset 144 (D2 input)
+//	f4      uintptr  // offset 152 (D3 input)
+//	f5      uintptr  // offset 160 (D4 input)
+//	f6      uintptr  // offset 168 (D5 input)
+//	f7      uintptr  // offset 176 (D6 input)
+//	f8      uintptr  // offset 184 (D7 input)
+//	r1      uintptr  // offset 192 (return X0)
+//	r2      uintptr  // offset 200 (return X1)
+//	fr1     uintptr  // offset 208 (return D0 for HFA or float)
+//	fr2     uintptr  // offset 216 (return D1 for HFA)
+//	fr3     uintptr  // offset 224 (return D2 for HFA)
+//	fr4     uintptr  // offset 232 (return D3 for HFA)
+//	r8      uintptr  // offset 240 (X8 - large struct return pointer)
+//	errno   uintptr  // offset 248 (captured C errno; 0 if errnoFn == 0)
+//	errnoFn uintptr  // offset 256 (address of __errno_location/__error; 0 = skip)
 // }
 //
 // Stack frame layout (total STACK_SIZE = 96 bytes, 16-byte aligned):
@@ -111,7 +113,7 @@ TEXT syscallN(SB), NOSPLIT|NOFRAME, $0
 	MOVD 0(R9), R10   // fn
 	BL   (R10)
 
-	// Get the args pointer back
+	// Get the args pointer back (R9 was clobbered by the BL call)
 	MOVD 80(RSP), R9  // PTR_ADDRESS = 80
 
 	// Save return values (offsets verified by check_arm64.go)
@@ -122,6 +124,17 @@ TEXT syscallN(SB), NOSPLIT|NOFRAME, $0
 	FMOVD F2, 224(R9)  // fr3: D2 return for HFA
 	FMOVD F3, 232(R9)  // fr4: D3 return for HFA
 
+	// Errno capture (conditional): only when errnoFn (offset 256) is non-zero.
+	// Safe window: we are still on g0, same OS thread as the C call.
+	// R19 and R20 are callee-saved under AAPCS64, so they survive BL (R20).
+	MOVD 256(R9), R20  // R20 = errnoFn address
+	CBZ  R20, errno_done
+	MOVD R9, R19       // R19 = save args pointer across the errno call
+	BL   (R20)         // __errno_location()/__error() → R0 = &errno (int*)
+	MOVW (R0), R0      // R0 = *(&errno) as uint32, zero-extended to 64 bits
+	MOVD R0, 248(R19)  // args->errno = captured errno value
+
+errno_done:
 	// Restore frame and return
 	MOVD 72(RSP), R30            // Restore LR
 	MOVD 64(RSP), R29            // Restore FP

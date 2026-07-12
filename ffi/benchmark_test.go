@@ -49,7 +49,7 @@ func BenchmarkGoffiOverhead(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = CallFunction(cif, sym, unsafe.Pointer(&result), nil)
+		_, _ = CallFunction(cif, sym, unsafe.Pointer(&result), nil)
 	}
 }
 
@@ -96,7 +96,7 @@ func BenchmarkGoffiIntArgs(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = CallFunction(cif, sym, unsafe.Pointer(&result), []unsafe.Pointer{
+		_, _ = CallFunction(cif, sym, unsafe.Pointer(&result), []unsafe.Pointer{
 			unsafe.Pointer(&arg),
 		})
 	}
@@ -146,7 +146,7 @@ func BenchmarkGoffiStringOutput(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = CallFunction(cif, sym, unsafe.Pointer(&result), []unsafe.Pointer{unsafe.Pointer(&strPtr)})
+		_, _ = CallFunction(cif, sym, unsafe.Pointer(&result), []unsafe.Pointer{unsafe.Pointer(&strPtr)})
 	}
 }
 
@@ -196,7 +196,7 @@ func BenchmarkGoffiMultipleArgs(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = CallFunction(cif, sym, unsafe.Pointer(&result), []unsafe.Pointer{
+		_, _ = CallFunction(cif, sym, unsafe.Pointer(&result), []unsafe.Pointer{
 			unsafe.Pointer(&arg1),
 			unsafe.Pointer(&arg2),
 		})

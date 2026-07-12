@@ -106,7 +106,7 @@ func TestCallPrintf(t *testing.T) {
 	avalue := []unsafe.Pointer{unsafe.Pointer(&arg)}
 
 	var retVal int32
-	err = CallFunction(cif, sym, unsafe.Pointer(&retVal), avalue)
+	_, err = CallFunction(cif, sym, unsafe.Pointer(&retVal), avalue)
 	if err != nil {
 		t.Fatalf("CallFunction failed: %v", err)
 	}
@@ -200,7 +200,7 @@ func TestPointerArgumentPassing(t *testing.T) {
 			avalue := []unsafe.Pointer{unsafe.Pointer(&ptr)}
 
 			var result uint64
-			err := CallFunction(cif, sym, unsafe.Pointer(&result), avalue)
+			_, err := CallFunction(cif, sym, unsafe.Pointer(&result), avalue)
 			if err != nil {
 				t.Fatalf("CallFunction failed: %v", err)
 			}
@@ -276,7 +276,7 @@ func TestIntegerArgumentTypes(t *testing.T) {
 				avalue := []unsafe.Pointer{unsafe.Pointer(&arg)}
 
 				var result int32
-				err := CallFunction(cif, sym, unsafe.Pointer(&result), avalue)
+				_, err := CallFunction(cif, sym, unsafe.Pointer(&result), avalue)
 				if err != nil {
 					t.Fatalf("CallFunction failed: %v", err)
 				}
@@ -371,7 +371,7 @@ func TestWindowsStackArguments(t *testing.T) {
 	}
 
 	var result uintptr
-	err = CallFunction(cif, sym, unsafe.Pointer(&result), avalue)
+	_, err = CallFunction(cif, sym, unsafe.Pointer(&result), avalue)
 	if err != nil {
 		t.Fatalf("CallFunction failed: %v", err)
 	}
@@ -470,7 +470,7 @@ func TestWindowsStackArgumentsFileIO(t *testing.T) {
 	arg7 := uintptr(0)
 
 	var fileHandle uintptr
-	err = CallFunction(cifCreate, createFileA, unsafe.Pointer(&fileHandle), []unsafe.Pointer{
+	_, err = CallFunction(cifCreate, createFileA, unsafe.Pointer(&fileHandle), []unsafe.Pointer{
 		unsafe.Pointer(&arg1),
 		unsafe.Pointer(&arg2),
 		unsafe.Pointer(&arg3),
@@ -512,7 +512,7 @@ func TestWindowsStackArgumentsFileIO(t *testing.T) {
 	wArg5 := uintptr(0) // lpOverlapped - STACK ARGUMENT!
 
 	var writeResult int32
-	err = CallFunction(cifWrite, writeFile, unsafe.Pointer(&writeResult), []unsafe.Pointer{
+	_, err = CallFunction(cifWrite, writeFile, unsafe.Pointer(&writeResult), []unsafe.Pointer{
 		unsafe.Pointer(&wArg1),
 		unsafe.Pointer(&wArg2),
 		unsafe.Pointer(&wArg3),
@@ -544,7 +544,7 @@ func TestWindowsStackArgumentsFileIO(t *testing.T) {
 
 	cArg1 := fileHandle
 	var closeResult int32
-	err = CallFunction(cifClose, closeHandle, unsafe.Pointer(&closeResult), []unsafe.Pointer{
+	_, err = CallFunction(cifClose, closeHandle, unsafe.Pointer(&closeResult), []unsafe.Pointer{
 		unsafe.Pointer(&cArg1),
 	})
 	if err != nil {
@@ -557,7 +557,7 @@ func TestWindowsStackArgumentsFileIO(t *testing.T) {
 
 	arg2 = uint32(GENERIC_READ)
 	arg5 = uint32(OPEN_EXISTING)
-	err = CallFunction(cifCreate, createFileA, unsafe.Pointer(&fileHandle), []unsafe.Pointer{
+	_, err = CallFunction(cifCreate, createFileA, unsafe.Pointer(&fileHandle), []unsafe.Pointer{
 		unsafe.Pointer(&arg1),
 		unsafe.Pointer(&arg2),
 		unsafe.Pointer(&arg3),
@@ -598,7 +598,7 @@ func TestWindowsStackArgumentsFileIO(t *testing.T) {
 	rArg5 := uintptr(0) // lpOverlapped - STACK ARGUMENT!
 
 	var readResult int32
-	err = CallFunction(cifRead, readFile, unsafe.Pointer(&readResult), []unsafe.Pointer{
+	_, err = CallFunction(cifRead, readFile, unsafe.Pointer(&readResult), []unsafe.Pointer{
 		unsafe.Pointer(&rArg1),
 		unsafe.Pointer(&rArg2),
 		unsafe.Pointer(&rArg3),
@@ -627,7 +627,7 @@ func TestWindowsStackArgumentsFileIO(t *testing.T) {
 	t.Log("Step 7: Cleanup")
 
 	cArg1 = fileHandle
-	err = CallFunction(cifClose, closeHandle, unsafe.Pointer(&closeResult), []unsafe.Pointer{
+	_, err = CallFunction(cifClose, closeHandle, unsafe.Pointer(&closeResult), []unsafe.Pointer{
 		unsafe.Pointer(&cArg1),
 	})
 	if err != nil {
@@ -641,7 +641,7 @@ func TestWindowsStackArgumentsFileIO(t *testing.T) {
 	if err == nil {
 		dArg1 := tempFilePtr
 		var deleteResult int32
-		_ = CallFunction(cifDelete, deleteFileA, unsafe.Pointer(&deleteResult), []unsafe.Pointer{
+		_, _ = CallFunction(cifDelete, deleteFileA, unsafe.Pointer(&deleteResult), []unsafe.Pointer{
 			unsafe.Pointer(&dArg1),
 		})
 	}
@@ -781,7 +781,7 @@ func TestWindowsStackArguments10Args(t *testing.T) {
 	arg10 := unsafe.Pointer(&pi)     // lpProcessInformation (STACK arg 10!)
 
 	var createResult int32
-	err = CallFunction(cifCreate, createProcessA, unsafe.Pointer(&createResult), []unsafe.Pointer{
+	_, err = CallFunction(cifCreate, createProcessA, unsafe.Pointer(&createResult), []unsafe.Pointer{
 		unsafe.Pointer(&arg1),
 		unsafe.Pointer(&arg2),
 		unsafe.Pointer(&arg3),
@@ -819,7 +819,7 @@ func TestWindowsStackArguments10Args(t *testing.T) {
 	wArg1 := pi.hProcess
 	wArg2 := uint32(INFINITE)
 	var waitResult uint32
-	err = CallFunction(cifWait, waitForSingleObject, unsafe.Pointer(&waitResult), []unsafe.Pointer{
+	_, err = CallFunction(cifWait, waitForSingleObject, unsafe.Pointer(&waitResult), []unsafe.Pointer{
 		unsafe.Pointer(&wArg1),
 		unsafe.Pointer(&wArg2),
 	})
@@ -842,7 +842,7 @@ func TestWindowsStackArguments10Args(t *testing.T) {
 	eArg1 := pi.hProcess
 	eArg2 := unsafe.Pointer(&exitCode)
 	var exitResult int32
-	err = CallFunction(cifGetExit, getExitCodeProcess, unsafe.Pointer(&exitResult), []unsafe.Pointer{
+	_, err = CallFunction(cifGetExit, getExitCodeProcess, unsafe.Pointer(&exitResult), []unsafe.Pointer{
 		unsafe.Pointer(&eArg1),
 		unsafe.Pointer(&eArg2),
 	})
@@ -860,12 +860,12 @@ func TestWindowsStackArguments10Args(t *testing.T) {
 
 	cArg := pi.hProcess
 	var closeResult int32
-	_ = CallFunction(cifClose, closeHandle, unsafe.Pointer(&closeResult), []unsafe.Pointer{
+	_, _ = CallFunction(cifClose, closeHandle, unsafe.Pointer(&closeResult), []unsafe.Pointer{
 		unsafe.Pointer(&cArg),
 	})
 
 	cArg = pi.hThread
-	_ = CallFunction(cifClose, closeHandle, unsafe.Pointer(&closeResult), []unsafe.Pointer{
+	_, _ = CallFunction(cifClose, closeHandle, unsafe.Pointer(&closeResult), []unsafe.Pointer{
 		unsafe.Pointer(&cArg),
 	})
 
@@ -954,7 +954,7 @@ func TestFloat32ArgEncoding(t *testing.T) {
 			}
 
 			var frac float32
-			err := CallFunction(cif, sym, unsafe.Pointer(&frac), avalue)
+			_, err := CallFunction(cif, sym, unsafe.Pointer(&frac), avalue)
 			if err != nil {
 				t.Fatalf("CallFunction(modff) failed: %v", err)
 			}
@@ -1089,7 +1089,7 @@ func TestUnixStackSpill7Args(t *testing.T) {
 	}
 
 	var written int32
-	err = CallFunction(cif, sym, unsafe.Pointer(&written), avalue)
+	_, err = CallFunction(cif, sym, unsafe.Pointer(&written), avalue)
 	if err != nil {
 		t.Fatalf("CallFunction(snprintf) failed: %v", err)
 	}

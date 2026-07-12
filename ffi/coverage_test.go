@@ -87,7 +87,7 @@ func TestCallFunctionContext(t *testing.T) {
 
 		ctx := context.Background()
 		// IMPORTANT: avalue contains pointers TO the argument values
-		err := CallFunctionContext(ctx, cif, sym, unsafe.Pointer(&retVal), []unsafe.Pointer{unsafe.Pointer(&arg)})
+		_, err := CallFunctionContext(ctx, cif, sym, unsafe.Pointer(&retVal), []unsafe.Pointer{unsafe.Pointer(&arg)})
 		if err != nil {
 			t.Errorf("CallFunctionContext failed: %v", err)
 		}
@@ -101,7 +101,7 @@ func TestCallFunctionContext(t *testing.T) {
 		arg := unsafe.Pointer(unsafe.StringData(str))
 		var retVal int32
 
-		err := CallFunctionContext(ctx, cif, sym, unsafe.Pointer(&retVal), []unsafe.Pointer{unsafe.Pointer(&arg)})
+		_, err := CallFunctionContext(ctx, cif, sym, unsafe.Pointer(&retVal), []unsafe.Pointer{unsafe.Pointer(&arg)})
 		if err != context.Canceled {
 			t.Errorf("Expected context.Canceled, got %v", err)
 		}
@@ -116,14 +116,14 @@ func TestCallFunctionContext(t *testing.T) {
 		arg := unsafe.Pointer(unsafe.StringData(str))
 		var retVal int32
 
-		err := CallFunctionContext(ctx, cif, sym, unsafe.Pointer(&retVal), []unsafe.Pointer{unsafe.Pointer(&arg)})
+		_, err := CallFunctionContext(ctx, cif, sym, unsafe.Pointer(&retVal), []unsafe.Pointer{unsafe.Pointer(&arg)})
 		if err != context.DeadlineExceeded {
 			t.Errorf("Expected context.DeadlineExceeded, got %v", err)
 		}
 	})
 
 	t.Run("NilCIF", func(t *testing.T) {
-		err := CallFunctionContext(context.Background(), nil, sym, nil, nil)
+		_, err := CallFunctionContext(context.Background(), nil, sym, nil, nil)
 		var icErr *InvalidCallInterfaceError
 		if err == nil || err.(*InvalidCallInterfaceError).Field != "cif" {
 			t.Errorf("Expected InvalidCallInterfaceError for cif, got %v", err)
@@ -132,7 +132,7 @@ func TestCallFunctionContext(t *testing.T) {
 	})
 
 	t.Run("NilFunction", func(t *testing.T) {
-		err := CallFunctionContext(context.Background(), cif, nil, nil, nil)
+		_, err := CallFunctionContext(context.Background(), cif, nil, nil, nil)
 		if err == nil || err.(*InvalidCallInterfaceError).Field != "fn" {
 			t.Errorf("Expected InvalidCallInterfaceError for fn, got %v", err)
 		}
