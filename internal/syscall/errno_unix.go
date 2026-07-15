@@ -1,11 +1,12 @@
-//go:build (linux || darwin || freebsd) && (amd64 || arm64)
+//go:build ((linux && !android) || (android && !cgo) || darwin || freebsd) && (amd64 || arm64)
 
 package syscall
 
 import "unsafe"
 
 // goffi_errno_location_stub is the JMP trampoline that forwards calls to the
-// dynamically linked __errno_location (Linux/FreeBSD) or __error (macOS).
+// dynamically linked __errno_location (glibc Linux), __errno (Bionic), or
+// __error (macOS/FreeBSD).
 // The symbol is defined in errno_stubs_amd64.s / errno_stubs_arm64.s and
 // jumps to the goffi_errno_location dynamic symbol imported via
 // //go:cgo_import_dynamic in errno_linux.go / errno_darwin.go / errno_freebsd.go.
@@ -20,7 +21,8 @@ var goffi_errno_location_stub byte
 var errnoFnABI0 = uintptr(unsafe.Pointer(&goffi_errno_location_stub)) //nolint:govet // unsafe.Pointer-to-uintptr is intentional: this is an assembly stub address, not a GC-managed pointer.
 
 // ErrnoFnAddr returns the address of the platform's errno-location function
-// (__errno_location on Linux/FreeBSD, __error on macOS). This address is
+// (__errno_location on glibc Linux, __errno on Bionic, __error on
+// macOS/FreeBSD). This address is
 // passed to CallNFloatErrno to enable in-trampoline errno capture.
 //
 // Returns 0 if errno capture is not supported on the current platform.
