@@ -2,94 +2,85 @@
 
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2022 The Ebitengine Authors
-// SPDX-FileCopyrightText: 2025-2026 Andrey Kolkov and GoGPU Contributors
 
-//go:build !cgo && (darwin || freebsd || linux || netbsd) && !android
+//go:build !cgo && android && arm64
 
 #include "textflag.h"
 
 // these stubs are here because it is not possible to go:linkname directly the C functions on darwin arm64
 
 TEXT _malloc(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_malloc(SB)
+	JMP purego_malloc(SB)
 	RET
 
 TEXT _free(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_free(SB)
+	JMP purego_free(SB)
 	RET
 
 TEXT _setenv(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_setenv(SB)
+	JMP purego_setenv(SB)
 	RET
 
 TEXT _unsetenv(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_unsetenv(SB)
+	JMP purego_unsetenv(SB)
 	RET
 
 TEXT _sigfillset(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_sigfillset(SB)
+	JMP purego_sigfillset(SB)
 	RET
 
 TEXT _nanosleep(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_nanosleep(SB)
+	JMP purego_nanosleep(SB)
 	RET
 
 TEXT _abort(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_abort(SB)
+	JMP purego_abort(SB)
 	RET
 
 TEXT _sigaltstack(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_sigaltstack(SB)
+	JMP purego_sigaltstack(SB)
+	RET
+
+TEXT _write(SB), NOSPLIT|NOFRAME, $0-0
+	JMP purego_write(SB)
 	RET
 
 TEXT _pthread_attr_init(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_pthread_attr_init(SB)
+	JMP purego_pthread_attr_init(SB)
 	RET
 
 TEXT _pthread_create(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_pthread_create(SB)
+	JMP purego_pthread_create(SB)
 	RET
 
 TEXT _pthread_detach(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_pthread_detach(SB)
+	JMP purego_pthread_detach(SB)
 	RET
 
 TEXT _pthread_sigmask(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_pthread_sigmask(SB)
-	RET
-
-TEXT _pthread_self(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_pthread_self(SB)
-	RET
-
-TEXT _pthread_get_stacksize_np(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_pthread_get_stacksize_np(SB)
+	JMP purego_pthread_sigmask(SB)
 	RET
 
 TEXT _pthread_attr_getstacksize(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_pthread_attr_getstacksize(SB)
-	RET
-
-TEXT _pthread_attr_setstacksize(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_pthread_attr_setstacksize(SB)
+	JMP purego_pthread_attr_getstacksize(SB)
 	RET
 
 TEXT _pthread_attr_destroy(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_pthread_attr_destroy(SB)
+	JMP purego_pthread_attr_destroy(SB)
 	RET
 
 TEXT _pthread_mutex_lock(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_pthread_mutex_lock(SB)
+	JMP purego_pthread_mutex_lock(SB)
 	RET
 
 TEXT _pthread_mutex_unlock(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_pthread_mutex_unlock(SB)
+	JMP purego_pthread_mutex_unlock(SB)
 	RET
 
 TEXT _pthread_cond_broadcast(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_pthread_cond_broadcast(SB)
+	JMP purego_pthread_cond_broadcast(SB)
 	RET
 
 TEXT _pthread_setspecific(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_pthread_setspecific(SB)
+	JMP purego_pthread_setspecific(SB)
 	RET
