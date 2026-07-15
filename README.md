@@ -32,8 +32,8 @@ _, _ = ffi.CallFunction(cif, sym, unsafe.Pointer(&result), args)
 |---|---------|---------|
 | **Zero CGO** | Pure Go | No C compiler needed. `go get` and build. |
 | **Fast** | 88–114 ns/op | Pre-computed CIF, zero per-call allocations |
-| **Cross-platform** | 8 targets | Windows, Linux, macOS, FreeBSD × AMD64 + ARM64 |
-| **Callbacks** | C→Go safe | `crosscall2` integration, struct args, works from any C thread |
+| **Cross-platform** | 8 desktop targets + Android preview | Windows, Linux, macOS, FreeBSD × AMD64 + ARM64; Android arm64/API 29+ candidate pending physical-device startup proof |
+| **Callbacks** | C→Go safe where validated | `crosscall2` integration on desktop targets; Android callbacks fail explicitly until a physical-thread proof exists |
 | **Type-safe** | Runtime validation | 5 typed error types with `errors.As()` support |
 | **Struct pass/return** | Full ABI | Args: INTEGER/SSE classification. Returns: ≤8B (RAX/XMM0), 9–16B (4 modes: RAX/XMM × RAX/XMM), >16B (sret) |
 | **Variadic** | `printf`/`sprintf` | `PrepareVariadicCallInterface` — Apple ARM64 stack-force included |
@@ -45,6 +45,11 @@ _, _ = ffi.CallFunction(cif, sym, unsafe.Pointer(&result), args)
 ---
 
 ## Quick Start
+
+Android arm64/API 29+ is a preview candidate in both CGO modes. Cross-build,
+ABI, and ELF probes pass, but physical-device startup proof is still pending;
+see [docs/ANDROID.md](docs/ANDROID.md) for the runtime ABI, NDK probe, and the
+intentional callback limitation.
 
 ### Installation
 
@@ -276,7 +281,7 @@ if err != nil {
 | Context support | Timeouts/cancellation | No | No |
 | C-thread callbacks | crosscall2 | crosscall2 | Full |
 | String/bool/slice args | Raw pointers only | Auto-marshaling | Full |
-| Platform breadth | 8 targets | 8 GOARCH / 20+ OS×ARCH | All |
+| Platform breadth | 8 desktop targets + Android preview | 8 GOARCH / 20+ OS×ARCH | All |
 | AMD64 overhead | 88–114 ns | Not published | ~140 ns (Go 1.26 claims ~30% reduction) |
 
 **Choose goffi** for GPU/real-time workloads: struct passing, zero per-call overhead, callback float returns, typed errors.
