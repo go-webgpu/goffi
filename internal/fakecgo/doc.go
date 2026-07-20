@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2022 The Ebitengine Authors
+// SPDX-FileCopyrightText: 2025-2026 Andrey Kolkov and GoGPU Contributors
 
 //go:build !cgo && (darwin || freebsd || linux || netbsd)
 
@@ -15,17 +16,17 @@
 //
 // # Support
 //
-// Currently, fakecgo only supports macOS on amd64 & arm64. It also cannot
-// be used with -buildmode=c-archive because that requires special initialization
-// that fakecgo does not implement at the moment.
+// Currently, fakecgo supports Linux, macOS, FreeBSD, and NetBSD on amd64 & arm64.
+// It cannot be used with -buildmode=c-archive because that requires special
+// initialization that fakecgo does not implement at the moment.
 //
 // # Usage
 //
-// Using fakecgo is easy just import _ "github.com/go-webgpu/goffi/internal/fakecgo" and then
+// Using fakecgo is easy: just import _ "github.com/go-webgpu/goffi/internal/fakecgo" and then
 // set the environment variable CGO_ENABLED=0.
-// The recommended usage for fakecgo is to prefer using runtime/cgo if possible
-// but if cross-compiling or fast build times are important fakecgo is available.
-// Purego will pick which ever Cgo runtime is available and prefer the one that
+// The recommended usage is to prefer runtime/cgo if possible, but if
+// cross-compiling or fast build times are important, fakecgo is available.
+// goffi will pick whichever Cgo runtime is available and prefer the one that
 // comes with Go (runtime/cgo).
 package fakecgo
 

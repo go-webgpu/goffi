@@ -1,0 +1,13 @@
+goffi
+Copyright 2025-2026 Andrey Kolkov and GoGPU Contributors
+
+This project is licensed under the MIT License (see LICENSE).
+
+Portions of this software (internal/fakecgo/) are derived from
+ebitengine/purego (https://github.com/ebitengine/purego), licensed
+under the Apache License, Version 2.0. Original copyright:
+
+  Copyright 2022 The Ebitengine Authors
+
+The Apache-2.0 licensed files retain their original SPDX headers
+with dual copyright attribution.

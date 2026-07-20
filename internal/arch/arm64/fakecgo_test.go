@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// SPDX-FileCopyrightText: 2026 The Goffi Authors
+// SPDX-FileCopyrightText: 2026 Andrey Kolkov and GoGPU Contributors
 
 //go:build arm64 && !cgo
 
