@@ -24,6 +24,15 @@
 /internal/syscall/cgo.go @kolkov @jiyeyuran
 /ffi/callback_cthread_test.go @kolkov @jiyeyuran
 
+# Android ARM64 Bionic - @besmpl maintains Android platform support
+/ffi/*android* @kolkov @besmpl
+/internal/dl/*android* @kolkov @besmpl
+/internal/fakecgo/*android* @kolkov @besmpl
+/internal/syscall/*android* @kolkov @besmpl
+/docs/ANDROID.md @kolkov @besmpl
+/scripts/check-android-arm64.sh @kolkov @besmpl
+/testdata/android_abi_probe.c @kolkov @besmpl
+
 # Examples - Reference implementations
 /examples/ @kolkov
 

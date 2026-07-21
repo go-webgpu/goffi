@@ -335,6 +335,7 @@ if err != nil {
 | macOS | arm64 | AAPCS64 | v0.3.7 | Tested (M3 Pro) |
 | FreeBSD | amd64 | System V | v0.5.0 | Cross-compile verified |
 | FreeBSD | arm64 | AAPCS64 | v0.5.3 | Cross-compile verified |
+| Android | arm64 | AAPCS64 (Bionic) | v0.6.1 | Guarded preview (API 29+) |
 
 ---
 

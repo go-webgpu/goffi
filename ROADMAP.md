@@ -3,7 +3,7 @@
 > **Strategic Approach**: Build production-ready Zero-CGO FFI with benchmarked performance
 > **Philosophy**: Performance first, usability second, platform coverage third
 
-**Last Updated**: 2026-07-12 | **Current Version**: v0.6.0 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → ABI → v1.0 LTS | **Milestone**: v0.6.0 (errno + stack-move fix) → v0.7.0 RegisterFunc/Builder → v1.0.0 LTS
+**Last Updated**: 2026-07-21 | **Current Version**: v0.6.1 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → ABI → v1.0 LTS | **Milestone**: v0.6.1 (Android preview + fakecgo cleanup) → v0.7.0 RegisterFunc/Builder → v1.0.0 LTS
 
 ---
 
@@ -160,6 +160,12 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 - First pure-Go FFI with correct errno capture on Linux
 - Assembly-level capture inside trampoline (thread-safe window)
 - Platform support: `__errno_location` (Linux), `__error` (macOS/FreeBSD)
+
+**v0.6.1** = Android ARM64 + fakecgo cleanup ✅ RELEASED (2026-07-21)
+- **Android ARM64 Bionic** (guarded preview) — PR #62 by @besmpl
+- fakecgo `purego_` → `goffi_` rename + dual copyright — PR #63
+- LICENSE + NOTICE updated to GoGPU ecosystem pattern
+- @besmpl added as CODEOWNER for Android paths
 
 **v0.7.0** = RegisterFunc + Builder API (2026 Q3-Q4)
 - RegisterFunc convenience API (ADR-008)
