@@ -12,18 +12,12 @@ import (
 	"github.com/go-webgpu/goffi/internal/dl"
 )
 
-// Bionic keeps the object mapped after dlclose when RTLD_NODELETE is set.
-// This matches goffi's process-lifetime function-pointer policy.
-const (
-	RTLD_NOW      = dl.RTLD_NOW
-	RTLD_LOCAL    = dl.RTLD_LOCAL
-	RTLD_NODELETE = dl.RTLD_NODELETE
-)
-
 // LoadLibrary loads a public Android shared library with eager, private
-// symbol resolution. Android support is arm64/API 29+ only.
+// symbol resolution. Bionic keeps the object mapped after dlclose because
+// goffi's function pointers have process lifetime. Android support is
+// arm64/API 29+ only.
 func LoadLibrary(name string) (unsafe.Pointer, error) {
-	handle, err := dl.Dlopen(name, RTLD_NOW|RTLD_LOCAL|RTLD_NODELETE)
+	handle, err := dl.Dlopen(name, dl.RTLD_NOW|dl.RTLD_LOCAL|dl.RTLD_NODELETE)
 	if err != nil {
 		return nil, &LibraryError{Operation: "load", Name: name, Err: err}
 	}

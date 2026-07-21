@@ -11,8 +11,8 @@ import "unsafe"
 // the API-level marker with direct AAPCS64 calls instead of internal/dl so the
 // pre-Q guard cannot recurse through an uninitialized cgocall path.
 //
-//go:cgo_import_dynamic purego_android_dlopen dlopen "libdl.so"
-//go:cgo_import_dynamic purego_android_dlsym dlsym "libdl.so"
+//go:cgo_import_dynamic goffi_android_dlopen dlopen "libdl.so"
+//go:cgo_import_dynamic goffi_android_dlsym dlsym "libdl.so"
 //go:cgo_import_dynamic _ _ "libdl.so"
 
 // The assembly stubs are kept separate from the generated libc wrappers: the

@@ -54,3 +54,32 @@ func TestAndroidBionicABI(t *testing.T) {
 		})
 	}
 }
+
+func TestAndroidFakeCGORuntimeWiring(t *testing.T) {
+	// GOOS=android also satisfies linux build constraints. These references
+	// deliberately prove that iscgo.go, callbacks.go, and setenv.go are part
+	// of the Android build even though ffi callbacks remain unsupported.
+	if !_iscgo {
+		t.Fatal("runtime.iscgo must be true for outbound runtime.cgocall")
+	}
+
+	requiredHooks := []struct {
+		name string
+		ptr  *byte
+	}{
+		{"_cgo_init", _cgo_init},
+		{"_cgo_thread_start", _cgo_thread_start},
+		{"_cgo_notify_runtime_init_done", _cgo_notify_runtime_init_done},
+		{"_cgo_bindm", _cgo_bindm},
+		{"_cgo_setenv", _cgo_setenv},
+		{"_cgo_unsetenv", _cgo_unsetenv},
+	}
+	for _, hook := range requiredHooks {
+		if hook.ptr == nil {
+			t.Errorf("%s runtime hook is nil", hook.name)
+		}
+	}
+	if _cgo_pthread_key_created == nil {
+		t.Error("_cgo_pthread_key_created runtime hook is nil")
+	}
+}

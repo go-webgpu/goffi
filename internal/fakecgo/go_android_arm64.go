@@ -94,8 +94,11 @@ func x_cgo_inittls(tlsg *uintptr, tlsbase unsafe.Pointer) {
 	if !androidAPI29() {
 		androidFatal("fakecgo: Android API 29 or newer is required")
 	}
-	if tlsg == nil || *tlsg != androidTLSGOffset {
-		androidFatal("fakecgo: Android runtime.tls_g offset mismatch")
+	if tlsg == nil {
+		androidFatal("fakecgo: Android runtime did not provide runtime.tls_g")
+	}
+	if *tlsg != androidTLSGOffset {
+		androidFatal("fakecgo: Android runtime.tls_g offset mismatch (want 16)")
 	}
 }
 

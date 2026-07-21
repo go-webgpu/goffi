@@ -2,27 +2,28 @@
 
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2022 The Ebitengine Authors
+// SPDX-FileCopyrightText: 2025-2026 Andrey Kolkov and GoGPU Contributors
 
 //go:build !cgo && android && arm64
 
 package fakecgo
 
-//go:cgo_import_dynamic purego_malloc malloc "libc.so"
-//go:cgo_import_dynamic purego_free free "libc.so"
-//go:cgo_import_dynamic purego_setenv setenv "libc.so"
-//go:cgo_import_dynamic purego_unsetenv unsetenv "libc.so"
-//go:cgo_import_dynamic purego_sigfillset sigfillset "libc.so"
-//go:cgo_import_dynamic purego_nanosleep nanosleep "libc.so"
-//go:cgo_import_dynamic purego_abort abort "libc.so"
-//go:cgo_import_dynamic purego_sigaltstack sigaltstack "libc.so"
-//go:cgo_import_dynamic purego_write write "libc.so"
-//go:cgo_import_dynamic purego_pthread_attr_init pthread_attr_init "libc.so"
-//go:cgo_import_dynamic purego_pthread_create pthread_create "libc.so"
-//go:cgo_import_dynamic purego_pthread_detach pthread_detach "libc.so"
-//go:cgo_import_dynamic purego_pthread_sigmask pthread_sigmask "libc.so"
-//go:cgo_import_dynamic purego_pthread_attr_getstacksize pthread_attr_getstacksize "libc.so"
-//go:cgo_import_dynamic purego_pthread_attr_destroy pthread_attr_destroy "libc.so"
-//go:cgo_import_dynamic purego_pthread_mutex_lock pthread_mutex_lock "libc.so"
-//go:cgo_import_dynamic purego_pthread_mutex_unlock pthread_mutex_unlock "libc.so"
-//go:cgo_import_dynamic purego_pthread_cond_broadcast pthread_cond_broadcast "libc.so"
-//go:cgo_import_dynamic purego_pthread_setspecific pthread_setspecific "libc.so"
+//go:cgo_import_dynamic goffi_malloc malloc "libc.so"
+//go:cgo_import_dynamic goffi_free free "libc.so"
+//go:cgo_import_dynamic goffi_setenv setenv "libc.so"
+//go:cgo_import_dynamic goffi_unsetenv unsetenv "libc.so"
+//go:cgo_import_dynamic goffi_sigfillset sigfillset "libc.so"
+//go:cgo_import_dynamic goffi_nanosleep nanosleep "libc.so"
+//go:cgo_import_dynamic goffi_abort abort "libc.so"
+//go:cgo_import_dynamic goffi_sigaltstack sigaltstack "libc.so"
+//go:cgo_import_dynamic goffi_write write "libc.so"
+//go:cgo_import_dynamic goffi_pthread_attr_init pthread_attr_init "libc.so"
+//go:cgo_import_dynamic goffi_pthread_create pthread_create "libc.so"
+//go:cgo_import_dynamic goffi_pthread_detach pthread_detach "libc.so"
+//go:cgo_import_dynamic goffi_pthread_sigmask pthread_sigmask "libc.so"
+//go:cgo_import_dynamic goffi_pthread_attr_getstacksize pthread_attr_getstacksize "libc.so"
+//go:cgo_import_dynamic goffi_pthread_attr_destroy pthread_attr_destroy "libc.so"
+//go:cgo_import_dynamic goffi_pthread_mutex_lock pthread_mutex_lock "libc.so"
+//go:cgo_import_dynamic goffi_pthread_mutex_unlock pthread_mutex_unlock "libc.so"
+//go:cgo_import_dynamic goffi_pthread_cond_broadcast pthread_cond_broadcast "libc.so"
+//go:cgo_import_dynamic goffi_pthread_setspecific pthread_setspecific "libc.so"

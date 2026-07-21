@@ -16,9 +16,10 @@
 //
 // # Support
 //
-// Currently, fakecgo supports Linux, macOS, FreeBSD, and NetBSD on amd64 & arm64.
-// It cannot be used with -buildmode=c-archive because that requires special
-// initialization that fakecgo does not implement at the moment.
+// Currently, fakecgo supports Linux, macOS, FreeBSD, and NetBSD on amd64 & arm64,
+// plus Android arm64/API 29+ as a guarded preview. It cannot be used with
+// -buildmode=c-archive because that requires special initialization that fakecgo
+// does not implement at the moment.
 //
 // # Usage
 //

@@ -76,6 +76,22 @@ require_source_pattern "$runtime_tls" 'DATA runtime·tls_g\+0\(SB\)/8,[[:space:]
 require_source_pattern "$runtime_android_cgo" '^#define TLS_SLOT_APP 2$' 'Bionic TLS_SLOT_APP contract'
 require_source_pattern "$runtime_android_cgo" 'dlsym\(handle, "android_get_device_api_level"\)' 'Android API-level startup probe'
 
+# GOOS=android also satisfies linux build constraints. The shared fakecgo
+# wiring must therefore remain selected: iscgo=true admits outbound cgocall,
+# while the hooks satisfy the runtime paths enabled by that state. Public
+# Android callbacks are rejected separately in ffi.
+echo "Checking Android fakecgo runtime wiring"
+android_fakecgo_files=$(
+	GOOS=android GOARCH=arm64 CGO_ENABLED=0 \
+		go list -f '{{range .GoFiles}}{{println .}}{{end}}' ./internal/fakecgo
+)
+for required in callbacks.go iscgo.go setenv.go; do
+	grep -Fxq "$required" <<<"$android_fakecgo_files" || {
+		echo "Android fakecgo runtime wiring omitted $required" >&2
+		exit 1
+	}
+done
+
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 

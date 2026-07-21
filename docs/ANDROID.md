@@ -29,6 +29,14 @@ fakecgo startup path. The cgo=1 path uses small NDK C wrappers so external
 linking never emits an AAPCS64 branch relocation to a `cgo_import_dynamic`
 symbol. Both paths reject glibc sonames and `__errno_location`.
 
+`runtime.iscgo` is intentionally true in the cgo=0 path. Android builds also
+satisfy Go's `linux` build term, so the shared `iscgo.go`, `callbacks.go`, and
+`setenv.go` wiring is selected. `runtime.cgocall` rejects ordinary Unix targets
+when `iscgo` is false; when it is true, the runtime also selects its cgo-aware
+thread, TLS, signal, traceback, and extra-M paths. Android fakecgo supplies the
+init, thread-start, environment, pthread-key, and bind hooks those paths expect.
+This runtime wiring is separate from goffi's public callback policy.
+
 Android callback trampolines are deliberately unavailable. `ffi.NewCallback`
 panics with a stable message instead of exposing a pointer whose foreign-thread
 startup path has not been validated on a physical device. Vulkan/WebGPU users

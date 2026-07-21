@@ -6,9 +6,9 @@
 #include "textflag.h"
 
 TEXT _android_dlopen(SB), NOSPLIT|NOFRAME, $0-0
-	JMP purego_android_dlopen(SB)
+	JMP goffi_android_dlopen(SB)
 	RET
 
 TEXT _android_dlsym(SB), NOSPLIT|NOFRAME, $0-0
-	JMP purego_android_dlsym(SB)
+	JMP goffi_android_dlsym(SB)
 	RET
