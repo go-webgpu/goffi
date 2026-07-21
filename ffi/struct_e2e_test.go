@@ -19,10 +19,15 @@ import (
 var structTestLib unsafe.Pointer
 
 func TestMain(m *testing.M) {
-	if err := buildStructTestLib(); err != nil {
-		// If gcc not available, skip struct e2e tests gracefully.
-		// Other tests still run.
-		structTestLib = nil
+	// Android test binaries run on-device, where invoking a host compiler is
+	// neither meaningful nor available. Keep the pure validation tests active
+	// and let only the host-built shared-library cases skip via requireStructLib.
+	if runtime.GOOS != "android" {
+		if err := buildStructTestLib(); err != nil {
+			// If gcc is not available, skip struct e2e tests gracefully.
+			// Other tests still run.
+			structTestLib = nil
+		}
 	}
 	code := m.Run()
 	if structTestLib != nil {

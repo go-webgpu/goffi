@@ -10,6 +10,10 @@
 // but those depend on dynamic linker magic to get initialized
 // correctly, and sometimes they break. This variable is a
 // backup: it depends only on old C style static linking rules.
+//
+// Android builds also satisfy the linux build term, so this declaration is
+// intentionally selected for Android/arm64. Outbound runtime.cgocall requires
+// iscgo even though goffi rejects Android C-to-Go callbacks at its public API.
 
 package fakecgo
 

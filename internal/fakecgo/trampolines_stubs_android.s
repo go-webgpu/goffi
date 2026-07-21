@@ -4,7 +4,7 @@
 // SPDX-FileCopyrightText: 2022 The Ebitengine Authors
 // SPDX-FileCopyrightText: 2025-2026 Andrey Kolkov and GoGPU Contributors
 
-//go:build !cgo && (darwin || freebsd || linux || netbsd) && !android
+//go:build !cgo && android && arm64
 
 #include "textflag.h"
 
@@ -42,6 +42,10 @@ TEXT _sigaltstack(SB), NOSPLIT|NOFRAME, $0-0
 	JMP goffi_sigaltstack(SB)
 	RET
 
+TEXT _write(SB), NOSPLIT|NOFRAME, $0-0
+	JMP goffi_write(SB)
+	RET
+
 TEXT _pthread_attr_init(SB), NOSPLIT|NOFRAME, $0-0
 	JMP goffi_pthread_attr_init(SB)
 	RET
@@ -58,20 +62,8 @@ TEXT _pthread_sigmask(SB), NOSPLIT|NOFRAME, $0-0
 	JMP goffi_pthread_sigmask(SB)
 	RET
 
-TEXT _pthread_self(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_pthread_self(SB)
-	RET
-
-TEXT _pthread_get_stacksize_np(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_pthread_get_stacksize_np(SB)
-	RET
-
 TEXT _pthread_attr_getstacksize(SB), NOSPLIT|NOFRAME, $0-0
 	JMP goffi_pthread_attr_getstacksize(SB)
-	RET
-
-TEXT _pthread_attr_setstacksize(SB), NOSPLIT|NOFRAME, $0-0
-	JMP goffi_pthread_attr_setstacksize(SB)
 	RET
 
 TEXT _pthread_attr_destroy(SB), NOSPLIT|NOFRAME, $0-0

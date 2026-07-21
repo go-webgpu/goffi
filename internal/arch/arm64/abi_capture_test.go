@@ -42,7 +42,7 @@ func captureCall(t *testing.T, argTypes []*types.TypeDescriptor, args []unsafe.P
 	}
 
 	var impl Implementation
-	if err := impl.Execute(cif, fnPtr, nil, args); err != nil {
+	if _, err := impl.Execute(cif, fnPtr, nil, args, 0); err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
