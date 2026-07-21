@@ -409,6 +409,7 @@ go run github.com/go-webgpu/goffi/cmd/variadic-test
 | **FreeBSD** | AMD64 | System V | Cross-compile verified |
 | **FreeBSD** | ARM64 | AAPCS64 | Cross-compile verified |
 | **Linux** | ARM64 | AAPCS64 | Production |
+| **Android** | ARM64 | AAPCS64 (Bionic) | Guarded preview (API 29+, NDK r29) |
 
 ---
 

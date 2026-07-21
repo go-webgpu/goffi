@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-07-21
+
+### Added
+- **Android ARM64 Bionic support (guarded preview)** — Android arm64/API 29+ platform with Bionic loader, `__errno` routing, four-argument `_cgo_init` startup, TLS slot validation, and dual CGO mode support. Callbacks explicitly rejected pending physical-device thread proof. Cross-build, ABI, and ELF gates pass on NDK r29 with Go 1.25.12 and Go 1.26.5. ([PR #62](https://github.com/go-webgpu/goffi/pull/62) by [@besmpl](https://github.com/besmpl))
+- **Android CI matrix** — NDK r29 cross-build and ELF dependency audits for Go 1.25.12 + Go 1.26.5 in both CGO modes
+- **`docs/ANDROID.md`** — runtime ABI contract, NDK probe, callback limitation, and build instructions
+- **@besmpl added as CODEOWNER** for Android paths (`*android*` across `ffi/`, `internal/dl/`, `internal/fakecgo/`, `internal/syscall/`)
+
+### Changed
+- **fakecgo naming cleanup** — all `purego_` dynamic import symbols renamed to `goffi_` across `internal/fakecgo/` (18 files). Dual copyright attribution: Ebitengine Authors + Andrey Kolkov and GoGPU Contributors. ([PR #63](https://github.com/go-webgpu/goffi/pull/63))
+- **LICENSE** updated to `Andrey Kolkov and GoGPU Contributors` (matching gogpu ecosystem pattern)
+- **NOTICE** file added documenting Apache-2.0 heritage of fakecgo from ebitengine/purego
+- Platform count: 8 desktop targets + Android ARM64 preview (9 total)
+
 ## [0.6.0] - 2026-07-12
 
 ### Added
