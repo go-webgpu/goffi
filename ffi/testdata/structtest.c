@@ -1,6 +1,15 @@
 #include <stdint.h>
 #include <stdarg.h>
 
+// Scalar float returns use XMM0 on Windows AMD64. Keep a pointer argument so
+// the end-to-end tests exercise the same call shape as pointer-based native APIs.
+float return_float32(const void *value) {
+    return value ? 0.125f : 0.0f;
+}
+double return_float64(const void *value) {
+    return value ? 0.625 : 0.0;
+}
+
 // ≤ 8 bytes: {int32, uint32} — INTEGER class, single GP register
 struct pair_i32_u32 { int32_t a; uint32_t b; };
 int64_t take_struct_8(struct pair_i32_u32 s) {

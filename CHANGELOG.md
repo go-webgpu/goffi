@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Windows AMD64 scalar float returns** — recover `float32` and `float64` values from the XMM0 bits exposed as the second result of `syscall.SyscallN`
+
 ## [0.6.1] - 2026-07-21
 
 ### Added

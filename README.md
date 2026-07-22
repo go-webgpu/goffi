@@ -300,9 +300,6 @@ if err != nil {
 - Go runtime limitation, not goffi-specific. Go 1.22+ added partial SEH support ([#58542](https://github.com/golang/go/issues/58542)), but edge cases remain.
 - Workaround: build native libraries with `panic=abort`.
 
-**Windows: float return values not captured from XMM0**
-- `syscall.SyscallN` returns RAX only. Go `syscall` package limitation.
-
 **Apple ARM64: variadic args always go on stack**
 - Per Apple's AAPCS64 extension, variadic arguments must be passed on the stack even when GP/FP registers are available. Use `PrepareVariadicCallInterface` (not `PrepareCallInterface`) for variadic C functions on all platforms — goffi handles the Darwin-specific register flush automatically.
 
