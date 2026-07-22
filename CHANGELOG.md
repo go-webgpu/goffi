@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-07-22
+
 ### Fixed
-- **Windows AMD64 scalar float returns** — recover `float32` and `float64` values from the XMM0 bits exposed as the second result of `syscall.SyscallN`
+- **Windows AMD64 scalar float returns** — recover `float32` and `float64` values from the XMM0 bits exposed as the second result of `syscall.SyscallN`. Go's `asmstdcall` already copies XMM0 into the second return slot — goffi was receiving but discarding it. Resolves long-standing known issue TASK-019. ([PR #65](https://github.com/go-webgpu/goffi/pull/65) by [@besmpl](https://github.com/besmpl))
+- Removed "Windows float returns not captured" from README Known Limitations
 
 ## [0.6.1] - 2026-07-21
 
