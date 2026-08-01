@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-08-01
+
+### Fixed
+- **ARM64: HFA return checkptr crash** — `handleHFAReturn` cast `(*[4]float64)(rvalue)` was oversized for 2-3 element HFAs (CGSize, CGPoint = 16 bytes, cast = 32 bytes). `go test -race` (checkptr) crashed with "converted pointer straddles multiple allocations". Fix: per-element writes via `unsafe.Add`. ([#67](https://github.com/go-webgpu/goffi/issues/67), reported by @jbunds)
+- **ARM64: 9-16B struct return silent corruption** — `(*[2]uint64)(rvalue)` wrote 8 full bytes for the hi word even when struct was smaller than 16 bytes. Fix: `copy` with exact remaining size, matching AMD64 pattern. Proactive fix — checkptr doesn't catch this (GC pads to 16), but packed C structs could trigger corruption
+- Added `TestHandleHFAReturn_Checkptr` and `TestHandleHFAReturn_Float32` unit tests
+
 ## [0.6.2] - 2026-07-22
 
 ### Fixed

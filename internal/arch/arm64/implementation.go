@@ -88,10 +88,14 @@ func (i *Implementation) handleReturn(
 		if cif.ReturnType.Size <= 8 {
 			*(*uint64)(rvalue) = retLo
 		} else if cif.ReturnType.Size <= 16 {
-			// 9-16 byte struct returned in X0-X1
-			dest := (*[2]uint64)(rvalue)
-			dest[0] = retLo
-			dest[1] = retHi
+			// 9-16 byte struct returned in X0-X1.
+			// Write hi word via copy to avoid oversized cast on packed structs.
+			*(*uint64)(rvalue) = retLo
+			remaining := cif.ReturnType.Size - 8
+			copy(
+				(*[8]byte)(unsafe.Add(rvalue, 8))[:remaining],
+				(*[8]byte)(unsafe.Pointer(&retHi))[:remaining],
+			)
 		} else {
 			return types.ErrUnsupportedReturnType
 		}
@@ -133,16 +137,14 @@ func (i *Implementation) handleHFAReturn(
 	isFloat32 := elemKind == types.FloatType
 
 	if isFloat32 {
-		dest := (*[4]float32)(rvalue)
 		for idx := 0; idx < hfaCount; idx++ {
-			dest[idx] = math.Float32frombits(uint32(fret[idx]))
+			*(*float32)(unsafe.Add(rvalue, uintptr(idx)*4)) = math.Float32frombits(uint32(fret[idx]))
 		}
 		return nil
 	}
 
-	dest := (*[4]float64)(rvalue)
 	for idx := 0; idx < hfaCount; idx++ {
-		dest[idx] = math.Float64frombits(fret[idx])
+		*(*float64)(unsafe.Add(rvalue, uintptr(idx)*8)) = math.Float64frombits(fret[idx])
 	}
 	return nil
 }
