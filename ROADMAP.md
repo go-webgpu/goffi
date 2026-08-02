@@ -3,7 +3,7 @@
 > **Strategic Approach**: Build production-ready Zero-CGO FFI with benchmarked performance
 > **Philosophy**: Performance first, usability second, platform coverage third
 
-**Last Updated**: 2026-07-21 | **Current Version**: v0.6.1 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → ABI → v1.0 LTS | **Milestone**: v0.6.1 (Android preview + fakecgo cleanup) → v0.7.0 RegisterFunc/Builder → v1.0.0 LTS
+**Last Updated**: 2026-08-01 | **Current Version**: v0.6.3 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → ABI → v1.0 LTS | **Milestone**: v0.6.3 (HFA checkptr fix) → v0.7.0 RegisterFunc/Builder → v1.0.0 LTS
 
 ---
 
@@ -167,6 +167,14 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 - LICENSE + NOTICE updated to GoGPU ecosystem pattern
 - @besmpl added as CODEOWNER for Android paths
 
+**v0.6.2** = Windows float returns fix ✅ RELEASED (2026-07-22)
+- Windows XMM0 float return capture (TASK-019 resolved) — PR #65 by @besmpl
+
+**v0.6.3** = ARM64 HFA checkptr fix ✅ RELEASED (2026-08-01)
+- ARM64 `handleHFAReturn` checkptr crash fix (#67, reported by @jbunds)
+- ARM64 9-16B struct return proactive fix (copy pattern)
+- Struct pass/return examples and README section (#58)
+
 **v0.7.0** = RegisterFunc + Builder API (2026 Q3-Q4)
 - RegisterFunc convenience API (ADR-008)
 - Library struct + OpenLibraryBytes (ADR-009)
@@ -180,9 +188,9 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 
 ---
 
-## 📊 Current Status (v0.6.0)
+## 📊 Current Status (v0.6.3)
 
-**Phase**: errno always-capture, stack-move fix, 8 platforms. Planning v0.7.0 (RegisterFunc)
+**Phase**: HFA checkptr fix, struct examples. 9 platforms. Planning v0.7.0 (RegisterFunc)
 
 **What Works**:
 - ✅ Dynamic library loading (`LoadLibrary`, `GetSymbol`, `FreeLibrary`)
