@@ -172,6 +172,62 @@ A new CIF must be prepared for each unique combination of variadic argument type
 portion of the CIF can be reused by re-calling `PrepareVariadicCallInterface` with different
 variadic arg type slices.
 
+### Example: Passing and Returning Structs
+
+goffi handles C struct pass-by-value across all ABI size classes. Describe the struct layout
+with a `TypeDescriptor`, then pass struct values directly via `unsafe.Pointer(&s)`.
+
+```go
+// C struct: typedef struct { int64_t x; int64_t y; } Point;
+pointType := &types.TypeDescriptor{
+    Kind:      types.StructType,
+    Size:      16,          // must match C sizeof(Point)
+    Alignment: 8,           // must match C alignof(Point)
+    Members: []*types.TypeDescriptor{
+        types.SInt64TypeDescriptor, // x
+        types.SInt64TypeDescriptor, // y
+    },
+}
+
+var cif types.CallInterface
+ffi.PrepareCallInterface(&cif, types.DefaultCall,
+    pointType,                                            // return: Point
+    []*types.TypeDescriptor{types.SInt64TypeDescriptor, types.SInt64TypeDescriptor},
+)
+
+x, y := int64(3), int64(4)
+var result Point
+_, _ = ffi.CallFunction(&cif, makePointFn,
+    unsafe.Pointer(&result),                              // buffer for struct return value
+    []unsafe.Pointer{unsafe.Pointer(&x), unsafe.Pointer(&y)},
+)
+// result.X == 3, result.Y == 4
+
+// Pass struct as argument:
+var distCif types.CallInterface
+ffi.PrepareCallInterface(&distCif, types.DefaultCall,
+    types.SInt64TypeDescriptor,
+    []*types.TypeDescriptor{pointType, pointType},        // two Point args
+)
+
+a := Point{X: 0, Y: 0}
+b := Point{X: 3, Y: 4}
+var dist int64
+_, _ = ffi.CallFunction(&distCif, distFn,
+    unsafe.Pointer(&dist),
+    []unsafe.Pointer{unsafe.Pointer(&a), unsafe.Pointer(&b)}, // pointer to struct data
+)
+// dist == 25
+```
+
+Structs >16 bytes are returned via hidden pointer (sret) — goffi handles this transparently.
+
+> **Note:** On Windows AMD64, struct arguments containing float fields are not supported
+> due to `syscall.SyscallN` limitations. Use integer-only structs for cross-platform code,
+> or pass float fields as individual arguments.
+
+See [`examples/struct/`](examples/struct/) for a complete working example with compile-and-run.
+
 ---
 
 ## Performance
