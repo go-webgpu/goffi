@@ -1,4 +1,4 @@
-//go:build ((linux && !android) || (android && !cgo) || darwin || freebsd) && (amd64 || arm64)
+//go:build ((linux && !android && !cgo) || (android && !cgo) || darwin || freebsd) && (amd64 || arm64)
 
 package syscall
 

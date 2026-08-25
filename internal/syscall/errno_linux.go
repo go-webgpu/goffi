@@ -1,4 +1,4 @@
-//go:build linux && !android && (amd64 || arm64)
+//go:build linux && !android && !cgo && (amd64 || arm64)
 
 package syscall
 

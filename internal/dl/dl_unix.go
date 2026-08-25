@@ -1,4 +1,4 @@
-//go:build (linux && !android) || darwin || freebsd
+//go:build (linux && !android && !cgo) || darwin || freebsd
 
 // OUR OWN Dlopen/Dlsym implementation - NO dependencies!
 // Uses runtime.cgocall approach similar to syscall6.
@@ -6,11 +6,13 @@
 // This implementation uses System V AMD64 ABI calling convention, which is
 // IDENTICAL on Linux and macOS. Platform-specific constants (RTLD_*) are
 // defined in:
-//   - dl_linux.go (Linux-specific constants)
+//   - dl_linux_consts.go (Linux-specific constants, shared by cgo and !cgo)
 //   - dl_darwin.go (macOS-specific constants)
+//   - dl_freebsd.go (FreeBSD-specific constants)
 //
 // The assembly wrappers (dl_wrappers_unix.s, dl_stubs_unix.s) and the
-// core logic here work identically on both platforms.
+// core logic here work identically on Linux, macOS, and FreeBSD (their
+// paths; cgo is handled separately in dl_linux_cgo.go).
 
 package dl
 
@@ -20,7 +22,8 @@ import (
 	"unsafe"
 )
 
-// RTLD constants are platform-specific - see dl_linux.go and dl_darwin.go
+// RTLD constants are platform-specific - see dl_linux_consts.go,
+// dl_darwin.go and dl_freebsd.go.
 
 //go:linkname runtime_cgocall runtime.cgocall
 //go:noescape

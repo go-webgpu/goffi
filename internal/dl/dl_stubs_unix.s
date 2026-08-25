@@ -1,11 +1,11 @@
-//go:build (linux || darwin || freebsd) && amd64
+//go:build ((linux && !android && !cgo) || darwin || freebsd) && amd64
 
 #include "textflag.h"
 
 // JMP stubs to dynamically linked symbols
 // These symbols are linked via //go:cgo_import_dynamic in:
-//   - dl_linux_nocgo.go (Linux: libdl.so.2)
-//   - dl_darwin_nocgo.go (macOS: libSystem.B.dylib)
+//   - dl_linux.go (Linux: libdl.so.2)
+//   - dl_darwin.go (macOS: libSystem.B.dylib)
 
 // dlopen_stub: JMP to dlopen
 TEXT dlopen_stub(SB), NOSPLIT|NOFRAME, $0-0
