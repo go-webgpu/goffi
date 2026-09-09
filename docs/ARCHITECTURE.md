@@ -324,6 +324,19 @@ pointType := &types.TypeDescriptor{
 
 Five typed error types for precise error handling: `InvalidCallInterfaceError`, `LibraryError`, `CallingConventionError`, `TypeValidationError`, `UnsupportedPlatformError`.
 
+### avalue Indirection Convention
+
+Following the libffi convention, `avalue[i]` is a **pointer TO the argument value**. GoFFI dereferences `avalue[i]` once to read the value placed into the register or stack slot:
+
+```
+C parameter: int x         → avalue[i] = &x         → GoFFI reads *&x = x value
+C parameter: char *buf     → avalue[i] = &buf        → GoFFI reads *&buf = buf address
+C parameter: int *out      → avalue[i] = &outPtr     → GoFFI reads *&outPtr = &out
+                              where outPtr = &out         (C receives address of out)
+```
+
+The third case (out-pointer) requires an intermediate Go variable. Without it, GoFFI would read the current value of `out` (likely zero) instead of its address, and the C function receives NULL.
+
 ---
 
 ## Variadic Function Support

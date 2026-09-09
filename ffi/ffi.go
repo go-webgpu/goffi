@@ -46,16 +46,13 @@
 //
 // # Supported Platforms
 //
-//   - Linux AMD64 (System V ABI)
-//   - Windows AMD64 (Win64 ABI)
-//   - macOS AMD64 (planned)
-//   - ARM64 (planned)
+//   - Linux, Windows, macOS, FreeBSD (AMD64 + ARM64) — 8 production targets
+//   - Android ARM64 (API 29+, guarded preview)
 //
 // # Performance
 //
-// This implementation uses hand-optimized assembly for each platform's calling
-// convention. Overhead is approximately 50-60ns per call, which is negligible
-// for most use cases (e.g., WebGPU rendering).
+// Hand-optimized assembly per platform ABI. Overhead: 88-114 ns/op with
+// errno capture. sync.Pool for callback stack-move safety (0 allocs steady state).
 //
 // # Safety
 //
@@ -248,11 +245,32 @@ func PrepareVariadicCallInterface(
 //   - Once the C function starts executing, it CANNOT be interrupted mid-flight.
 //   - For cancellable operations, the C library itself must support cancellation.
 //
+// # avalue Convention (critical for correctness)
+//
+// Each avalue[i] is a pointer TO the argument value, following the libffi convention.
+// GoFFI dereferences avalue[i] to read the value passed to the C function:
+//
+//	Input scalar (int x):       avalue[i] = unsafe.Pointer(&x)
+//	Input pointer (char *buf):  avalue[i] = unsafe.Pointer(&buf)  // GoFFI reads buf → C gets buf
+//	Out-pointer (int *result):  avalue[i] = unsafe.Pointer(&resultPtr)
+//	                            where resultPtr = unsafe.Pointer(&result)
+//
+// The out-pointer case requires an intermediate variable. Without it, GoFFI reads
+// the VALUE of result (likely 0) instead of its ADDRESS, and the C function receives NULL:
+//
+//	// WRONG — C receives NULL:
+//	var handle unsafe.Pointer
+//	avalue := []unsafe.Pointer{unsafe.Pointer(&handle)}  // GoFFI reads handle (nil)
+//
+//	// CORRECT — C receives &handle:
+//	var handle unsafe.Pointer
+//	handlePtr := unsafe.Pointer(&handle)
+//	avalue := []unsafe.Pointer{unsafe.Pointer(&handlePtr)}  // GoFFI reads handlePtr (&handle)
+//
 // Safety:
 //   - All argument pointers must remain valid during the call
 //   - Return value buffer must be large enough for the result type
 //   - Use runtime.KeepAlive() if needed to prevent premature GC of arguments
-//   - Use runtime.Pinner to pin pointers under a moving GC
 func CallFunctionContext(
 	ctx context.Context,
 	cif *types.CallInterface,

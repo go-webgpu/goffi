@@ -228,6 +228,34 @@ Structs >16 bytes are returned via hidden pointer (sret) — goffi handles this 
 
 See [`examples/struct/`](examples/struct/) for a complete working example with compile-and-run.
 
+### avalue Convention: Pointer-to-Value
+
+Every `avalue[i]` must be a **pointer TO the argument value**. GoFFI dereferences it to read
+the actual value passed to C. This follows the [libffi convention](https://sourceware.org/libffi/).
+
+For most cases this is straightforward — `unsafe.Pointer(&x)` for scalars, `unsafe.Pointer(&buf)` for
+pointers. The non-obvious case is **out-pointer parameters** (where C writes a result through a pointer):
+
+```go
+// C: int get_device(uint32_t index, void **device)
+// The function writes *device — an out-pointer parameter.
+
+// WRONG — C receives NULL (GoFFI reads the VALUE of device, which is nil):
+var device unsafe.Pointer
+_, _ = ffi.CallFunction(&cif, fn, unsafe.Pointer(&ret),
+    []unsafe.Pointer{unsafe.Pointer(&index), unsafe.Pointer(&device)})
+
+// CORRECT — C receives &device (GoFFI reads the VALUE of devicePtr, which is &device):
+var device unsafe.Pointer
+devicePtr := unsafe.Pointer(&device)
+_, _ = ffi.CallFunction(&cif, fn, unsafe.Pointer(&ret),
+    []unsafe.Pointer{unsafe.Pointer(&index), unsafe.Pointer(&devicePtr)})
+// After call: device holds the handle written by C
+```
+
+**Rule of thumb:** if the C parameter is `T *out` (C writes through it), you need an intermediate
+`outPtr := unsafe.Pointer(&out)` and pass `unsafe.Pointer(&outPtr)` in avalue.
+
 ---
 
 ## Performance
