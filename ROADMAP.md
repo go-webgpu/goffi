@@ -3,7 +3,7 @@
 > **Strategic Approach**: Build production-ready Zero-CGO FFI with benchmarked performance
 > **Philosophy**: Performance first, usability second, platform coverage third
 
-**Last Updated**: 2026-09-08 | **Current Version**: v0.6.3 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → ABI → v1.0 LTS | **Milestone**: v0.6.3 (HFA checkptr fix) → v0.7.0 `goffi_static` + RegisterFunc/Builder → v1.0.0 LTS
+**Last Updated**: 2026-09-10 | **Current Version**: v0.6.4 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → ABI → v1.0 LTS | **Milestone**: v0.6.4 `goffi_static` → v0.7.0 RegisterFunc/Builder → v1.0.0 LTS
 
 ---
 
@@ -173,15 +173,19 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 **v0.6.3** = ARM64 HFA checkptr fix ✅ RELEASED (2026-08-01)
 - ARM64 `handleHFAReturn` checkptr crash fix (#67, reported by @jbunds)
 - ARM64 9-16B struct return proactive fix (copy pattern)
-- Struct pass/return examples and README section (#58)
 
-**v0.7.0** = Static linking + RegisterFunc + Builder API (2026 Q3-Q4)
-- `-tags goffi_static` fully static Linux ELFs (#74, gogpu#474) — shipped in PR #78
-- Linking-mode docs + ELF CI gates
+**v0.6.4** = Static linking profile + struct examples ✅ RELEASED (2026-09-10)
+- `-tags goffi_static` fully static Linux ELFs (#74, gogpu#474) — PR #78
+- Linking-mode docs + ELF CI gates (`scripts/check-elf-linking.sh`)
 - ADR-001 userspace ELF loader (research)
+- Struct pass/return examples (`examples/struct/`, #58 / PR #69)
+- Docs: avalue out-pointer double-indirection (#79 / PR #80)
+
+**v0.7.0** = RegisterFunc + Builder API (2026 Q3-Q4)
 - RegisterFunc convenience API (ADR-008)
 - Library struct + OpenLibraryBytes (ADR-009)
 - NewFunc/Call/CallCtx ergonomic wrappers (ADR-009)
+- Enterprise C-ABI / Rust-cdylib host profile ([#81](https://github.com/go-webgpu/goffi/issues/81))
 
 **v1.0.0** = Long-term support release (2027 Q1)
 - API stability guarantee
@@ -191,16 +195,17 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 
 ---
 
-## 📊 Current Status (v0.6.3)
+## 📊 Current Status (v0.6.4)
 
-**Phase**: HFA checkptr fix, struct examples. 9 platforms. `goffi_static` in PR #78; planning RegisterFunc for v0.7.0
+**Phase**: `goffi_static` linking profile shipped. 9 platforms. Next: RegisterFunc/Builder ergonomics for v0.7.0
 
 **What Works**:
 - ✅ Dynamic library loading (`LoadLibrary`, `GetSymbol`, `FreeLibrary`)
 - ✅ Function call interface (`PrepareCallInterface`)
 - ✅ Function execution (`CallFunction`, `CallFunctionContext`)
+- ✅ **`-tags goffi_static`** — fully static Linux ELFs (FFI unavailable; `errors.Is(err, ErrStaticBuild)`)
 - ✅ **Benchmarks**: 64-114 ns/op FFI overhead ✨
-- ✅ **Typed errors**: 5 error types with `errors.As()` support
+- ✅ **Typed errors**: 5 error types with `errors.As()` support (+ `ErrStaticBuild` sentinel)
 - ✅ **Context support**: Timeouts and cancellation
 - ✅ **Cross-platform**: Linux + Windows + macOS (AMD64 + ARM64)
 - ✅ **Type system**: Predefined descriptors for common types

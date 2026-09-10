@@ -1,7 +1,8 @@
 # ADR-001: Userspace ELF loader for static binaries
 
-**Status:** Proposed (research / preview)  
+**Status:** Proposed (research / preview) — Track 1–2 (`goffi_static` + docs/CI) **shipped in v0.6.4**; userspace loader remains research  
 **Date:** 2026-09-08  
+**Updated:** 2026-09-10  
 **Tracking:** [goffi#74](https://github.com/go-webgpu/goffi/issues/74), [gogpu#474](https://github.com/gogpu/gogpu/issues/474)  
 **Go baseline:** 1.25+ (`structs.HostLayout`, `CGO_ENABLED=0`)
 
@@ -26,8 +27,9 @@ Explore a **pure-Go userspace ELF `.so` loader** gated behind
 path to “static binary + runtime LoadLibrary-like behavior” on Linux without
 shipping `ld.so`.
 
-Ship Track 1–2 (`goffi_static` + docs/CI) first. This ADR does **not** block
-closing the documentation / static-profile side of #74 / gogpu#474.
+Ship Track 1–2 (`goffi_static` + docs/CI) first — **done in v0.6.4**. This ADR does **not** block
+closing the documentation / static-profile side of #74 / gogpu#474; it tracks only the
+optional userspace ELF loader follow-up.
 
 ## Goals
 

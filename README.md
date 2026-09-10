@@ -455,7 +455,12 @@ if err != nil {
 | v0.4.1 | Released | ABI compliance audit — 10/11 gaps fixed |
 | v0.4.2 | Released | purego compatibility (`-tags nofakecgo`) |
 | v0.5.1 | Released | Struct ABI, CGO_ENABLED=1, 9-16B XMM return |
-| **v0.6.0** | **In progress** | Variadic functions (`PrepareVariadicCallInterface`), builder API |
+| v0.6.0 | Released | errno always-capture (`CallFunction` → `(Errno, error)`) |
+| v0.6.1 | Released | Android ARM64 preview, fakecgo rename |
+| v0.6.2 | Released | Windows scalar float returns |
+| v0.6.3 | Released | ARM64 HFA checkptr + 9-16B struct return fix |
+| **v0.6.4** | **Released** | `-tags goffi_static`, linking docs, struct examples |
+| v0.7.0 | Planned | RegisterFunc / Builder API, C-ABI host profile (#81) |
 | v1.0.0 | Planned | API stability (SemVer 2.0), security audit |
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and [ROADMAP.md](ROADMAP.md) for the full plan.
@@ -477,13 +482,15 @@ go test -v ./ffi                       # verbose, auto-detects platform
 
 | Document | Description |
 |----------|-------------|
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Technical architecture: assembly, ABIs, callbacks |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Technical architecture: assembly, ABIs, callbacks, linking |
 | [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | Benchmarks, optimization strategies, Go 1.26 |
+| [docs/ANDROID.md](docs/ANDROID.md) | Android ARM64 preview ABI + build notes |
+| [docs/ADR-001-userspace-elf-loader.md](docs/ADR-001-userspace-elf-loader.md) | Research: optional pure-Go `.so` loader |
 | [CHANGELOG.md](CHANGELOG.md) | Version history, migration guides |
 | [ROADMAP.md](ROADMAP.md) | Development roadmap to v1.0 |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
 | [SECURITY.md](SECURITY.md) | Security policy |
-| [examples/](examples/) | Working code examples |
+| [examples/](examples/) | Working code examples (`simple`, `struct`) |
 
 ---
 
