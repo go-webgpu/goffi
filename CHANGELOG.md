@@ -7,11 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-09-10
+
 ### Added
-- **`-tags goffi_static`** — fully static Linux amd64/arm64 binaries under `CGO_ENABLED=0` by excluding all `//go:cgo_import_dynamic` directives (`libdl`/`libc`/`libpthread`). `ffi.LoadLibrary` / `GetSymbol` return `ffi.ErrStaticBuild`. ([#74](https://github.com/go-webgpu/goffi/issues/74), [gogpu#474](https://github.com/gogpu/gogpu/issues/474))
+- **`-tags goffi_static`** — fully static Linux amd64/arm64 binaries under `CGO_ENABLED=0` by excluding all `//go:cgo_import_dynamic` directives (`libdl`/`libc`/`libpthread`). `ffi.LoadLibrary` / `GetSymbol` return `ffi.ErrStaticBuild`. ([#74](https://github.com/go-webgpu/goffi/issues/74), [gogpu#474](https://github.com/gogpu/gogpu/issues/474), [PR #78](https://github.com/go-webgpu/goffi/pull/78))
 - **Linking modes** documented in README (dynamic FFI, musl dynamic, static no-FFI)
 - **`scripts/check-elf-linking.sh`** — CI/helper asserts `PT_INTERP` / `DT_NEEDED` for default vs static profiles
 - **`docs/ADR-001-userspace-elf-loader.md`** — research track for optional pure-Go ELF `.so` loader (preview, not default)
+- **Struct pass/return examples** — `examples/struct/` + README section covering INTEGER/SSE/sret size classes ([#58](https://github.com/go-webgpu/goffi/issues/58), [PR #69](https://github.com/go-webgpu/goffi/pull/69))
+
+### Changed
+- **Docs: avalue double-indirection** — clarify out-pointer parameter pattern (`avalue[i]` must point to a pointer variable) in README and `docs/ARCHITECTURE.md` ([#79](https://github.com/go-webgpu/goffi/issues/79), [PR #80](https://github.com/go-webgpu/goffi/pull/80))
+- README: star history chart ([PR #75](https://github.com/go-webgpu/goffi/pull/75))
 
 ## [0.6.3] - 2026-08-01
 
@@ -881,7 +888,20 @@ See [ROADMAP.md](ROADMAP.md) for detailed roadmap to v1.0.
 
 ---
 
-[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.6.4...HEAD
+[0.6.4]: https://github.com/go-webgpu/goffi/compare/v0.6.3...v0.6.4
+[0.6.3]: https://github.com/go-webgpu/goffi/compare/v0.6.2...v0.6.3
+[0.6.2]: https://github.com/go-webgpu/goffi/compare/v0.6.1...v0.6.2
+[0.6.1]: https://github.com/go-webgpu/goffi/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/go-webgpu/goffi/compare/v0.5.6...v0.6.0
+[0.5.6]: https://github.com/go-webgpu/goffi/compare/v0.5.5...v0.5.6
+[0.5.5]: https://github.com/go-webgpu/goffi/compare/v0.5.4...v0.5.5
+[0.5.4]: https://github.com/go-webgpu/goffi/compare/v0.5.3...v0.5.4
+[0.5.3]: https://github.com/go-webgpu/goffi/compare/v0.5.2...v0.5.3
+[0.5.2]: https://github.com/go-webgpu/goffi/compare/v0.5.1...v0.5.2
+[0.5.1]: https://github.com/go-webgpu/goffi/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/go-webgpu/goffi/compare/v0.4.2...v0.5.0
+[0.4.2]: https://github.com/go-webgpu/goffi/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/go-webgpu/goffi/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/go-webgpu/goffi/compare/v0.3.9...v0.4.0
 [0.3.9]: https://github.com/go-webgpu/goffi/compare/v0.3.8...v0.3.9

@@ -324,6 +324,19 @@ pointType := &types.TypeDescriptor{
 
 Five typed error types for precise error handling: `InvalidCallInterfaceError`, `LibraryError`, `CallingConventionError`, `TypeValidationError`, `UnsupportedPlatformError`.
 
+Under `-tags goffi_static`, dynamic loading is unavailable: `LoadLibrary` / `GetSymbol` return errors wrapping `ErrStaticBuild` (use `errors.Is`).
+
+### Linking modes (Linux)
+
+`CGO_ENABLED=0` does **not** imply a fully static ELF. Default builds still record `//go:cgo_import_dynamic` for `dlopen` / libc so host `.so` loading works:
+
+| Mode | Build | Dynamic load | Typical use |
+|------|-------|--------------|-------------|
+| Dynamic FFI (default) | `CGO_ENABLED=0 go build` | yes | desktop GPU/GUI |
+| Static no-FFI | `CGO_ENABLED=0 go build -tags goffi_static` | no (`ErrStaticBuild`) | `FROM scratch`, air-gapped CLI |
+
+See README [Linking modes](../README.md#linking-modes-linux) and [ADR-001](./ADR-001-userspace-elf-loader.md). Helper: `scripts/check-elf-linking.sh`.
+
 ### avalue Indirection Convention
 
 Following the libffi convention, `avalue[i]` is a **pointer TO the argument value**. GoFFI dereferences `avalue[i]` once to read the value placed into the register or stack slot:
