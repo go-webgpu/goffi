@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build !cgo && (darwin || freebsd || linux || netbsd)
+//go:build !cgo && (darwin || freebsd || linux || netbsd) && !goffi_static
 
 #include "textflag.h"
 #include "abi_amd64.h"

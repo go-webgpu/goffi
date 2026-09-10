@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2011 The Go Authors
 // SPDX-FileCopyrightText: 2026 The Goffi Authors
 
-//go:build !cgo && android && arm64
+//go:build !cgo && android && arm64 && !goffi_static
 
 package fakecgo
 

@@ -3,7 +3,7 @@
 > **Strategic Approach**: Build production-ready Zero-CGO FFI with benchmarked performance
 > **Philosophy**: Performance first, usability second, platform coverage third
 
-**Last Updated**: 2026-08-01 | **Current Version**: v0.6.3 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → ABI → v1.0 LTS | **Milestone**: v0.6.3 (HFA checkptr fix) → v0.7.0 RegisterFunc/Builder → v1.0.0 LTS
+**Last Updated**: 2026-09-08 | **Current Version**: v0.6.3 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → ABI → v1.0 LTS | **Milestone**: v0.6.3 (HFA checkptr fix) → v0.7.0 `goffi_static` + RegisterFunc/Builder → v1.0.0 LTS
 
 ---
 
@@ -175,7 +175,10 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 - ARM64 9-16B struct return proactive fix (copy pattern)
 - Struct pass/return examples and README section (#58)
 
-**v0.7.0** = RegisterFunc + Builder API (2026 Q3-Q4)
+**v0.7.0** = Static linking + RegisterFunc + Builder API (2026 Q3-Q4)
+- `-tags goffi_static` fully static Linux ELFs (#74, gogpu#474) — shipped in PR #78
+- Linking-mode docs + ELF CI gates
+- ADR-001 userspace ELF loader (research)
 - RegisterFunc convenience API (ADR-008)
 - Library struct + OpenLibraryBytes (ADR-009)
 - NewFunc/Call/CallCtx ergonomic wrappers (ADR-009)
@@ -190,7 +193,7 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 
 ## 📊 Current Status (v0.6.3)
 
-**Phase**: HFA checkptr fix, struct examples. 9 platforms. Planning v0.7.0 (RegisterFunc)
+**Phase**: HFA checkptr fix, struct examples. 9 platforms. `goffi_static` in PR #78; planning RegisterFunc for v0.7.0
 
 **What Works**:
 - ✅ Dynamic library loading (`LoadLibrary`, `GetSymbol`, `FreeLibrary`)

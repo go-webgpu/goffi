@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2022 The Ebitengine Authors
 // SPDX-FileCopyrightText: 2025-2026 Andrey Kolkov and GoGPU Contributors
 
-//go:build !cgo && (darwin || freebsd || linux || netbsd)
+//go:build !cgo && (darwin || freebsd || linux || netbsd) && !goffi_static
 
 // Package fakecgo implements the Cgo runtime (runtime/cgo) entirely in Go.
 // This allows code that calls into C to function properly when CGO_ENABLED=0.

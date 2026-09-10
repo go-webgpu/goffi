@@ -1,4 +1,4 @@
-//go:build ((linux && !android) || freebsd) && (amd64 || arm64)
+//go:build ((linux && !android) || freebsd) && (amd64 || arm64) && !goffi_static
 
 // Unix library loading via dlopen - OUR OWN implementation (NO dependencies!)
 //

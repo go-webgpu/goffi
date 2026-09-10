@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 The Goffi Authors
 
-//go:build !cgo && android && arm64
+//go:build !cgo && android && arm64 && !goffi_static
 
 #include "textflag.h"
 

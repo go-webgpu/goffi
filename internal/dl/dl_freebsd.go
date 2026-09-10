@@ -1,4 +1,4 @@
-//go:build freebsd
+//go:build freebsd && !goffi_static
 
 // FreeBSD-specific constants for dynamic library loading.
 //

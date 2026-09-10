@@ -72,6 +72,28 @@ CGO_ENABLED=1 go build ./...
 
 > **How?** goffi uses Go's `cgo_import_dynamic` for dynamic library loading. Under `CGO_ENABLED=0` the cgo runtime is supplied by `internal/fakecgo`; under `CGO_ENABLED=1` the standard `runtime/cgo` is linked in. Both modes share the same FFI fast path and ABIs.
 
+### Linking modes (Linux)
+
+`CGO_ENABLED=0` does **not** imply a fully static ELF when goffi is imported. `//go:cgo_import_dynamic` for `dlopen` / libc still records `PT_INTERP` and `DT_NEEDED` (`libdl.so.2`, `libc.so.6`, `libpthread.so.0`). This matches purego and is required for host `dlopen` — the kernel only maps `ld.so` when `PT_INTERP` is present. See [goffi#74](https://github.com/go-webgpu/goffi/issues/74) and [gogpu#474](https://github.com/gogpu/gogpu/issues/474).
+
+| Mode | How | ELF shape | `LoadLibrary` | Typical use |
+|------|-----|-----------|---------------|-------------|
+| **Dynamic FFI** (default) | `CGO_ENABLED=0 go build` | dynamic + `libdl`/`libc` | yes | desktop GPU/GUI |
+| **Musl dynamic** | build on Alpine / `CC=musl-gcc` | dynamic vs musl | yes | Alpine containers with GPU/GUI |
+| **Static no-FFI** | `CGO_ENABLED=0 go build -tags goffi_static` | fully static (no `PT_INTERP`, no `NEEDED`) | no (`errors.Is(err, ffi.ErrStaticBuild)`) | `FROM scratch`, air-gapped CLI |
+
+```bash
+# Fully static Linux amd64/arm64 binary (FFI unavailable)
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags goffi_static -o app .
+file app   # statically linked
+# Verify: no INTERP / NEEDED
+scripts/check-elf-linking.sh --static ./app
+```
+
+Under `-tags goffi_static`, errno capture is unavailable (always returns 0): `ErrnoFnAddr()` is a no-op so the assembly trampoline skips `__errno_location` / `__error`, which need dynamic libc.
+
+`FROM scratch` + Vulkan/Wayland/libX11 via host `dlopen` is not possible without either `ld.so` or a userspace ELF loader (see [docs/ADR-001-userspace-elf-loader.md](docs/ADR-001-userspace-elf-loader.md)). Windows is unaffected (`LoadLibraryW` via ntdll).
+
 ### Example: Calling strlen
 
 ```go
@@ -379,6 +401,9 @@ if err != nil {
 ---
 
 ## Known Limitations
+
+**Linux: default builds are dynamically linked** ([#74](https://github.com/go-webgpu/goffi/issues/74))
+- Importing goffi records `libdl`/`libc` via `cgo_import_dynamic` even with `CGO_ENABLED=0`. Use `-tags goffi_static` for a fully static ELF (no runtime `.so` loading), or build against musl for Alpine. See [Linking modes](#linking-modes-linux).
 
 **Windows: C++ exceptions may crash the program** ([#12516](https://github.com/golang/go/issues/12516))
 - Go runtime limitation, not goffi-specific. Go 1.22+ added partial SEH support ([#58542](https://github.com/golang/go/issues/58542)), but edge cases remain.

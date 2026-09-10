@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`-tags goffi_static`** — fully static Linux amd64/arm64 binaries under `CGO_ENABLED=0` by excluding all `//go:cgo_import_dynamic` directives (`libdl`/`libc`/`libpthread`). `ffi.LoadLibrary` / `GetSymbol` return `ffi.ErrStaticBuild`. ([#74](https://github.com/go-webgpu/goffi/issues/74), [gogpu#474](https://github.com/gogpu/gogpu/issues/474))
+- **Linking modes** documented in README (dynamic FFI, musl dynamic, static no-FFI)
+- **`scripts/check-elf-linking.sh`** — CI/helper asserts `PT_INTERP` / `DT_NEEDED` for default vs static profiles
+- **`docs/ADR-001-userspace-elf-loader.md`** — research track for optional pure-Go ELF `.so` loader (preview, not default)
+
 ## [0.6.3] - 2026-08-01
 
 ### Fixed

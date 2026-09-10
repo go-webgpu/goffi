@@ -1,4 +1,4 @@
-//go:build darwin && (amd64 || arm64)
+//go:build darwin && (amd64 || arm64) && !goffi_static
 
 // macOS library loading - OUR OWN implementation (NO dependencies!)
 //

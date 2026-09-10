@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2022 The Ebitengine Authors
 // SPDX-FileCopyrightText: 2025-2026 Andrey Kolkov and GoGPU Contributors
 
-//go:build !cgo && (darwin || linux || freebsd)
+//go:build !cgo && (darwin || linux || freebsd) && !goffi_static
 
 /*
 trampoline for emulating required C functions for cgo in go (see cgo.go)

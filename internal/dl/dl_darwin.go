@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build darwin && !goffi_static
 
 // macOS-specific constants for dynamic library loading.
 //

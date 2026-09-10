@@ -1,4 +1,4 @@
-//go:build linux && !android
+//go:build linux && !android && !goffi_static
 
 // Linux-specific constants for dynamic library loading.
 //
