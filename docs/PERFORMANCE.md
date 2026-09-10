@@ -2,7 +2,7 @@
 
 > **Comprehensive performance analysis, benchmarks, and usage guidelines**
 > **Platform**: Windows AMD64, 12th Gen Intel Core i7-1255U
-> **Go Version**: 1.25+
+> **Go Version**: 1.26+
 
 ---
 

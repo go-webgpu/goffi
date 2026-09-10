@@ -56,7 +56,8 @@ are reproducible without a device:
 ANDROID_NDK_HOME=/path/to/android-ndk-r29 scripts/check-android-arm64.sh
 ```
 
-The audited source/ABI matrix is Go 1.25.12 and Go 1.26.5 with Android NDK
-r29 (`29.0.14206865`). Keep both Go lines in CI when runtime startup files or
-TLS offsets change upstream. Passing this probe is not physical-device
+The audited source/ABI matrix is Go 1.26.5 and the current 1.26 patch release
+with Android NDK r29 (`29.0.14206865`). go.mod requires 1.26, so the older 1.25
+line is gone. Keep both Go lines in CI when runtime startup files or TLS
+offsets change upstream. Passing this probe is not physical-device
 startup evidence.

@@ -1,0 +1,117 @@
+name: universal
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build + Profile U contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          # Pinned to match .github/workflows/ci.yml: the goffi_musl build below
+          # depends on the toolchain's cgo_import_dynamic restrictions, which
+          # the -gcflags=...=-std workaround is calibrated against.
+          go-version: '1.26.x'
+      - name: Build every mode, vet and unit tests
+        run: |
+          set -euo pipefail
+          CGO_ENABLED=0 go build ./...
+          CGO_ENABLED=0 go build -tags goffi_universal ./...
+          CGO_ENABLED=0 go build -tags goffi_static ./...
+          CGO_ENABLED=0 go build -tags goffi_musl -gcflags=github.com/go-webgpu/goffi/internal/dl=-std ./...
+          # -unsafeptr=false: goffi reconstructs pointers from native call
+          # registers and stack slots by design (see ffi/callback_pointer.go's
+          # //go:nocheckptr contract). ci.yml runs vet through golangci-lint,
+          # which excludes govet on exactly those paths (.golangci.yml); this
+          # flag is the bare-vet equivalent of that exclusion.
+          CGO_ENABLED=0 go vet -unsafeptr=false ./...
+          CGO_ENABLED=0 go test ./...
+          CGO_ENABLED=0 go test -tags goffi_universal ./internal/...
+      - name: Build the universal probe and check the ELF contract
+        run: |
+          set -euo pipefail
+          bash scripts/build-universal.sh -o universal-probe ./cmd/universal-probe
+          go run ./cmd/goffi-audit universal-probe
+      - name: Upload universal probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: universal-probe
+          path: universal-probe
+
+  run-glibc:
+    name: run on glibc (${{ matrix.image }})
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image: [ "debian:stable-slim", "ubuntu:24.04" ]
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: universal-probe
+      - name: Run the same universal binary on glibc
+        run: |
+          set -eu
+          chmod +x universal-probe
+          ./universal-probe | tee out.txt
+          grep -q UNIVERSAL-PROBE-OK out.txt
+
+  run-musl:
+    name: run on musl (alpine)
+    needs: build
+    runs-on: ubuntu-latest
+    container:
+      image: alpine:latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: universal-probe
+      - name: Run the same universal binary on musl
+        shell: sh
+        run: |
+          set -eu
+          chmod +x universal-probe
+          ./universal-probe | tee out.txt
+          grep -q UNIVERSAL-PROBE-OK out.txt
+
+  purego-coexistence:
+    name: purego coexistence (CGO-free, -tags nofakecgo)
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: goffi
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.x'
+      - name: Build and run a program importing goffi and purego together
+        run: |
+          set -euo pipefail
+          mkdir coexist && cd coexist
+          printf '%s\n' \
+            'package main' \
+            '' \
+            'import (' \
+            '	_ "github.com/ebitengine/purego"' \
+            '	"github.com/go-webgpu/goffi/ffi"' \
+            ')' \
+            '' \
+            'func main() { println("coexist ffi.Available =", ffi.Available()) }' \
+            > main.go
+          go mod init coexist
+          go mod edit -replace github.com/go-webgpu/goffi=../goffi
+          GOFLAGS=-mod=mod go get github.com/go-webgpu/goffi/ffi
+          GOFLAGS=-mod=mod go get github.com/ebitengine/purego
+          CGO_ENABLED=0 go build -tags nofakecgo -o coexist .
+          ./coexist

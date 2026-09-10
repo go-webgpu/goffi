@@ -1,4 +1,4 @@
-//go:build darwin && (amd64 || arm64)
+//go:build darwin && (amd64 || arm64) && !goffi_static
 
 package syscall
 

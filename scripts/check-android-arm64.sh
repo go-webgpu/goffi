@@ -31,7 +31,7 @@ readelf="$toolchain/llvm-readelf"
 # lines, or when any audited source invariant changes.
 go_version=$(go env GOVERSION)
 case "$go_version" in
-	go1.25.12|go1.26.5) ;;
+	go1.25.12|go1.26.5|go1.26.6|go1.26.7) ;;
 	*)
 		echo "unsupported Go runtime source for Android fakecgo: $go_version" >&2
 		echo "audit the new runtime/cgo Android arm64 startup ABI before extending this gate" >&2
@@ -123,20 +123,26 @@ done
 echo "Checking NDK C ABI headers"
 "$cc" -std=c11 -Wall -Werror -fsyntax-only "$ROOT/testdata/android_abi_probe.c"
 
+# Full `go vet` here runs the complete analyzer set (unlike `go test`'s vet
+# subset). Disable unsafeptr: goffi reconstructs pointers from native call
+# registers and stack slots by design (see ffi/callback_pointer.go's
+# //go:nocheckptr contract). ci.yml runs vet through golangci-lint, which
+# excludes govet on exactly those paths (.golangci.yml); -unsafeptr=false is the
+# bare-vet equivalent of that exclusion, matching universal.yml.
 for cgo in 0 1; do
 	echo "Building Android arm64 (CGO_ENABLED=$cgo)"
 	if [[ "$cgo" == 1 ]]; then
 		CC="$cc" GOOS=android GOARCH=arm64 CGO_ENABLED=1 \
 			go test -exec=true ./... 2>&1
 		CC="$cc" GOOS=android GOARCH=arm64 CGO_ENABLED=1 \
-			go vet ./...
+			go vet -unsafeptr=false ./...
 		CC="$cc" GOOS=android GOARCH=arm64 CGO_ENABLED=1 \
 			go test -c -o "$tmp/ffi-cgo.test" ./ffi
 	else
 		GOOS=android GOARCH=arm64 CGO_ENABLED=0 \
 			go test -exec=true ./... 2>&1
 		GOOS=android GOARCH=arm64 CGO_ENABLED=0 \
-			go vet ./...
+			go vet -unsafeptr=false ./...
 		GOOS=android GOARCH=arm64 CGO_ENABLED=0 \
 			go test -c -o "$tmp/ffi-nocgo.test" ./ffi
 	fi

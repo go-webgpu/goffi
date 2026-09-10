@@ -225,7 +225,7 @@ experiment: prototype macOS Apple Silicon support
 
 ### Prerequisites
 
-- **Go 1.25 or later** (required for latest runtime.cgocall features)
+- **Go 1.26 or later** (required for latest runtime.cgocall features)
 - **golangci-lint** (code quality)
 - **GCC or Clang** (for race detector, optional but recommended)
 - **Platform access**:
@@ -241,7 +241,7 @@ go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
 # Verify installation
 golangci-lint --version
-go version  # Should be 1.25+
+go version  # Should be 1.26+
 ```
 
 ### Running Tests

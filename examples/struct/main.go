@@ -15,6 +15,7 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 	"os/exec"
@@ -25,6 +26,15 @@ import (
 	"github.com/go-webgpu/goffi/ffi"
 	"github.com/go-webgpu/goffi/types"
 )
+
+// structlibSource is the C library exercised by this example. It is embedded so
+// the example builds as a normal Go package (a .c file in the package directory
+// would otherwise be rejected as cgo input) and so it runs regardless of the
+// working directory: buildLib writes it to a temp file and compiles it at run
+// time. Building the shared library still requires a C compiler (gcc/clang).
+//
+//go:embed csrc/structlib.c
+var structlibSource string
 
 // Point mirrors C: typedef struct { int64_t x; int64_t y; } Point;
 type Point struct {
@@ -251,10 +261,10 @@ func buildLib() (string, bool) {
 		return "", false
 	}
 
-	src := filepath.Join(filepath.Dir(os.Args[0]), "structlib.c")
-	if _, statErr := os.Stat(src); statErr != nil {
-		// When invoked via "go run .", the source directory is the working directory.
-		src = "structlib.c"
+	src := filepath.Join(dir, "structlib.c")
+	if err = os.WriteFile(src, []byte(structlibSource), 0o600); err != nil {
+		fmt.Println("write C source error:", err)
+		return "", false
 	}
 
 	var soPath string

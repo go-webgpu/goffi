@@ -68,3 +68,5 @@ RESEARCH*.md
 # Go modules (don't ignore go.mod and go.sum)
 !go.mod
 !go.sum
+/goffi-audit
+/def_probe

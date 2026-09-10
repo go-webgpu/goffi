@@ -3,7 +3,7 @@ name: CI
 # Testing Strategy:
 # - Tests run on Linux and Windows (AMD64 only - macOS planned for v0.5.0)
 # - goffi uses platform-specific assembly (System V vs Win64 ABI)
-# - Go 1.25+ required (matches go.mod requirement)
+# - Go 1.26+ required (matches go.mod requirement)
 # - Race detector critical for low-level FFI code
 #
 # Branch Strategy (Git Flow):
@@ -41,7 +41,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: '1.26.x'
           cache: true
 
       - name: Download dependencies
@@ -69,7 +69,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: '1.26.x'
           cache: true
 
       - name: Check formatting
@@ -97,7 +97,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: '1.26.x'
           cache: true
 
       - name: Cross-compile all platforms
@@ -168,6 +168,52 @@ jobs:
   # Keep both supported Go patch lines: runtime/cgo startup and TLS details
   # are part of this platform contract, so a single floating toolchain is not
   # sufficient evidence.
+  # Static builds - the goffi_static tag must strip every
+  # //go:cgo_import_dynamic directive, otherwise the linker keeps emitting an
+  # ELF interpreter and the artifact will not run on Alpine or scratch.
+  # See docs/STATIC_BUILDS.md and unxed/f4#693.
+  static-build:
+    name: Static Build (goffi_static)
+    runs-on: ubuntu-latest
+    needs: [lint, formatting]
+    env:
+      CGO_ENABLED: 0
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.x'
+          cache: true
+
+      - name: Check static build mode
+        run: scripts/check-static.sh
+
+  # musl builds - the goffi_musl tag must swap the glibc SONAMEs and the
+  # ELF interpreter for their musl equivalents, otherwise the binary cannot
+  # start on Alpine. Link-time checks run for amd64 and arm64; the runtime
+  # probe executes inside a real Alpine userland. See docs/MUSL.md.
+  musl-build:
+    name: musl Build (goffi_musl)
+    runs-on: ubuntu-latest
+    needs: [lint, formatting]
+    env:
+      CGO_ENABLED: 0
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.x'
+          cache: true
+
+      - name: Check musl build mode
+        run: scripts/check-musl.sh
+
   android-cross:
     name: Android arm64 (Go ${{ matrix.go }})
     runs-on: ubuntu-latest
@@ -175,7 +221,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ['1.25.12', '1.26.5']
+        go: ['1.25.12', '1.26.5', '1.26.x']
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -229,7 +275,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: '1.26.x'
           cache: true
           cache-dependency-path: go.sum
 
@@ -298,7 +344,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: '1.26.x'
           cache: true
 
       - name: Download dependencies
@@ -340,7 +386,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: '1.26.x'
 
       - name: Download coverage reports
         uses: actions/download-artifact@v4
@@ -408,7 +454,7 @@ jobs:
           echo "✅ Lint: PASSED"
           echo "✅ Formatting: PASSED"
           echo "✅ Cross-Compile: PASSED (8 desktop targets)"
-          echo "✅ Android arm64: PASSED (API 29+, Go 1.25/1.26, cgo=0/1)"
+          echo "✅ Android arm64: PASSED (API 29+, Go 1.26, cgo=0/1)"
           echo "✅ Tests: PASSED (CGO_ENABLED=0 and CGO_ENABLED=1)"
           echo "   - Linux AMD64 (ubuntu-latest)"
           echo "   - Windows AMD64 (windows-latest)"

@@ -11,3 +11,13 @@ under the Apache License, Version 2.0. Original copyright:
 
 The Apache-2.0 licensed files retain their original SPDX headers
 with dual copyright attribution.
+
+--------------------------------------------------------------------------------
+Profile U (universal glibc/musl) build
+--------------------------------------------------------------------------------
+goffi's universal build ports the "Profile U" concept from
+unxed/static-everywhere (https://github.com/unxed/static-everywhere): a single
+CGO-free binary with no PT_INTERP and no DT_NEEDED that reaches the host libc
+through the host's own dynamic loader. The full in-process foreign-libc loader
+pg83/solo (https://github.com/pg83/solo) is referenced but not vendored. See
+docs/PROFILE_U.md.

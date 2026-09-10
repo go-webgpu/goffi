@@ -404,6 +404,47 @@ if err != nil {
 
 ---
 
+## Static Builds
+
+Binaries that import goffi are dynamically linked by default: the
+`//go:cgo_import_dynamic` directives behind `dlopen`/`dlsym` make the Go linker
+emit an ELF interpreter and `DT_NEEDED` entries even under `CGO_ENABLED=0`, and
+`-extldflags '-static'` cannot change that because no external linker runs.
+
+Build with `-tags goffi_static` to drop those directives:
+
+```bash
+CGO_ENABLED=0 go build -tags goffi_static ./...
+```
+
+The result is a genuinely static binary that runs on Alpine and in `scratch`
+containers. The trade is unavoidable — `dlopen` is a service of the dynamic
+loader, which a static executable does not have — so in that mode `LoadLibrary`,
+`GetSymbol` and `CallFunction` return an error wrapping `ffi.ErrStaticBuild`.
+
+The API is identical in both modes, so one source tree can produce both
+artifacts. Branch on `ffi.Available()`, a compile-time constant, to keep the
+pure-Go path and let the linker drop the rest:
+
+```go
+if ffi.Available() {
+    backend = newAcceleratedBackend()
+} else {
+    backend = newPureGoBackend()
+}
+```
+
+The tag is a no-op on Windows and Android, which are dynamically linked by
+construction; `Available()` stays `true` there, so a cross-platform build matrix
+can pass the tag everywhere. See [docs/STATIC_BUILDS.md](docs/STATIC_BUILDS.md).
+
+For Alpine and other musl-based distros there is a third flavor: the default
+build hardcodes glibc SONAMEs and the glibc loader path, so it cannot start
+under musl at all. Build with `-tags goffi_musl` (plus one `-gcflags` line) to
+target musl with **full FFI** — see [docs/MUSL.md](docs/MUSL.md).
+
+---
+
 ## Platform Support
 
 | Platform | Arch | ABI | Since | CI |
@@ -511,3 +552,9 @@ MIT — see [LICENSE](LICENSE).
 ---
 
 *goffi v0.4.1 | [GitHub](https://github.com/go-webgpu/goffi) | [pkg.go.dev](https://pkg.go.dev/github.com/go-webgpu/goffi) | [Dev.to](https://dev.to/kolkov/goffi-zero-cgo-foreign-function-interface-for-go-how-we-call-c-libraries-without-a-c-compiler-ca5)*
+
+## Universal build (glibc + musl)
+
+One CGO-free binary can do FFI on both glibc and musl systems — see
+[docs/PROFILE_U.md](docs/PROFILE_U.md). Attribution for the Profile U concept
+(unxed/static-everywhere, pg83/solo) is in [NOTICE](NOTICE).

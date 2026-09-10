@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Andrey Kolkov and GoGPU Contributors
 
-//go:build cgo && (linux || darwin || freebsd)
+//go:build cgo && (linux || darwin || freebsd) && !goffi_static
 
 package syscall
 

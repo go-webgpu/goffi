@@ -1,4 +1,4 @@
-//go:build (linux || darwin) && amd64
+//go:build (linux || darwin) && amd64 && !goffi_static
 
 #include "textflag.h"
 #include "go_asm.h"

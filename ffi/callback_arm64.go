@@ -1,4 +1,4 @@
-//go:build ((linux && !android) || darwin || freebsd) && arm64
+//go:build ((linux && !android) || darwin || freebsd) && arm64 && !goffi_static
 
 // Package ffi provides callback support for Foreign Function Interface (ARM64 Unix version).
 // This file implements Go function registration as C callbacks using
@@ -185,13 +185,11 @@ func callbackWrap(a *callbackArgs) {
 		case reflect.Ptr:
 			if intIdx < numIntRegs {
 				pos := numFloatRegs + intIdx
-				//nolint:govet,gosec // G103: FFI callback argument
-				ptr := unsafe.Pointer(frame[pos])
+				ptr := pointerFromNative(frame[pos])
 				val = reflect.NewAt(argType.Elem(), ptr)
 				intIdx++
 			} else {
-				//nolint:govet,gosec // G103: FFI callback argument
-				ptr := unsafe.Pointer(frame[stackIdx])
+				ptr := pointerFromNative(frame[stackIdx])
 				val = reflect.NewAt(argType.Elem(), ptr)
 				stackIdx++
 			}
@@ -199,12 +197,10 @@ func callbackWrap(a *callbackArgs) {
 		case reflect.UnsafePointer:
 			if intIdx < numIntRegs {
 				pos := numFloatRegs + intIdx
-				//nolint:govet,gosec // G103: FFI callback argument
-				val = reflect.ValueOf(unsafe.Pointer(frame[pos]))
+				val = reflect.ValueOf(pointerFromNative(frame[pos]))
 				intIdx++
 			} else {
-				//nolint:govet,gosec // G103: FFI callback argument
-				val = reflect.ValueOf(unsafe.Pointer(frame[stackIdx]))
+				val = reflect.ValueOf(pointerFromNative(frame[stackIdx]))
 				stackIdx++
 			}
 

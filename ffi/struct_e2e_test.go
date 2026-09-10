@@ -6,6 +6,7 @@
 package ffi
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,6 +20,15 @@ import (
 var structTestLib unsafe.Pointer
 
 func TestMain(m *testing.M) {
+	if !Available() {
+		// Built with -tags goffi_static: LoadLibrary, GetSymbol and
+		// CallFunction are stubs, so every behavioural test in this package
+		// would fail for the same uninteresting reason. That mode is covered
+		// from the outside by TestStaticBuildProducesStaticBinary.
+		fmt.Println("ffi: skipping tests, binary was built with -tags goffi_static")
+		os.Exit(0)
+	}
+
 	// Android test binaries run on-device, where invoking a host compiler is
 	// neither meaningful nor available. Keep the pure validation tests active
 	// and let only the host-built shared-library cases skip via requireStructLib.
