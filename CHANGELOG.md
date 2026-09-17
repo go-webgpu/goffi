@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`LoadLibrary` / `GetSymbol`: names containing a NUL byte.** On Windows `GetSymbol` panicked (deprecated `syscall.StringBytePtr`); on Linux, macOS, FreeBSD and Android the name was cut at the NUL, so a different library or symbol could be loaded. Both functions now return a `*LibraryError` wrapping `syscall.EINVAL` on every OS.
 - Windows ARM64: `go test ./internal/arch/arm64` failed with `[setup failed]` because a test file imported `internal/fakecgo`, which has no Windows files.
 - `internal/fakecgo`: smaller cleanups from purego — `crosscall2` on arm64 no longer calls `runtime·load_g` ([purego#456](https://github.com/ebitengine/purego/pull/456)), `x_cgo_init` keeps `pthread_attr_t` on the stack ([purego#432](https://github.com/ebitengine/purego/pull/432)), `pthread_attr_t` has the 8-byte alignment of the C type, and the Darwin mutex/cond types use `structs.HostLayout` ([purego#502](https://github.com/ebitengine/purego/pull/502)).
+- **FreeBSD amd64: callbacks pointed into a data page** — `ffi/callback_amd64.s` carried `(linux || darwin) && amd64` while `ffi/callback.go` carried `(linux || darwin || freebsd) && amd64`, so on freebsd/amd64 the assembly trampoline table was never built and the `//go:linkname` placeholder variable became `ffi.callbackTrampoline`. The build succeeded, but `NewCallback` returned addresses in the data segment (`go tool nm`: `D`, not `T`). The assembly now builds on FreeBSD too.
+- CI: `scripts/check-callback-trampolines.sh` links a consumer for every asm-trampoline target (linux, darwin, freebsd × amd64, arm64) and fails unless `ffi.callbackTrampoline` is a text symbol.
 
 ## [0.6.4] - 2026-09-10
 

@@ -238,6 +238,13 @@ jobs:
             echo "✅ netbsd/$arch fakecgo layouts"
           done
 
+      # Targets whose NewCallback uses goffi's own assembly trampolines must
+      # link ffi.callbackTrampoline as code. A .s file with a narrower build
+      # constraint than its .go file still compiles and links, so only the
+      # symbol type of a linked binary shows the breakage.
+      - name: Check callback trampolines link as code
+        run: scripts/check-callback-trampolines.sh
+
   # Android arm64/API 29+ source, ABI, cgo-mode, and ELF regression checks.
   # Keep both supported Go patch lines: runtime/cgo startup and TLS details
   # are part of this platform contract, so a single floating toolchain is not
