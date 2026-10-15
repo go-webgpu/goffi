@@ -4,8 +4,9 @@ run:
   timeout: 10m
   concurrency: 4
   modules-download-mode: readonly
-  build-tags:
-    - linux  #
+  # No build-tags: GOOS-named tags add files instead of switching the target
+  # (with "linux", *_linux.go joined the host OS files and typecheck failed
+  # off Linux). Lint other targets with GOOS/GOARCH, see the CI lint matrix.
 
 linters:
   disable:
@@ -79,6 +80,14 @@ linters:
       - path: ffi/callback(_arm64)?\.go
         linters:
           - unused        # callbackWrap_call referenced from assembly
+      # Android: NewCallback always panics (callbacks are unsupported in the
+      # preview, ffi/callback_android_arm64.go), so staticcheck treats the code
+      # after it in the callback-struct tests as unreachable. Those tests skip
+      # on arm64 before reaching it.
+      - path: ffi/struct_e2e_test\.go
+        text: "SA4006"
+        linters:
+          - staticcheck
 
 issues:
   max-issues-per-linter: 100

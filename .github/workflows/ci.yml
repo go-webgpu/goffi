@@ -1,23 +1,19 @@
 name: CI
 
-# Testing Strategy:
-# - Tests run on Linux and Windows (AMD64 only - macOS planned for v0.5.0)
-# - goffi uses platform-specific assembly (System V vs Win64 ABI)
+# Testing strategy:
+# - Tests run natively on Linux (amd64, arm64), Windows (amd64) and macOS
+#   (arm64), each with CGO_ENABLED=0 (fakecgo) and CGO_ENABLED=1
+# - Other targets are cross-compiled and linted via GOOS/GOARCH (Android in
+#   its informational android-cross job)
 # - Go 1.25+ required (matches go.mod requirement)
-# - Race detector critical for low-level FFI code
 #
-# Branch Strategy (Git Flow):
-# - feature/** branches: Development work
-# - release/** branches: Pre-release testing (test here BEFORE merging to main)
-# - develop branch: Integration branch
-# - main branch: Production-ready code only (protected)
-# - Pull requests: Must pass all tests before merge
+# Branch strategy (GitHub Flow): short-lived branches, pull requests into
+# main; main is protected and must pass "CI Success".
 
 on:
   push:
     branches:
       - main
-      - develop
       - 'experiment/**'  # goffi uses experiment/** for prototypes
       - 'feature/**'
       - 'release/**'
@@ -25,7 +21,6 @@ on:
   pull_request:
     branches:
       - main
-      - develop
 
 jobs:
   # Linting - Fast fail on code quality issues
@@ -52,6 +47,49 @@ jobs:
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+          args: --config=.golangci.yml --timeout=5m
+
+  # Lint every other supported target. goffi is pure Go, so with
+  # CGO_ENABLED=0 GOOS/GOARCH select exactly the files a build for that
+  # target compiles; linux/amd64 with CGO_ENABLED=1 covers the cgo-only
+  # files. A typecheck error makes golangci-lint exit non-zero, so a target
+  # that does not compile cannot pass as "0 issues". Android is linted in the
+  # informational android-cross job.
+  lint-targets:
+    name: Lint - ${{ matrix.goos }}/${{ matrix.goarch }} (cgo=${{ matrix.cgo }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: linux, goarch: amd64, cgo: '1' }
+          - { goos: linux, goarch: arm64, cgo: '0' }
+          - { goos: darwin, goarch: amd64, cgo: '0' }
+          - { goos: darwin, goarch: arm64, cgo: '0' }
+          - { goos: windows, goarch: amd64, cgo: '0' }
+          - { goos: windows, goarch: arm64, cgo: '0' }
+          - { goos: freebsd, goarch: amd64, cgo: '0' }
+          - { goos: freebsd, goarch: arm64, cgo: '0' }
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: ${{ matrix.cgo }}
+          # FreeBSD needs fakecgo compiled as std for //go:cgo_export_dynamic.
+          GOFLAGS: ${{ matrix.goos == 'freebsd' && '-gcflags=github.com/go-webgpu/goffi/internal/fakecgo=-std' || '' }}
         with:
           version: latest
           args: --config=.golangci.yml --timeout=5m
@@ -213,6 +251,17 @@ jobs:
 
       - name: Check Android arm64
         run: scripts/check-android-arm64.sh
+
+      - name: Lint android/arm64
+        if: matrix.go == '1.26.5'
+        uses: golangci/golangci-lint-action@v8
+        env:
+          GOOS: android
+          GOARCH: arm64
+          CGO_ENABLED: '0'
+        with:
+          version: latest
+          args: --config=.golangci.yml --timeout=5m
 
   # Unit tests - Platform-specific (Linux + Windows + macOS AMD64)
   # Tested under both CGO_ENABLED=0 (fakecgo path) and CGO_ENABLED=1 (real
@@ -483,18 +532,19 @@ jobs:
     name: CI Success
     # android-cross is deliberately absent: Android is a preview platform
     # (see the note above the android-cross job).
-    needs: [lint, formatting, cross-compile, test, benchmarks, quality-gate, elf-linking]
+    needs: [lint, lint-targets, formatting, cross-compile, test, benchmarks, quality-gate, elf-linking]
     runs-on: ubuntu-latest
     if: success()
     steps:
       - name: Success
         run: |
           echo "✅ All CI checks passed!"
-          echo "✅ Lint: PASSED"
+          echo "✅ Lint: PASSED (linux/amd64 + every other target via lint-targets)"
           echo "✅ Formatting: PASSED"
           echo "✅ Cross-Compile: PASSED (8 desktop targets)"
           echo "✅ Tests: PASSED (CGO_ENABLED=0 and CGO_ENABLED=1)"
           echo "   - Linux AMD64 (ubuntu-latest)"
+          echo "   - Linux ARM64 (ubuntu-24.04-arm)"
           echo "   - Windows AMD64 (windows-latest)"
           echo "   - macOS ARM64 (macos-latest)"
           echo "✅ ELF Linking: PASSED (default dynamic + goffi_static)"
