@@ -186,8 +186,15 @@ jobs:
           go-version: ${{ matrix.go }}
           cache: true
 
+      # setup-android installs `tools platform-tools` by default. Google's SDK
+      # repository no longer lists the obsolete `tools` package, so
+      # `sdkmanager tools` exits 1 and fails the step
+      # (android-actions/setup-android#537). Nothing here uses `tools`; request
+      # only platform-tools. The NDK is installed explicitly below.
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Install Android NDK r29
         shell: bash
