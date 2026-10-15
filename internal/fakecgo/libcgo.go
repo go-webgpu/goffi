@@ -14,8 +14,12 @@ type (
 	// Darwin (32 bytes) - https://github.com/apple/darwin-xnu/blob/2ff845c2e033bd0ff64b5b6aa6063a1f8f65aa32/bsd/sys/_types.h#L74
 	// FreeBSD (32 bytes) - https://github.com/DoctorWkt/xv6-freebsd/blob/d2a294c2a984baed27676068b15ed9a29b06ab6f/include/signal.h#L98C9-L98C21
 	// Linux (128 bytes) - https://github.com/torvalds/linux/blob/ab75170520d4964f3acf8bb1f91d34cbc650688e/arch/x86/include/asm/signal.h#L25
-	sigset_t       [128]byte
-	pthread_attr_t [64]byte
+	sigset_t [128]byte
+	// pthread_attr_t is opaque: 64 bytes covers every target (glibc 56 on amd64,
+	// 64 on arm64; Darwin 64; FreeBSD and NetBSD are smaller). Use uint64
+	// elements so it gets the 8-byte alignment of the C type when it lives on
+	// the Go stack.
+	pthread_attr_t [8]uint64
 	pthread_t      int
 	pthread_key_t  uint64
 )

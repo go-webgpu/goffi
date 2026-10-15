@@ -4012,7 +4012,7 @@ TEXT ·callbackTrampoline(SB), NOSPLIT|NOFRAME, $0
 	B ·callbackDispatcher(SB)
 
 // callbackDispatcher handles the actual callback invocation on ARM64
-// via crosscall2 → runtime·load_g → runtime·cgocallback.
+// via crosscall2 → runtime·cgocallback.
 // This supports callbacks from both Go-managed threads and C-library-created
 // threads (e.g. Metal's addCompletedHandler: dispatching on internal C threads).
 //

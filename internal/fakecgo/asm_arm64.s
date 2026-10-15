@@ -26,8 +26,8 @@ TEXT crosscall2(SB), NOSPLIT|NOFRAME, $0
 	SAVE_F8_TO_F15(8*14)
 	STP (R29, R30), (8*22)(RSP)
 
-	// Initialize Go ABI environment
-	BL runtime·load_g(SB)
+	// runtime·cgocallback loads g itself (and takes it from frame when fn
+	// is nil), so no runtime·load_g call is needed here.
 	BL runtime·cgocallback(SB)
 
 	RESTORE_R19_TO_R28(8*4)
