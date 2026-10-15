@@ -225,7 +225,16 @@ func TestCallback_MixedArgs(t *testing.T) {
 
 // Test callback with pointer argument.
 func TestCallback_PointerArg(t *testing.T) {
-	original := 42
+	// The frame below plays the C caller and holds raw words. A Go pointer
+	// stored there must be pinned, as for any Go pointer handed to C: as a
+	// plain uintptr it is invisible to escape analysis, the target would stay
+	// on the goroutine stack, and a stack copy before the dispatch would leave
+	// the callback writing to the old stack.
+	original := new(int)
+	*original = 42
+	var pinner runtime.Pinner
+	pinner.Pin(original)
+	defer pinner.Unpin()
 	modified := false
 
 	callback := func(ptr *int) {
@@ -239,7 +248,7 @@ func TestCallback_PointerArg(t *testing.T) {
 	idx := callbackIndex(cbPtr)
 
 	var frame [128]uintptr
-	frame[callbackIntRegIndex(0)] = uintptr(unsafe.Pointer(&original)) // first int arg
+	frame[callbackIntRegIndex(0)] = uintptr(unsafe.Pointer(original)) // first int arg
 
 	args := &callbackArgs{
 		index: idx,
@@ -252,8 +261,8 @@ func TestCallback_PointerArg(t *testing.T) {
 		t.Error("Callback was not called or did not modify value")
 	}
 
-	if original != 100 {
-		t.Errorf("Expected original value to be 100, got %d", original)
+	if *original != 100 {
+		t.Errorf("Expected original value to be 100, got %d", *original)
 	}
 }
 

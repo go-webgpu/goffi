@@ -27,7 +27,11 @@ func captureCall(t *testing.T, argTypes []*types.TypeDescriptor, args []unsafe.P
 	var out abiCapture
 
 	argTypes = append([]*types.TypeDescriptor{types.PointerTypeDescriptor}, argTypes...)
-	outPtr := uintptr(unsafe.Pointer(&out))
+	// Keep the argument an unsafe.Pointer, never a uintptr (see the Safety
+	// notes of ffi.CallFunction): a uintptr hides &out from escape analysis,
+	// out then stays on the goroutine stack, and a stack copy before the call
+	// makes the shim write to the old stack.
+	outPtr := unsafe.Pointer(&out)
 	args = append([]unsafe.Pointer{unsafe.Pointer(&outPtr)}, args...)
 
 	cif := &types.CallInterface{
