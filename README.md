@@ -79,7 +79,7 @@ CGO_ENABLED=1 go build ./...
 | Mode | How | ELF shape | `LoadLibrary` | Typical use |
 |------|-----|-----------|---------------|-------------|
 | **Dynamic FFI** (default) | `CGO_ENABLED=0 go build` | dynamic + `libdl`/`libc` | yes | desktop GPU/GUI |
-| **Musl dynamic** | build on Alpine / `CC=musl-gcc` | dynamic vs musl | yes | Alpine containers with GPU/GUI |
+| **Musl dynamic** | `CGO_ENABLED=0 go build -tags goffi_musl -gcflags=github.com/go-webgpu/goffi/internal/dl=-std` | dynamic vs musl (`/lib/ld-musl-<arch>.so.1`, `libc.musl-<arch>.so.1`) | yes | Alpine containers with GPU/GUI |
 | **Static no-FFI** | `CGO_ENABLED=0 go build -tags goffi_static` | fully static (no `PT_INTERP`, no `NEEDED`) | no (`errors.Is(err, ffi.ErrStaticBuild)`) | `FROM scratch`, air-gapped CLI |
 
 ```bash
@@ -91,6 +91,8 @@ scripts/check-elf-linking.sh --static ./app
 ```
 
 Under `-tags goffi_static`, errno capture is unavailable (always returns 0): `ErrnoFnAddr()` is a no-op so the assembly trampoline skips `__errno_location` / `__error`, which need dynamic libc.
+
+A default binary does not start on Alpine: its `PT_INTERP` and `DT_NEEDED` name the glibc loader and SONAMEs. `-tags goffi_musl` (linux/amd64 and linux/arm64) names the musl ones instead; FFI stays fully available. See [docs/MUSL.md](docs/MUSL.md).
 
 `FROM scratch` + Vulkan/Wayland/libX11 via host `dlopen` is not possible without either `ld.so` or a userspace ELF loader (see [docs/ADR-001-userspace-elf-loader.md](docs/ADR-001-userspace-elf-loader.md)). Windows is unaffected (`LoadLibraryW` via ntdll).
 
@@ -403,7 +405,7 @@ if err != nil {
 ## Known Limitations
 
 **Linux: default builds are dynamically linked** ([#74](https://github.com/go-webgpu/goffi/issues/74))
-- Importing goffi records `libdl`/`libc` via `cgo_import_dynamic` even with `CGO_ENABLED=0`. Use `-tags goffi_static` for a fully static ELF (no runtime `.so` loading), or build against musl for Alpine. See [Linking modes](#linking-modes-linux).
+- Importing goffi records `libdl`/`libc` via `cgo_import_dynamic` even with `CGO_ENABLED=0`. Use `-tags goffi_static` for a fully static ELF (no runtime `.so` loading), or `-tags goffi_musl` for Alpine. See [Linking modes](#linking-modes-linux).
 
 **Windows: C++ exceptions may crash the program** ([#12516](https://github.com/golang/go/issues/12516))
 - Go runtime limitation, not goffi-specific. Go 1.22+ added partial SEH support ([#58542](https://github.com/golang/go/issues/58542)), but edge cases remain.

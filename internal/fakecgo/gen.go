@@ -263,7 +263,7 @@ func run() error {
 		case "linux":
 			// The go command also satisfies the linux build tag on Android,
 			// including for _linux.go files. Keep glibc imports out of Bionic.
-			goosTemplate = template.Must(template.New("symbols_linux.go").Parse(strings.Replace(templateSymbolsGoos, "//go:build !cgo && !goffi_static", "//go:build !cgo && !android && !goffi_static", 1)))
+			goosTemplate = template.Must(template.New("symbols_linux.go").Parse(strings.Replace(templateSymbolsGoos, "//go:build !cgo && !goffi_static", "//go:build !cgo && !android && !goffi_static && !goffi_musl", 1)))
 		case "android":
 			// Android uses a distinct build selector and symbol set. Keep the
 			// generated generic Linux imports out of the Android ELF.
@@ -283,6 +283,46 @@ func run() error {
 		}
 		if err = os.WriteFile(name, src, 0o644); err != nil {
 			return err
+		}
+	}
+
+	// musl (Alpine and friends): the whole POSIX surface lives in one
+	// arch-named libc.so, so both symbol groups point at the same object,
+	// and the object name embeds the musl architecture, so the file is
+	// generated per GOARCH. One symbol is dropped: musl's dynamic linker
+	// binds every import immediately at load time and aborts startup on an
+	// unresolved one, unlike glibc's lazy PLT which forgives stubs nobody
+	// calls -- and pthread_get_stacksize_np is a Darwin-only API that
+	// neither glibc nor musl exports. Its trampoline is only reachable from
+	// the Darwin threadentry, so on Linux the linker dead-code-eliminates
+	// it and the missing import is never referenced.
+	muslPthread := make([]Symbol, 0, len(pthreadSymbols))
+	for _, s := range pthreadSymbols {
+		if s.Name == "pthread_get_stacksize_np" {
+			continue
+		}
+		muslPthread = append(muslPthread, s)
+	}
+	for _, mc := range []struct{ arch, so string }{
+		{"amd64", "libc.musl-x86_64.so.1"},
+		{"arm64", "libc.musl-aarch64.so.1"},
+	} {
+		tag := "//go:build !cgo && !android && !goffi_static && goffi_musl && " + mc.arch
+		mt := template.Must(template.New("symbols_musl.go").Parse(
+			strings.Replace(templateSymbolsGoos, "//go:build !cgo && !goffi_static", tag, 1)))
+		mb := &bytes.Buffer{}
+		if merr := mt.Execute(mb, []LocatedSymbols{
+			{SharedObject: mc.so, Symbols: libcSymbols},
+			{SharedObject: mc.so, Symbols: muslPthread},
+		}); merr != nil {
+			return merr
+		}
+		msrc, merr := format.Source(mb.Bytes())
+		if merr != nil {
+			return merr
+		}
+		if merr := os.WriteFile(fmt.Sprintf("symbols_musl_%s.go", mc.arch), msrc, 0o644); merr != nil {
+			return merr
 		}
 	}
 

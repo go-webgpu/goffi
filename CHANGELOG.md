@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`-tags goffi_musl`** — CGO-free binaries for Alpine and other musl systems (linux/amd64, linux/arm64): the dynamic imports name `libc.musl-<arch>.so.1` and `PT_INTERP` is `/lib/ld-musl-<arch>.so.1`. FFI stays fully available. Needs `-gcflags=github.com/go-webgpu/goffi/internal/dl=-std`. See `docs/MUSL.md`.
+
 ## [0.6.4] - 2026-09-10
 
 ### Added
