@@ -271,7 +271,7 @@ func isHomogeneousFloatAggregate(t *types.TypeDescriptor) (bool, int, types.Type
 	const invalidKind types.TypeKind = -1
 
 	var (
-		elementKind types.TypeKind = invalidKind
+		elementKind = invalidKind
 		totalCount  int
 	)
 

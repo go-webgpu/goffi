@@ -58,7 +58,7 @@ func NewCallback(fn any) uintptr {
 		argType := typ.In(i)
 		switch argType.Kind() {
 		case reflect.Int, reflect.Int64, reflect.Uint, reflect.Uint64,
-			reflect.Uintptr, reflect.Ptr, reflect.UnsafePointer:
+			reflect.Uintptr, reflect.Pointer, reflect.UnsafePointer:
 			// Supported uintptr-sized types (8 bytes on amd64)
 		case reflect.Float32, reflect.Float64:
 			panic("ffi: float arguments not supported in Windows callbacks (use uintptr and math.Float64bits)")
@@ -79,7 +79,7 @@ func NewCallback(fn any) uintptr {
 		retType := typ.Out(0)
 		switch retType.Kind() {
 		case reflect.Int, reflect.Int64, reflect.Uint, reflect.Uint64,
-			reflect.Uintptr, reflect.Ptr, reflect.UnsafePointer:
+			reflect.Uintptr, reflect.Pointer, reflect.UnsafePointer:
 			// Supported uintptr-sized return types (8 bytes on amd64)
 		case reflect.Float32, reflect.Float64:
 			panic("ffi: float return type not supported in Windows callbacks")
