@@ -60,6 +60,10 @@
 // all inputs and provides type-safe wrappers. Users should ensure:
 //   - Argument types match the C function signature exactly
 //   - Pointers remain valid during the call (use runtime.KeepAlive if needed)
+//   - Pointer arguments are held in unsafe.Pointer variables, never uintptr
+//     (a uintptr hides a stack variable from escape analysis; see CallFunctionContext)
+//   - Go pointers stored in memory that C reads (structs, callback frames) are
+//     pinned with runtime.Pinner
 //   - Return value buffer is large enough for the result
 //
 // # Thread Safety
@@ -269,6 +273,9 @@ func PrepareVariadicCallInterface(
 //
 // Safety:
 //   - All argument pointers must remain valid during the call
+//   - Hold pointer arguments in unsafe.Pointer variables, never uintptr: a
+//     uintptr hides the target from escape analysis, so a local it points to
+//     can stay on the goroutine stack and move before the C function runs
 //   - Return value buffer must be large enough for the result type
 //   - Use runtime.KeepAlive() if needed to prevent premature GC of arguments
 func CallFunctionContext(

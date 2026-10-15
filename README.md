@@ -138,9 +138,10 @@ func main() {
 		panic(err)
 	}
 
-	// Call strlen — avalue elements are pointers TO argument values
+	// Call strlen — avalue elements are pointers TO argument values.
+	// Keep pointer arguments in unsafe.Pointer variables, never uintptr.
 	testStr := "Hello, goffi!\x00"
-	strPtr := uintptr(unsafe.Pointer(unsafe.StringData(testStr)))
+	strPtr := unsafe.Pointer(unsafe.StringData(testStr))
 	var length uint64
 
 	_, err = ffi.CallFunction(cif, strlen, unsafe.Pointer(&length), []unsafe.Pointer{unsafe.Pointer(&strPtr)})
