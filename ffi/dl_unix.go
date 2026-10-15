@@ -51,6 +51,9 @@ const (
 //
 // Note: Always pair LoadLibrary with FreeLibrary to prevent resource leaks.
 func LoadLibrary(name string) (unsafe.Pointer, error) {
+	if err := checkCName("load", name); err != nil {
+		return nil, err
+	}
 	handle, err := dl.Dlopen(name, RTLD_NOW|RTLD_GLOBAL)
 	if err != nil {
 		return nil, &LibraryError{
@@ -86,6 +89,9 @@ func LoadLibrary(name string) (unsafe.Pointer, error) {
 //
 // Note: The returned pointer is only valid while the library remains loaded.
 func GetSymbol(handle unsafe.Pointer, name string) (unsafe.Pointer, error) {
+	if err := checkCName("symbol", name); err != nil {
+		return nil, err
+	}
 	fnPtr, err := dl.Dlsym(uintptr(handle), name)
 	if err != nil {
 		return nil, &LibraryError{

@@ -71,8 +71,17 @@ func LoadLibrary(name string) (unsafe.Pointer, error) {
 //	    log.Fatal(err)
 //	}
 func GetSymbol(handle unsafe.Pointer, name string) (unsafe.Pointer, error) {
-	namePtr := unsafe.Pointer(syscall.StringBytePtr(name))
-	proc, _, err := procGetProcAddress.Call(uintptr(handle), uintptr(namePtr))
+	// GetProcAddress takes an ANSI name. BytePtrFromString returns EINVAL
+	// for a name containing NUL; the deprecated StringBytePtr panicked.
+	namePtr, err := syscall.BytePtrFromString(name)
+	if err != nil {
+		return nil, &LibraryError{
+			Operation: "symbol",
+			Name:      name,
+			Err:       err,
+		}
+	}
+	proc, _, err := procGetProcAddress.Call(uintptr(handle), uintptr(unsafe.Pointer(namePtr)))
 	if proc == 0 {
 		return nil, &LibraryError{
 			Operation: "symbol",

@@ -17,6 +17,9 @@ import (
 // goffi's function pointers have process lifetime. Android support is
 // arm64/API 29+ only.
 func LoadLibrary(name string) (unsafe.Pointer, error) {
+	if err := checkCName("load", name); err != nil {
+		return nil, err
+	}
 	handle, err := dl.Dlopen(name, dl.RTLD_NOW|dl.RTLD_LOCAL|dl.RTLD_NODELETE)
 	if err != nil {
 		return nil, &LibraryError{Operation: "load", Name: name, Err: err}
@@ -28,6 +31,9 @@ func LoadLibrary(name string) (unsafe.Pointer, error) {
 
 // GetSymbol retrieves a function or data pointer from an Android library.
 func GetSymbol(handle unsafe.Pointer, name string) (unsafe.Pointer, error) {
+	if err := checkCName("symbol", name); err != nil {
+		return nil, err
+	}
 	fnPtr, err := dl.Dlsym(uintptr(handle), name)
 	if err != nil {
 		return nil, &LibraryError{Operation: "symbol", Name: name, Err: err}
