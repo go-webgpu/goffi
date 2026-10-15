@@ -2,6 +2,8 @@ package ffi
 
 import (
 	"fmt"
+
+	"github.com/go-webgpu/goffi/internal/hostlibc"
 )
 
 // InvalidCallInterfaceError indicates CallInterface preparation failed due to
@@ -151,6 +153,16 @@ func (e *TypeValidationError) Is(target error) bool {
 	_, ok := target.(*TypeValidationError)
 	return ok
 }
+
+// ErrNoHostLibc is returned, usually wrapped in a *LibraryError, by every
+// operation that needs libc when a universal ("Profile U") binary is running
+// on a system with no dynamic loader goffi recognises, so startup could not
+// bind one: LoadLibrary, GetSymbol and CallFunction.
+//
+// Unlike ErrStaticBuild this is not a property of the build -- the same binary
+// has full FFI on any host with a glibc or musl loader. Check Available at
+// startup, or errors.Is(err, ffi.ErrNoHostLibc) at the call site.
+var ErrNoHostLibc = hostlibc.ErrMissing
 
 // Deprecated: Legacy sentinel errors kept for backwards compatibility.
 // Use typed errors above with errors.As() for better error handling.

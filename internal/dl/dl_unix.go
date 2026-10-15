@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"structs"
 	"unsafe"
+
+	"github.com/go-webgpu/goffi/internal/hostlibc"
 )
 
 // RTLD constants are platform-specific - see dl_linux.go and dl_darwin.go
@@ -79,6 +81,13 @@ var dlerror_wrapperABI0 uintptr
 
 // Dlopen loads a shared library
 func Dlopen(path string, mode int) (uintptr, error) {
+	// A universal binary that could not reach a host loader has no libc, so
+	// the dlopen import below is unbound and calling it faults. See
+	// internal/hostlibc.
+	if hostlibc.Missing {
+		return 0, hostlibc.ErrMissing
+	}
+
 	// Convert Go string to C string
 	pathBytes := append([]byte(path), 0)
 
@@ -100,6 +109,10 @@ func Dlopen(path string, mode int) (uintptr, error) {
 
 // Dlsym returns the address of a symbol in a loaded library
 func Dlsym(handle uintptr, name string) (uintptr, error) {
+	if hostlibc.Missing {
+		return 0, hostlibc.ErrMissing
+	}
+
 	// Convert Go string to C string
 	nameBytes := append([]byte(name), 0)
 
@@ -121,6 +134,10 @@ func Dlsym(handle uintptr, name string) (uintptr, error) {
 
 // Dlclose unloads a dynamic library
 func Dlclose(handle uintptr) error {
+	if hostlibc.Missing {
+		return hostlibc.ErrMissing
+	}
+
 	// Not implemented yet
 	return nil
 }

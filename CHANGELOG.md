@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Universal build ("Profile U", `-tags goffi_universal`)** — one `CGO_ENABLED=0` binary for linux/amd64 and linux/arm64 that does FFI on both glibc and musl hosts. Every libc symbol is imported with an empty SONAME and the ELF interpreter is stripped after linking (`scripts/build-universal.sh`, `cmd/goffi-strip-interp`), so the kernel loads the binary directly anywhere; before any libc symbol is touched the process re-execs itself through the host loader with the host libc preloaded. On a host with no loader goffi recognises, or where a preloaded library kills the re-executed process, the binary carries on without FFI. See `docs/PROFILE_U.md`.
+- **`ffi.Available()`** — whether this build and host can do FFI: constant false under `goffi_static`, decided at startup under `goffi_universal`, true otherwise. **`ffi.ErrNoHostLibc`** — returned by `LoadLibrary`/`GetSymbol`/`CallFunction` in a universal binary that could not bind a libc.
+- **`ffi.HostLoader()`, `HostLibC()`, `HostPreload()`, `LibcKind()`** — the host loader table the universal build uses (`internal/loader`).
+- **`ffi.Executable()`, `ffi.Argv0()`** — `os.Executable`/`os.Args[0]` as they were before the universal re-exec replaced them; the same as `os` in every other build.
+- A universal program can start copies of itself with plain `exec.Command(os.Args[0])`: the re-exec guard `GOFFI_UNIVERSAL_REEXEC` is tagged with the pid it was written for, so a child runs the bridge itself.
+- CI: `universal.yml` builds one universal probe and runs the same binary on four glibc images (glibc 2.31 to current) and on Alpine, checks the ELF contract with `cmd/goffi-audit`, runs a respawn probe (`cmd/universal-respawn`) everywhere, and covers the preload-abort fallback.
+- **`-tags goffi_musl`** — CGO-free binaries for Alpine and other musl systems (linux/amd64, linux/arm64): the dynamic imports name `libc.musl-<arch>.so.1` and `PT_INTERP` is `/lib/ld-musl-<arch>.so.1`. FFI stays fully available. Needs `-gcflags=github.com/go-webgpu/goffi/internal/dl=-std`. See `docs/MUSL.md`.
+
 ## [0.6.4] - 2026-09-10
 
 ### Added

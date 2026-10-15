@@ -460,10 +460,37 @@ jobs:
         if: matrix.arch == 'amd64'
         run: go test -tags goffi_static ./ffi -count=1 -run 'StaticBuild'
 
+  # musl builds: -tags goffi_musl must replace the glibc SONAMEs and the ELF
+  # interpreter with their musl equivalents, otherwise the binary cannot start
+  # on Alpine. Link-time checks cover amd64 and arm64; the runtime probe runs
+  # inside a real Alpine userland. See docs/MUSL.md.
+  musl-build:
+    name: musl Build (goffi_musl, Go ${{ matrix.go }})
+    runs-on: ubuntu-latest
+    needs: [lint, formatting]
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ['1.25', '1.26']
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+          cache: true
+
+      - name: Check musl build mode
+        run: scripts/check-musl.sh
+
   # Final status - All checks passed
   ci-success:
     name: CI Success
-    needs: [lint, formatting, cross-compile, android-cross, test, benchmarks, quality-gate, elf-linking]
+    needs: [lint, formatting, cross-compile, android-cross, test, benchmarks, quality-gate, elf-linking, musl-build]
     runs-on: ubuntu-latest
     if: success()
     steps:
@@ -479,6 +506,7 @@ jobs:
           echo "   - Windows AMD64 (windows-latest)"
           echo "   - macOS ARM64 (macos-latest)"
           echo "✅ ELF Linking: PASSED (default dynamic + goffi_static)"
+          echo "✅ musl: PASSED (goffi_musl, Alpine runtime probe)"
           echo "✅ Benchmarks: PASSED"
           echo "✅ Quality Gate: PASSED"
           echo ""

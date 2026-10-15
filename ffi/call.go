@@ -4,6 +4,7 @@ import (
 	"unsafe"
 
 	"github.com/go-webgpu/goffi/internal/arch"
+	"github.com/go-webgpu/goffi/internal/hostlibc"
 	gosyscall "github.com/go-webgpu/goffi/internal/syscall"
 	"github.com/go-webgpu/goffi/types"
 )
@@ -16,6 +17,12 @@ func executeFunction(
 	rvalue unsafe.Pointer,
 	avalue []unsafe.Pointer,
 ) (syscallErrno uintptr, err error) {
+	if hostlibc.Missing {
+		// A universal binary that could not bind a libc at startup: the errno
+		// import and the callee itself are unbound. LoadLibrary and GetSymbol
+		// fail in this mode too, so fn cannot legitimately have come from goffi.
+		return 0, ErrNoHostLibc
+	}
 	if arch.Registry.Caller == nil {
 		return 0, types.ErrUnsupportedArchitecture
 	}

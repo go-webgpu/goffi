@@ -6,7 +6,11 @@
 
 package fakecgo
 
-import "unsafe"
+import (
+	"unsafe"
+
+	"github.com/go-webgpu/goffi/internal/hostlibc"
+)
 
 //go:nosplit
 func _cgo_sys_thread_start(ts *ThreadStart) {
@@ -66,6 +70,42 @@ var setg_func uintptr
 //
 //go:nosplit
 func x_cgo_init(g *G, setg uintptr) {
+	// Portable universal build. Two shims run before we touch any libc
+	// symbol (the malloc below is the first). Both are no-ops in the default
+	// and goffi_musl builds.
+	//
+	// 1. setupUniversalTLS: on the first, kernel-direct launch the thread
+	//    pointer is unset (rt0_go delegates TLS setup to _cgo_init); give it a
+	//    scratch page so the compiler's g-reloads after ABI0 calls don't fault.
+	// 2. maybeReexecUniversal: re-exec through the host loader with libc
+	//    pre-loaded, so the empty-SONAME imports bind. See
+	//    reexec_universal_linux.go.
+	setupUniversalTLS()
+	maybeReexecUniversal()
+	if hostlibc.Missing {
+		// The bridge could not reach a libc, so every symbol this function
+		// would use next -- malloc, the pthread_attr_* trio -- is unbound and
+		// calling one faults. Give the process back to the Go runtime as a
+		// pure-Go program instead of dying here.
+		//
+		// Clearing iscgo is what makes that work. The runtime read _cgo_init
+		// long before this call and took the branch that delegates TLS setup
+		// to us (setupUniversalTLS did it, onto a scratch page), but every
+		// later decision -- creating an M with pthread_create versus clone(2),
+		// keeping g in TLS versus the g register, installing signal handlers
+		// the cgo way -- is made by reading runtime.iscgo at the point of use.
+		// False from here on means the runtime never calls into the libc that
+		// is not there, and threads it starts set up their own TLS.
+		//
+		// g.stacklo keeps the bounds rt0_go computed (SP minus 64 KiB); the
+		// pthread_attr_getstacksize refinement below is exactly what a
+		// CGO_ENABLED=0 binary does without, so nothing is lost.
+		_iscgo = false
+		dropLibcEnvHooks()
+		setg_func = setg
+		return
+	}
+
 	var size size_t
 	var attr *pthread_attr_t
 
