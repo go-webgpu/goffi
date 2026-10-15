@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **NetBSD amd64/arm64** — full FFI tier: `LoadLibrary`, `CallFunction` and `NewCallback`. NetBSD keeps the `dlopen` family in `libc.so` (like FreeBSD), and its errno accessor is `__errno`. Adds `internal/dl/dl_netbsd.go` and `internal/syscall/errno_netbsd.go`; `netbsd` joins the Unix-family build constraints. Reuses the existing System V and AAPCS64 backends unchanged. Requires `-gcflags="github.com/go-webgpu/goffi/internal/fakecgo=-std"`, same as FreeBSD.
+- **`scripts/check-platforms.sh`** — single source of truth for the platform matrix. Builds and links every target purego supports under `CGO_ENABLED=0`, asserts the tier each one claims, and fails if a target listed as `pending` starts building.
+- **`docs/PLATFORMS.md`** — tier definitions, required build flags, purego parity diff, and the per-architecture cost of the pending targets.
+- **ROADMAP: "Architecture Expansion"** — sequenced plan for the six remaining Linux architectures (riscv64, loong64, 386, arm, ppc64le, s390x).
+- **windows/386 documented as a `load` tier** — `LoadLibrary`, `GetSymbol` and `NewCallback` work; `CallFunction` returns `ErrUnsupportedArchitecture`. This already built; it was never stated.
+
+### Fixed
+- **FreeBSD amd64: callbacks pointed into a data page** — `ffi/callback_amd64.s` carried `(linux || darwin) && amd64` while `ffi/callback.go` carried `(linux || darwin || freebsd) && amd64`, so on freebsd/amd64 the assembly trampoline table was never built and the `//go:linkname` placeholder variable became `ffi.callbackTrampoline`. The build succeeded, but `NewCallback` returned addresses in the data segment (`go tool nm`: `D`, not `T`). The assembly now builds on FreeBSD too.
+- CI: `scripts/check-platforms.sh` links a consumer for every asm-trampoline target (linux, darwin, freebsd, netbsd × amd64, arm64) and fails unless `ffi.callbackTrampoline` is a text symbol.
+- **NetBSD fakecgo did not export `environ`/`__progname`/`__ps_strings` dynamically.** `//go:linkname` alone produces a local definition. NetBSD's `libc.so` carries undefined references to all three (crt0 normally defines them) and rtld resolves them against the main object at startup, so the process would have died before `main`. Added `//go:cgo_export_dynamic`, matching `freebsd.go`.
+
+### Changed
+- CI: the hand-rolled `cross-compile` job is replaced by `platform-matrix`, which runs `scripts/check-platforms.sh`.
+- CI: new `purego-coexistence` job builds and runs a `CGO_ENABLED=0 -tags nofakecgo` program that calls libc through both purego and goffi.
+
 ## [0.6.4] - 2026-09-10
 
 ### Added

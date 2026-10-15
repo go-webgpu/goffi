@@ -83,9 +83,18 @@ jobs:
           fi
           echo "All files are properly formatted ✓"
 
-  # Cross-compilation - Verify all 8 supported desktop platforms compile
-  cross-compile:
-    name: Cross-Compile
+  # Platform matrix - every target purego supports under CGO_ENABLED=0.
+  #
+  # scripts/check-platforms.sh owns the table and asserts the tier each target
+  # claims in docs/PLATFORMS.md:
+  #   - "full"/"nocb"/"load" targets must compile AND link a consumer binary;
+  #   - targets whose callbacks come from goffi's own assembly must resolve
+  #     ffi.callbackTrampoline to a TEXT symbol (a .s file with a narrower
+  #     build constraint than its .go file still compiles and links);
+  #   - "pending" targets must still fail, so the published table cannot go
+  #     stale without CI noticing.
+  platform-matrix:
+    name: Platform Matrix
     runs-on: ubuntu-latest
     needs: [lint, formatting]
     env:
@@ -100,69 +109,92 @@ jobs:
           go-version: '1.25'
           cache: true
 
-      - name: Cross-compile all platforms
+      - name: Check platform matrix
+        run: scripts/check-platforms.sh
+
+  # goffi and purego in one CGO_ENABLED=0 program. Both ship a fakecgo, and
+  # two copies cannot link together; -tags nofakecgo drops goffi's so that
+  # purego's runtime/cgo stand-in serves both libraries.
+  purego-coexistence:
+    name: purego coexistence (-tags nofakecgo)
+    runs-on: ubuntu-latest
+    needs: [lint, formatting]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          path: goffi
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache-dependency-path: goffi/go.sum
+
+      - name: Build and run a program importing goffi and purego together
         run: |
-          targets=(
-            "linux/amd64"
-            "linux/arm64"
-            "darwin/amd64"
-            "darwin/arm64"
-            "windows/amd64"
-            "windows/arm64"
+          set -euo pipefail
+          mkdir coexist && cd coexist
+          cat > main.go <<'EOF'
+          package main
+
+          import (
+          	"fmt"
+          	"os"
+          	"unsafe"
+
+          	"github.com/ebitengine/purego"
+          	"github.com/go-webgpu/goffi/ffi"
+          	"github.com/go-webgpu/goffi/types"
           )
-          FAILED=0
-          for target in "${targets[@]}"; do
-            os="${target%%/*}"
-            arch="${target##*/}"
-            echo "Building ${os}/${arch}..."
-            if GOOS=$os GOARCH=$arch go build ./... 2>&1; then
-              echo "  ✅ ${os}/${arch}"
-            else
-              echo "  ❌ ${os}/${arch} FAILED"
-              FAILED=1
-            fi
-          done
 
-          # FreeBSD requires -gcflags="-std" for fakecgo's //go:cgo_export_dynamic
-          for fbsd_arch in amd64 arm64; do
-            echo "Building freebsd/${fbsd_arch} (with -gcflags for fakecgo)..."
-            if GOOS=freebsd GOARCH=${fbsd_arch} go build \
-              -gcflags="github.com/go-webgpu/goffi/internal/fakecgo=-std" \
-              ./... 2>&1; then
-              echo "  ✅ freebsd/${fbsd_arch}"
-            else
-              echo "  ❌ freebsd/${fbsd_arch} FAILED"
-              FAILED=1
-            fi
-          done
+          func main() {
+          	// purego side
+          	libc, err := purego.Dlopen("libc.so.6", purego.RTLD_NOW|purego.RTLD_GLOBAL)
+          	if err != nil {
+          		fmt.Println("purego Dlopen:", err)
+          		os.Exit(1)
+          	}
+          	var getpid func() int32
+          	purego.RegisterLibFunc(&getpid, libc, "getpid")
 
-          if [ $FAILED -eq 1 ]; then
-            echo "❌ Cross-compilation check FAILED"
-            exit 1
-          fi
-          echo "✅ All 8 platforms compile successfully"
+          	// goffi side
+          	h, err := ffi.LoadLibrary("libc.so.6")
+          	if err != nil {
+          		fmt.Println("goffi LoadLibrary:", err)
+          		os.Exit(1)
+          	}
+          	sym, err := ffi.GetSymbol(h, "getpid")
+          	if err != nil {
+          		fmt.Println("goffi GetSymbol:", err)
+          		os.Exit(1)
+          	}
+          	cif := &types.CallInterface{}
+          	if err = ffi.PrepareCallInterface(cif, types.DefaultCall, types.SInt32TypeDescriptor, nil); err != nil {
+          		fmt.Println("goffi PrepareCallInterface:", err)
+          		os.Exit(1)
+          	}
+          	var pid int32
+          	if _, err = ffi.CallFunction(cif, sym, unsafe.Pointer(&pid), nil); err != nil {
+          		fmt.Println("goffi CallFunction:", err)
+          		os.Exit(1)
+          	}
 
-          # Verify examples compile
-          echo ""
-          echo "Building examples..."
-          for example_dir in examples/*/; do
-            if [ -f "${example_dir}go.mod" ]; then
-              example_name=$(basename "$example_dir")
-              echo "Building example: ${example_name}..."
-              if (cd "$example_dir" && go build . 2>&1); then
-                echo "  ✅ ${example_name}"
-              else
-                echo "  ❌ ${example_name} FAILED"
-                FAILED=1
-              fi
-            fi
-          done
-
-          if [ $FAILED -eq 1 ]; then
-            echo "❌ Examples build check FAILED"
-            exit 1
-          fi
-          echo "✅ All examples compile successfully"
+          	want := int32(os.Getpid())
+          	fmt.Println("purego getpid =", getpid(), "goffi getpid =", pid, "os.Getpid =", want)
+          	if getpid() != want || pid != want {
+          		os.Exit(1)
+          	}
+          	fmt.Println("COEXIST-OK")
+          }
+          EOF
+          go mod init coexist
+          go mod edit -replace github.com/go-webgpu/goffi=../goffi
+          GOFLAGS=-mod=mod go get github.com/go-webgpu/goffi/ffi
+          GOFLAGS=-mod=mod go get github.com/ebitengine/purego
+          CGO_ENABLED=0 go build -tags nofakecgo -o coexist .
+          ./coexist | tee out.txt
+          grep -q COEXIST-OK out.txt
 
   # Android arm64/API 29+ source, ABI, cgo-mode, and ELF regression gates.
   # Keep both supported Go patch lines: runtime/cgo startup and TLS details
@@ -463,7 +495,7 @@ jobs:
   # Final status - All checks passed
   ci-success:
     name: CI Success
-    needs: [lint, formatting, cross-compile, android-cross, test, benchmarks, quality-gate, elf-linking]
+    needs: [lint, formatting, platform-matrix, purego-coexistence, android-cross, test, benchmarks, quality-gate, elf-linking]
     runs-on: ubuntu-latest
     if: success()
     steps:
@@ -472,7 +504,12 @@ jobs:
           echo "✅ All CI checks passed!"
           echo "✅ Lint: PASSED"
           echo "✅ Formatting: PASSED"
-          echo "✅ Cross-Compile: PASSED (8 desktop targets)"
+          echo "✅ Platform Matrix: PASSED"
+          echo "   - full FFI: linux, darwin, freebsd, netbsd (amd64 + arm64),"
+          echo "               windows (amd64 + arm64)"
+          echo "   - reduced:  android/arm64 (no callbacks), windows/386 (loader only)"
+          echo "   - pending:  linux 386/arm/loong64/ppc64le/riscv64/s390x"
+          echo "✅ purego coexistence: PASSED (-tags nofakecgo)"
           echo "✅ Android arm64: PASSED (API 29+, Go 1.25/1.26, cgo=0/1)"
           echo "✅ Tests: PASSED (CGO_ENABLED=0 and CGO_ENABLED=1)"
           echo "   - Linux AMD64 (ubuntu-latest)"
@@ -482,5 +519,6 @@ jobs:
           echo "✅ Benchmarks: PASSED"
           echo "✅ Quality Gate: PASSED"
           echo ""
-          echo "Note: Windows ARM64 cross-compile verified, runtime tested by community"
+          echo "Note: Windows ARM64, FreeBSD and NetBSD are cross-compile verified;"
+          echo "      runtime coverage there comes from the community."
           echo "🚀 Ready for merge!"

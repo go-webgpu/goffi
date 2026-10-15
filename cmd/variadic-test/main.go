@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 The Goffi Authors
 
-//go:build (linux || darwin || freebsd) && (amd64 || arm64)
+//go:build (linux || darwin || freebsd || netbsd) && (amd64 || arm64)
 
 // Command variadic-test compiles the bundled C test library and exercises
 // PrepareVariadicCallInterface on the current platform.

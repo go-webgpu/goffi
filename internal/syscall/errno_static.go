@@ -1,4 +1,4 @@
-//go:build goffi_static && ((linux && !android) || darwin || freebsd || android) && (amd64 || arm64)
+//go:build goffi_static && ((linux && !android) || darwin || freebsd || netbsd || android) && (amd64 || arm64)
 
 package syscall
 

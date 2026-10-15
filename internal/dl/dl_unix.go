@@ -1,4 +1,4 @@
-//go:build ((linux && !android) || darwin || freebsd) && !goffi_static
+//go:build ((linux && !android) || darwin || freebsd || netbsd) && !goffi_static
 
 // OUR OWN Dlopen/Dlsym implementation - NO dependencies!
 // Uses runtime.cgocall approach similar to syscall6.

@@ -32,7 +32,7 @@ _, _ = ffi.CallFunction(cif, sym, unsafe.Pointer(&result), args)
 |---|---------|---------|
 | **Zero CGO** | Pure Go | No C compiler needed. `go get` and build. |
 | **Fast** | 88–114 ns/op | Pre-computed CIF, zero per-call allocations |
-| **Cross-platform** | 8 desktop targets + Android preview | Windows, Linux, macOS, FreeBSD × AMD64 + ARM64; Android arm64/API 29+ candidate pending physical-device startup proof |
+| **Cross-platform** | 10 desktop targets + Android preview | Windows, Linux, macOS, FreeBSD, NetBSD × AMD64 + ARM64; windows/386 loader-only; Android arm64/API 29+ candidate pending physical-device startup proof |
 | **Callbacks** | C→Go safe where validated | `crosscall2` integration on desktop targets; Android callbacks fail explicitly until a physical-thread proof exists |
 | **Type-safe** | Runtime validation | 5 typed error types with `errors.As()` support |
 | **Struct pass/return** | Full ABI | Args: INTEGER/SSE classification. Returns: ≤8B (RAX/XMM0), 9–16B (4 modes: RAX/XMM × RAX/XMM), >16B (sret) |
@@ -387,7 +387,7 @@ if err != nil {
 | Context support | Timeouts/cancellation | No | No |
 | C-thread callbacks | crosscall2 | crosscall2 | Full |
 | String/bool/slice args | Raw pointers only | Auto-marshaling | Full |
-| Platform breadth | 8 desktop targets + Android preview | 8 GOARCH / 20+ OS×ARCH | All |
+| Platform breadth | 10 desktop targets + Android preview (zero-CGO throughout) | 8 GOARCH / 20+ OS×ARCH, several CGO_ENABLED=1 only | All |
 | AMD64 overhead | 88–114 ns | Not published | ~140 ns (Go 1.26 claims ~30% reduction) |
 
 **Choose goffi** for GPU/real-time workloads: struct passing, zero per-call overhead, callback float returns, typed errors.
@@ -431,17 +431,38 @@ if err != nil {
 
 ## Platform Support
 
-| Platform | Arch | ABI | Since | CI |
-|----------|------|-----|-------|----|
-| Windows | amd64 | Win64 | v0.1.0 | Tested |
-| Windows | arm64 | AAPCS64 | v0.5.0 | Tested (Snapdragon X) |
-| Linux | amd64 | System V | v0.1.0 | Tested |
-| Linux | arm64 | AAPCS64 | v0.3.0 | Cross-compile verified |
-| macOS | amd64 | System V | v0.1.1 | Tested |
-| macOS | arm64 | AAPCS64 | v0.3.7 | Tested (M3 Pro) |
-| FreeBSD | amd64 | System V | v0.5.0 | Cross-compile verified |
-| FreeBSD | arm64 | AAPCS64 | v0.5.3 | Cross-compile verified |
-| Android | arm64 | AAPCS64 (Bionic) | v0.6.1 | Guarded preview (API 29+) |
+All of it under `CGO_ENABLED=0`. See [docs/PLATFORMS.md](docs/PLATFORMS.md) for
+the tier definitions, the required build flags, and the purego parity diff;
+`scripts/check-platforms.sh` enforces the table in CI.
+
+| Platform | Arch | Tier | ABI | Since | CI |
+|----------|------|------|-----|-------|----|
+| Windows | amd64 | full | Win64 | v0.1.0 | Tested |
+| Windows | arm64 | full | AAPCS64 | v0.5.0 | Tested (Snapdragon X) |
+| Linux | amd64 | full | System V | v0.1.0 | Tested |
+| Linux | arm64 | full | AAPCS64 | v0.3.0 | Cross-compile verified |
+| macOS | amd64 | full | System V | v0.1.1 | Cross-compile verified |
+| macOS | arm64 | full | AAPCS64 | v0.3.7 | Tested (M3 Pro) |
+| FreeBSD | amd64 | full | System V | v0.5.0 | Cross-compile verified |
+| FreeBSD | arm64 | full | AAPCS64 | v0.5.3 | Cross-compile verified |
+| NetBSD | amd64 | full | System V | unreleased | Cross-compile verified |
+| NetBSD | arm64 | full | AAPCS64 | unreleased | Cross-compile verified |
+| Android | arm64 | no callbacks | AAPCS64 (Bionic) | v0.6.1 | Guarded preview (API 29+) |
+| Windows | 386 | loader only | — | — | Cross-compile verified |
+
+**Tiers:** *full* = `LoadLibrary` + `CallFunction` + `NewCallback`. *no callbacks*
+= `NewCallback` fails explicitly. *loader only* = `LoadLibrary`/`GetSymbol`/
+`NewCallback` work, `CallFunction` returns `ErrUnsupportedArchitecture` (the
+same shape purego offers on windows/386).
+
+**FreeBSD and NetBSD** need one extra flag:
+`-gcflags="github.com/go-webgpu/goffi/internal/fakecgo=-std"`.
+
+**Pending** (purego has them, goffi does not yet): linux 386, arm, loong64,
+ppc64le, riscv64, s390x. Each needs its own call trampoline, errno capture and
+fakecgo bring-up — see [ROADMAP.md](ROADMAP.md). purego's iOS and Android
+amd64/386/arm targets are `CGO_ENABLED=1`-only and are out of scope for a
+zero-CGO library.
 
 ---
 

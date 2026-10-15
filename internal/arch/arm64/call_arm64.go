@@ -1,4 +1,4 @@
-//go:build arm64 && (linux || darwin || windows || freebsd)
+//go:build arm64 && (linux || darwin || windows || freebsd || netbsd)
 
 // AAPCS64 ABI implementation (Linux, macOS, Windows, FreeBSD on ARM64)
 // All ARM64 platforms use the same AAPCS64 calling convention for non-variadic functions.

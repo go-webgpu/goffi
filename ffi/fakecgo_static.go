@@ -1,4 +1,4 @@
-//go:build goffi_static && (linux || darwin || freebsd) && !cgo
+//go:build goffi_static && (linux || darwin || freebsd || netbsd) && !cgo
 
 package ffi
 

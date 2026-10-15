@@ -238,6 +238,67 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 
 ---
 
+## 🧭 Architecture Expansion (purego parity)
+
+**Goal**: close the remaining gap against purego's `CGO_ENABLED=0` matrix.
+
+`CGO_ENABLED=1`-only targets from purego's list (iOS amd64/arm64, Android
+amd64/386/arm) are **out of scope**: goffi's contract is a zero-CGO build, and
+those targets cannot link without an external C toolchain. `windows/arm` is out
+of scope too — Go dropped it in 1.26.
+
+That leaves six Linux architectures. Current tier for all six: `pending` —
+`internal/arch/stubs` compiles them out, and the build fails in
+`internal/syscall`, which has no files for these GOARCHes. Tracked and gated by
+`scripts/check-platforms.sh`, which fails if any of them starts building without
+the table being updated.
+
+### Per-architecture work items
+
+Each architecture needs the same six pieces, roughly 700 lines of hand-written
+assembly and Go:
+
+| # | Component | What it does |
+|---|-----------|--------------|
+| 1 | `internal/syscall/syscall_<arch>.s` | Call trampoline: load integer/float registers from the argument block, spill the remainder to the outgoing stack area, `CALL`, write return registers back |
+| 2 | `internal/syscall/errno_stubs_<arch>.s` | In-trampoline errno capture, taken while still on the same OS thread as the C call |
+| 3 | `internal/arch/<arch>/` | ABI argument classification + `Execute` mapping a `CallInterface` onto the register file |
+| 4 | `internal/fakecgo/asm_<arch>.s`, `trampolines_<arch>.s`, `abi_<arch>.h` | `crosscall2`, `threadentry`, `setg` and the C↔Go ABI shims — without these `CGO_ENABLED=0` cannot start at all |
+| 5 | `internal/dl/dl_stubs_<arch>.s`, `dl_wrappers_<arch>.s` | dlopen/dlsym bridge |
+| 6 | Callback trampolines | Or an explicit `NewCallback` failure, as android/arm64 does today |
+
+### Suggested sequencing
+
+| Order | Target | ABI | Why this order | Notable hazard |
+|-------|--------|-----|----------------|----------------|
+| 1 | `linux/riscv64` | LP64D | Closest in shape to the existing AAPCS64 backend; proves the framework end-to-end | — |
+| 2 | `linux/loong64` | LP64D | Nearly mechanical once riscv64 lands | — |
+| 3 | `linux/386` | cdecl | Simplest trampoline (everything on the stack) | 64-bit args split across two slots; float returns arrive on the x87 stack (`ST(0)`), not in a register |
+| 4 | `linux/arm` | AAPCS32 | Wide install base (armhf) | Soft-float vs hard-float split: armhf passes floats in VFP registers, and Go's `linux/arm` has its own GOARM levels |
+| 5 | `linux/ppc64le` | ELFv2 | Distro-relevant | TOC/`r12` entry conventions; separate stack-argument area |
+| 6 | `linux/s390x` | z/Architecture | Last, hardest | Big-endian: sub-8-byte integers are right-justified in their register slot while float32 is left-justified. Needs Go 1.27 for a cgo-free build (same constraint purego documents) |
+
+**Ground rule**: no architecture is promoted out of `pending` on cross-compilation
+alone. An FFI backend that assembles but assigns registers subtly wrong is worse
+than a clean `ErrUnsupportedArchitecture`. Promotion requires either a QEMU
+user-mode run of `go test ./ffi` in CI, or a runtime report from real hardware.
+
+**Reference, not source**: purego is Apache-2.0 and goffi is MIT. The assembly is
+written against the published ABI documents for each architecture, with purego
+consulted for design only, matching how the existing amd64/arm64 backends were
+built. Attribution stays in `NOTICE`.
+
+### Not planned
+
+| Target | Reason |
+|--------|--------|
+| ios/amd64, ios/arm64 | `CGO_ENABLED=1` only |
+| android/amd64, android/386, android/arm | `CGO_ENABLED=1` only (Go requires external linking) |
+| windows/arm | Dropped by Go 1.26 |
+| linux/386, linux/arm `CallFunction` on 64-bit values | Will land with the arch backends above, not before |
+
+---
+
 ## 📅 What's Next
 
 ### **v0.5.0 - Usability + Variadic** (Q2 2025)

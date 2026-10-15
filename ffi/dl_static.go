@@ -1,4 +1,4 @@
-//go:build goffi_static && ((linux && !android) || darwin || freebsd || (android && arm64)) && (amd64 || arm64)
+//go:build goffi_static && ((linux && !android) || darwin || freebsd || netbsd || (android && arm64)) && (amd64 || arm64)
 
 package ffi
 

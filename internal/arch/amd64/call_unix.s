@@ -1,4 +1,4 @@
-//go:build amd64 && (linux || darwin)
+//go:build amd64 && (linux || darwin || freebsd || netbsd)
 
 // This file is intentionally empty.
 // The previous callUnix64 experiment was removed in v0.4.1 (TASK-022, GAP-11).

@@ -68,3 +68,8 @@ RESEARCH*.md
 # Go modules (don't ignore go.mod and go.sum)
 !go.mod
 !go.sum
+
+# Example build artifacts (scripts/check-platforms.sh builds to /dev/null,
+# but a manual "go build" in examples/ leaves these behind).
+examples/simple/example
+examples/struct/struct-example
