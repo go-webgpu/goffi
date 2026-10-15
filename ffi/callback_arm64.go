@@ -69,7 +69,7 @@ func validateCallbackSignature(typ reflect.Type) {
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
 			reflect.Uintptr, reflect.Float32, reflect.Float64,
-			reflect.Ptr, reflect.UnsafePointer, reflect.Bool:
+			reflect.Pointer, reflect.UnsafePointer, reflect.Bool:
 			// Valid types
 		default:
 			panic("ffi: unsupported callback argument type: " + argType.Kind().String())
@@ -86,7 +86,7 @@ func validateCallbackSignature(typ reflect.Type) {
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
 			reflect.Uintptr, reflect.Float32, reflect.Float64,
-			reflect.Ptr, reflect.UnsafePointer, reflect.Bool:
+			reflect.Pointer, reflect.UnsafePointer, reflect.Bool:
 			// Valid return types
 		default:
 			panic("ffi: unsupported callback return type: " + retType.Kind().String())
@@ -182,7 +182,7 @@ func callbackWrap(a *callbackArgs) {
 				stackIdx++
 			}
 
-		case reflect.Ptr:
+		case reflect.Pointer:
 			if intIdx < numIntRegs {
 				pos := numFloatRegs + intIdx
 				//nolint:govet,gosec // G103: FFI callback argument
@@ -237,7 +237,7 @@ func callbackWrap(a *callbackArgs) {
 			} else {
 				a.result = 0
 			}
-		case reflect.Ptr, reflect.UnsafePointer:
+		case reflect.Pointer, reflect.UnsafePointer:
 			a.result = ret.Pointer()
 		case reflect.Float32, reflect.Float64:
 			f64 := ret.Float()

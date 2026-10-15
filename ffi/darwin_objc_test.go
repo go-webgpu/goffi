@@ -204,11 +204,6 @@ func objcArgUInt64(val uint64) objcArg {
 	return objcArg{typ: types.UInt64TypeDescriptor, ptr: unsafe.Pointer(&v), keepAlive: &v}
 }
 
-func objcArgInt64(val int64) objcArg {
-	v := val
-	return objcArg{typ: types.SInt64TypeDescriptor, ptr: unsafe.Pointer(&v), keepAlive: &v}
-}
-
 func objcArgBool(val bool) objcArg {
 	var v uint8
 	if val {
@@ -220,16 +215,6 @@ func objcArgBool(val bool) objcArg {
 func objcArgDouble(val float64) objcArg {
 	v := val
 	return objcArg{typ: types.DoubleTypeDescriptor, ptr: unsafe.Pointer(&v), keepAlive: &v}
-}
-
-func objcArgRect(rect nsRect) objcArg {
-	v := rect
-	return objcArg{typ: nsRectType, ptr: unsafe.Pointer(&v), keepAlive: &v}
-}
-
-func objcArgSize(size nsSize) objcArg {
-	v := size
-	return objcArg{typ: nsSizeType, ptr: unsafe.Pointer(&v), keepAlive: &v}
 }
 
 func objcCall(t *testing.T, rt *objcRuntime, retType *types.TypeDescriptor, rvalue unsafe.Pointer, self, sel uintptr, args ...objcArg) {
@@ -270,10 +255,13 @@ func objcCallVoid(t *testing.T, rt *objcRuntime, self, sel uintptr, args ...objc
 	objcCall(t, rt, types.VoidTypeDescriptor, nil, self, sel, args...)
 }
 
-func objcCallBool(t *testing.T, rt *objcRuntime, self, sel uintptr, args ...objcArg) bool {
-	var result uint8
-	objcCall(t, rt, types.UInt8TypeDescriptor, unsafe.Pointer(&result), self, sel, args...)
-	return result != 0
+// objcCallCPtr returns a pointer to C memory, such as the result of
+// -[NSString UTF8String]. The FFI call writes it straight into an
+// unsafe.Pointer, so it never goes through a uintptr conversion.
+func objcCallCPtr(t *testing.T, rt *objcRuntime, self, sel uintptr, args ...objcArg) unsafe.Pointer {
+	var result unsafe.Pointer
+	objcCall(t, rt, types.PointerTypeDescriptor, unsafe.Pointer(&result), self, sel, args...)
+	return result
 }
 
 func objcCallUInt64(t *testing.T, rt *objcRuntime, self, sel uintptr, args ...objcArg) uint64 {
@@ -322,18 +310,15 @@ func withAutoreleasePool(t *testing.T, rt *objcRuntime, fn func()) {
 	fn()
 }
 
-func cString(ptr uintptr) string {
-	if ptr == 0 {
+func cString(ptr unsafe.Pointer) string {
+	if ptr == nil {
 		return ""
 	}
 	var length int
-	for {
-		if *(*byte)(unsafe.Add(unsafe.Pointer(ptr), length)) == 0 {
-			break
-		}
+	for *(*byte)(unsafe.Add(ptr, length)) != 0 {
 		length++
 	}
-	return string(unsafe.Slice((*byte)(unsafe.Pointer(ptr)), length))
+	return string(unsafe.Slice((*byte)(ptr), length))
 }
 
 func TestDarwinSelectorsRegistered(t *testing.T) {
@@ -485,8 +470,8 @@ func TestDarwinNSStringRoundTrip(t *testing.T) {
 			t.Fatalf("NSString length = %d, want 5", length)
 		}
 
-		utf8Ptr := objcCallPtr(t, rt, obj, selUTF8)
-		if utf8Ptr == 0 {
+		utf8Ptr := objcCallCPtr(t, rt, obj, selUTF8)
+		if utf8Ptr == nil {
 			t.Fatal("NSString UTF8String returned nil")
 		}
 		if got := cString(utf8Ptr); got != "goffi" {
