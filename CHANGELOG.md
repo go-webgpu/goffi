@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **CI: Android arm64 jobs are informational, not a merge gate.** Android is a preview platform (`docs/ANDROID.md`: physical-device startup validation is still pending), but `android-cross` was in `CI Success`'s `needs`, so an Android-only failure, including the October 2026 `setup-android` breakage outside goffi, blocked every pull request. The jobs still run and show on each PR; they go back into the required set once Android leaves preview.
+
 ## [0.6.4] - 2026-09-10
 
 ### Added

@@ -60,3 +60,8 @@ The audited source/ABI matrix is Go 1.25.12 and Go 1.26.5 with Android NDK
 r29 (`29.0.14206865`). Keep both Go lines in CI when runtime startup files or
 TLS offsets change upstream. Passing this probe is not physical-device
 startup evidence.
+
+In CI the probe runs on every pull request (`Android arm64 (Go …)` jobs), but
+while Android is a preview it is informational: a failure shows on the PR and
+does not block `CI Success` or merging. Once physical-device startup validation
+exists, the jobs go back into the required set.
