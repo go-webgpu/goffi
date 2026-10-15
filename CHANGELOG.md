@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **CI: Android arm64 jobs are informational, not a merge gate.** Android is a preview platform (`docs/ANDROID.md`: physical-device startup validation is still pending), but `android-cross` was in `CI Success`'s `needs`, so an Android-only failure, including the October 2026 `setup-android` breakage outside goffi, blocked every pull request. The jobs still run and show on each PR; they go back into the required set once Android leaves preview.
 
+### Fixed
+- **macOS / FreeBSD (`CGO_ENABLED=0`): new runtime threads started with all signals unblocked.** `internal/fakecgo` defined `SIG_BLOCK`/`SIG_UNBLOCK`/`SIG_SETMASK` once with the Linux values 0/1/2, but Darwin, FreeBSD and NetBSD use 1/2/3. `pthread_sigmask(SIG_SETMASK, ...)` in `_cgo_sys_thread_start` therefore ran as `SIG_UNBLOCK`: instead of blocking every signal across `pthread_create`, it unblocked them, and the "restore" afterwards unblocked the saved mask instead of reinstating it. A signal arriving on the new thread before the runtime set up its g0 stack could crash the process (`signal 27 received on thread with no signal stack` under the profiler). The constants are now defined per OS with each system's values. Linux and Android were not affected. Ported from [ebitengine/purego#553](https://github.com/ebitengine/purego/pull/553) (reported in [purego#552](https://github.com/ebitengine/purego/issues/552)); goffi's `internal/fakecgo` derives from purego's.
+- `internal/fakecgo`: `TestSighowMatchesSystemHeaders` compiles a probe with the system C compiler and checks the three constants against the host's `<signal.h>` (skipped when no compiler is available), so CI on macOS catches a mismatch.
+
 ## [0.6.4] - 2026-09-10
 
 ### Added
