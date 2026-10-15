@@ -22,13 +22,10 @@ type (
 
 // for pthread_sigmask:
 
+// sighow is the how argument of pthread_sigmask. Its values differ between
+// operating systems (Linux 0/1/2, Darwin and the BSDs 1/2/3), so SIG_BLOCK,
+// SIG_UNBLOCK and SIG_SETMASK are defined in the per-OS libcgo_<os>.go files.
 type sighow int32
-
-const (
-	SIG_BLOCK   sighow = 0
-	SIG_UNBLOCK sighow = 1
-	SIG_SETMASK sighow = 2
-)
 
 type G struct {
 	_       structs.HostLayout

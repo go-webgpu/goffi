@@ -16,6 +16,13 @@ var (
 	PTHREAD_MUTEX_INITIALIZER = pthread_mutex_t(0)
 )
 
+// Source: https://github.com/NetBSD/src/blob/613e27c65223fd2283b6ed679da1197e12f50e27/sys/sys/signal.h#L242
+const (
+	SIG_BLOCK   sighow = 1
+	SIG_UNBLOCK sighow = 2
+	SIG_SETMASK sighow = 3
+)
+
 // Source: https://github.com/NetBSD/src/blob/613e27c65223fd2283b6ed679da1197e12f50e27/sys/compat/linux/arch/m68k/linux_signal.h#L133
 type stack_t struct {
 	ss_sp    uintptr
