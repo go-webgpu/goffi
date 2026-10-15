@@ -1,8 +1,9 @@
 name: CI
 
 # Testing strategy:
-# - Tests run natively on Linux (amd64, arm64), Windows (amd64) and macOS
-#   (arm64), each with CGO_ENABLED=0 (fakecgo) and CGO_ENABLED=1
+# - Tests run natively on Linux, Windows and macOS, each on amd64 and arm64,
+#   with CGO_ENABLED=0 (fakecgo) and CGO_ENABLED=1, on Go 1.25 (go.mod
+#   minimum) and Go stable; Go tip runs as an informational job
 # - Other targets are cross-compiled and linted via GOOS/GOARCH (Android in
 #   its informational android-cross job)
 # - Go 1.25+ required (matches go.mod requirement)
@@ -21,6 +22,11 @@ on:
   pull_request:
     branches:
       - main
+  # Weekly run: toolchain changes (Go stable and tip) can break goffi without
+  # any commit here.
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
 
 jobs:
   # Linting - Fast fail on code quality issues
@@ -202,6 +208,36 @@ jobs:
           fi
           echo "✅ All examples compile successfully"
 
+      # Regression checks for targets without a hosted runner:
+      # - every test package must compile and link for FreeBSD (-exec=/bin/true
+      #   builds the test binaries without running them).
+      # - FreeBSD binaries must depend on libthr.so.3, not libpthread.so, which
+      #   is only a development symlink (ships with FreeBSD-clibs-dev).
+      # - internal/fakecgo asserts the NetBSD stack_t/mutex/cond layouts at
+      #   compile time, so vetting its tests for netbsd catches a drift.
+      - name: FreeBSD test build and DT_NEEDED, NetBSD fakecgo layouts
+        run: |
+          for arch in amd64 arm64; do
+            GOOS=freebsd GOARCH=$arch go test -exec=/bin/true -count=1 \
+              -gcflags="github.com/go-webgpu/goffi/internal/fakecgo=-std" ./...
+            bin="$RUNNER_TEMP/ffi-freebsd-$arch.test"
+            GOOS=freebsd GOARCH=$arch go test -c -o "$bin" \
+              -gcflags="github.com/go-webgpu/goffi/internal/fakecgo=-std" ./ffi
+            needed=$(readelf -d "$bin" | grep NEEDED)
+            echo "freebsd/$arch:"
+            echo "$needed"
+            if ! echo "$needed" | grep -q '\[libthr\.so\.3\]'; then
+              echo "❌ freebsd/$arch: libthr.so.3 missing from DT_NEEDED"
+              exit 1
+            fi
+            if echo "$needed" | grep -q '\[libpthread\.so\]'; then
+              echo "❌ freebsd/$arch: depends on libpthread.so"
+              exit 1
+            fi
+            GOOS=netbsd GOARCH=$arch go vet ./internal/fakecgo
+            echo "✅ netbsd/$arch fakecgo layouts"
+          done
+
   # Android arm64/API 29+ source, ABI, cgo-mode, and ELF regression checks.
   # Keep both supported Go patch lines: runtime/cgo startup and TLS details
   # are part of this platform contract, so a single floating toolchain is not
@@ -263,7 +299,8 @@ jobs:
           version: latest
           args: --config=.golangci.yml --timeout=5m
 
-  # Unit tests - Platform-specific (Linux + Windows + macOS AMD64)
+  # Unit tests on every production target with a hosted runner, with the
+  # minimum Go version from go.mod.
   # Tested under both CGO_ENABLED=0 (fakecgo path) and CGO_ENABLED=1 (real
   # runtime/cgo path). Both modes must pass identically; CGO_ENABLED=0 is the
   # primary path used by the gogpu ecosystem and must not regress.
@@ -279,12 +316,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # Every production target with a GitHub-hosted runner runs natively:
+        # linux, windows and darwin, each on amd64 and arm64.
+        # macos-latest is Apple Silicon; macos-15-intel is darwin/amd64.
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, windows-11-arm, macos-latest, macos-15-intel]
         cgo: ['0', '1']
-        # macos-latest: Apple Silicon ARM64 (M-series)
-        # Note: macOS Intel (x86_64) deprecated Dec 2025, no free tier Intel runners
-        # Intel tested via Linux/Windows AMD64 (same System V / similar ABI)
-        # Build tags in source files (//go:build) select correct implementation
 
     steps:
       - name: Checkout code
@@ -324,6 +360,17 @@ jobs:
         shell: bash
         run: go test -count=1 -v ./internal/...
 
+      # As a normal user TestSetuidEtc can only check that syscall.Set*id
+      # fails with EPERM instead of panicking. As root it checks that every
+      # thread of the process got the new credentials (glibc setxid
+      # broadcast). Build as the runner user, run only the binary under sudo
+      # so root never writes into the Go build/module caches.
+      - name: Run fakecgo set*id tests as root (Linux, CGO_ENABLED=0)
+        if: runner.os == 'Linux' && matrix.cgo == '0'
+        run: |
+          go test -c -o "$RUNNER_TEMP/fakecgo.test" ./internal/fakecgo
+          sudo "$RUNNER_TEMP/fakecgo.test" -test.count=1 -test.v -test.run 'TestAllThreadsSyscall|TestSetuidEtc|TestThreadEntryReturn'
+
       - name: Display coverage summary
         shell: bash
         run: |
@@ -357,6 +404,71 @@ jobs:
   # by `//go:build !cgo` and therefore not compiled in cgo mode.
 
   # Benchmarks - Performance validation (Linux only - reference platform)
+  # The test job pins Go 1.25, the minimum in go.mod. fakecgo and the
+  # assembly depend on runtime and compiler internals that change between
+  # releases, so the suite also runs on the current stable Go.
+  test-go-stable:
+    name: Test - Go stable - ${{ matrix.os }} (cgo=${{ matrix.cgo }})
+    runs-on: ${{ matrix.os }}
+    needs: [lint, formatting]
+    env:
+      CGO_ENABLED: ${{ matrix.cgo }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, windows-11-arm, macos-latest, macos-15-intel]
+        cgo: ['0', '1']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Run tests
+        shell: bash
+        run: |
+          go version
+          go test -count=1 ./...
+
+  # Go tip, informational (not part of CI Success: tip can break for reasons
+  # outside goffi). It shows compiler and runtime changes before a release
+  # ships them, e.g. the amd64 LEAVE epilogue that made fakecgo's threadentry
+  # crash on Go 1.28 development builds in July 2026.
+  test-go-tip:
+    name: Test - Go tip - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    needs: [lint, formatting]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go (bootstrap)
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: false
+
+      - name: Install Go tip
+        run: |
+          go install golang.org/dl/gotip@latest
+          gotip download
+          echo "$(gotip env GOROOT)/bin" >> "$GITHUB_PATH"
+
+      - name: Run tests (CGO_ENABLED=0 and 1)
+        run: |
+          go version
+          CGO_ENABLED=0 go test -count=1 ./...
+          CGO_ENABLED=1 go test -count=1 ./...
+
   benchmarks:
     name: Benchmarks
     runs-on: ubuntu-latest
@@ -532,7 +644,7 @@ jobs:
     name: CI Success
     # android-cross is deliberately absent: Android is a preview platform
     # (see the note above the android-cross job).
-    needs: [lint, lint-targets, formatting, cross-compile, test, benchmarks, quality-gate, elf-linking]
+    needs: [lint, lint-targets, formatting, cross-compile, test, test-go-stable, benchmarks, quality-gate, elf-linking]
     runs-on: ubuntu-latest
     if: success()
     steps:
@@ -543,14 +655,12 @@ jobs:
           echo "✅ Formatting: PASSED"
           echo "✅ Cross-Compile: PASSED (8 desktop targets)"
           echo "✅ Tests: PASSED (CGO_ENABLED=0 and CGO_ENABLED=1)"
-          echo "   - Linux AMD64 (ubuntu-latest)"
-          echo "   - Linux ARM64 (ubuntu-24.04-arm)"
-          echo "   - Windows AMD64 (windows-latest)"
-          echo "   - macOS ARM64 (macos-latest)"
+          echo "   - Linux AMD64 + ARM64, Windows AMD64 + ARM64, macOS ARM64 + AMD64"
+          echo "   - Go 1.25 (go.mod minimum) and Go stable"
           echo "✅ ELF Linking: PASSED (default dynamic + goffi_static)"
           echo "✅ Benchmarks: PASSED"
           echo "✅ Quality Gate: PASSED"
           echo ""
-          echo "Note: Windows ARM64 cross-compile verified, runtime tested by community"
+          echo "Note: Go tip runs as an informational job and does not gate this result"
           echo "Note: Android arm64 (preview) is checked by its own jobs and does not gate this result"
           echo "🚀 Ready for merge!"
