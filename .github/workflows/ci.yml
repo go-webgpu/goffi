@@ -265,6 +265,16 @@ jobs:
           # Test only main packages to avoid coverage dilution from platform-specific files
           go test -v -coverprofile=coverage.txt -covermode=atomic ./ffi ./types
 
+      # The internal packages have their own tests (internal/fakecgo,
+      # internal/arch/amd64, internal/arch/arm64 on the arm64 macOS runner)
+      # that the coverage step above deliberately leaves out. Run
+      # them separately, without coverage, so they still gate every OS and cgo
+      # mode: TestSighowMatchesSystemHeaders in internal/fakecgo only means
+      # something when it runs against the real <signal.h> of each OS.
+      - name: Run internal package tests
+        shell: bash
+        run: go test -count=1 -v ./internal/...
+
       - name: Display coverage summary
         shell: bash
         run: |
