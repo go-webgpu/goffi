@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Andrey Kolkov and GoGPU Contributors
 
-//go:build arm64 && !cgo
+//go:build arm64 && !cgo && !windows
 
 package arm64
 
@@ -9,5 +9,7 @@ package arm64
 // implementation is supplied by internal/fakecgo. When CGO_ENABLED=1, the
 // standard runtime/cgo package is linked transparently via internal/syscall
 // (and internal/dl), so this import must be excluded to avoid pulling a
-// package whose build constraints exclude every Go file.
+// package whose build constraints exclude every Go file. The same holds on
+// Windows, where runtime.cgocall works without fakecgo and internal/fakecgo
+// has no files at all.
 import _ "github.com/go-webgpu/goffi/internal/fakecgo"

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **macOS / FreeBSD (`CGO_ENABLED=0`): new runtime threads started with all signals unblocked.** `internal/fakecgo` defined `SIG_BLOCK`/`SIG_UNBLOCK`/`SIG_SETMASK` once with the Linux values 0/1/2, but Darwin, FreeBSD and NetBSD use 1/2/3. `pthread_sigmask(SIG_SETMASK, ...)` in `_cgo_sys_thread_start` therefore ran as `SIG_UNBLOCK`: instead of blocking every signal across `pthread_create`, it unblocked them, and the "restore" afterwards unblocked the saved mask instead of reinstating it. A signal arriving on the new thread before the runtime set up its g0 stack could crash the process (`signal 27 received on thread with no signal stack` under the profiler). The constants are now defined per OS with each system's values. Linux and Android were not affected. Ported from [ebitengine/purego#553](https://github.com/ebitengine/purego/pull/553) (reported in [purego#552](https://github.com/ebitengine/purego/issues/552)); goffi's `internal/fakecgo` derives from purego's.
 - `internal/fakecgo`: `TestSighowMatchesSystemHeaders` compiles a probe with the system C compiler and checks the three constants against the host's `<signal.h>` (skipped when no compiler is available), so CI on macOS catches a mismatch.
+- Windows ARM64: `go test ./internal/arch/arm64` failed with `[setup failed]` because a test file imported `internal/fakecgo`, which has no Windows files.
 
 ## [0.6.4] - 2026-09-10
 
