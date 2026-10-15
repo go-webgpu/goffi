@@ -2014,7 +2014,7 @@ TEXT ·callbackTrampoline(SB), NOSPLIT|NOFRAME, $0
 	CALL ·callbackDispatcher(SB)
 
 // callbackDispatcher is the common handler for all callback trampolines.
-// It routes through crosscall2 → runtime·load_g → runtime·cgocallback
+// It routes through crosscall2 → runtime·cgocallback
 // to properly support callbacks from both Go-managed threads and
 // C-library-created threads (e.g. Metal's addCompletedHandler:).
 //
