@@ -36,7 +36,7 @@ func (i *Implementation) Execute(
 			args[idx] = uintptr(*(*uint8)(avalue[idx]))
 		case types.SInt16Type, types.UInt16Type:
 			args[idx] = uintptr(*(*uint16)(avalue[idx]))
-		case types.SInt32Type, types.UInt32Type:
+		case types.SInt32Type, types.UInt32Type, types.IntType:
 			args[idx] = uintptr(*(*uint32)(avalue[idx]))
 		case types.SInt64Type, types.UInt64Type:
 			args[idx] = uintptr(*(*uint64)(avalue[idx]))
