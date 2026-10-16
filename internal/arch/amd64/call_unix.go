@@ -98,7 +98,7 @@ func (i *Implementation) Execute(
 			addInt(uintptr(*(*uint8)(avalue[idx])))
 		case types.SInt16Type, types.UInt16Type:
 			addInt(uintptr(*(*uint16)(avalue[idx])))
-		case types.SInt32Type, types.UInt32Type:
+		case types.SInt32Type, types.UInt32Type, types.IntType:
 			addInt(uintptr(*(*uint32)(avalue[idx])))
 		case types.SInt64Type, types.UInt64Type:
 			addInt(uintptr(*(*uint64)(avalue[idx])))

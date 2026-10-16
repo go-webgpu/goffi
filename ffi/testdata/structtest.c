@@ -248,6 +248,12 @@ double stack_f64x16(double a0, double a1, double a2, double a3, double a4, doubl
     return a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14 + 16 * a15;
 }
 
+// C `int` arguments and results (#99), described by types.IntTypeDescriptor.
+// The weights make a misplaced or misread argument change the result.
+int int_weighted3(int a, int b, int c) {
+    return a + 2 * b + 3 * c;
+}
+
 // Callbacks with stack arguments: C calls the Go callback with 1..10.
 int64_t cb_call_stack_i32x10(int64_t (*f)(int32_t, int32_t, int32_t, int32_t, int32_t,
                                           int32_t, int32_t, int32_t, int32_t, int32_t)) {

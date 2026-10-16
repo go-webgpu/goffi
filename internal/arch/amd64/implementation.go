@@ -81,7 +81,7 @@ func (i *Implementation) handleReturn(
 		*(*int16)(rvalue) = int16(retVal)
 	case types.UInt32Type:
 		*(*uint32)(rvalue) = uint32(retVal)
-	case types.SInt32Type:
+	case types.SInt32Type, types.IntType:
 		*(*int32)(rvalue) = int32(retVal)
 	case types.UInt64Type, types.SInt64Type, types.PointerType:
 		*(*uint64)(rvalue) = retVal
