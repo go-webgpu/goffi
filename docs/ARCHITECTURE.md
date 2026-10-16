@@ -178,7 +178,7 @@ Struct argument passing is verified by `ffi/struct_e2e_test.go`, which compiles 
 4. **24B triple** (`{int64, int64, int64}`) — MEMORY class, copied to stack
 5. **Struct + scalar** — mixed register allocation
 
-Tests run on Linux, macOS, FreeBSD, and Windows where gcc is available; skipped gracefully otherwise.
+The test library is built with `$CC` (default `gcc`; the FreeBSD CI job uses the base system `cc`). The tests skip only on Android (test binaries run on the device), in a `goffi_static` build, or when there is no C compiler for the test's architecture; with `GOFFI_REQUIRE_TESTLIB=1`, which CI sets wherever such a compiler exists, a missing compiler fails the run as well. A library that fails to build or load always fails the run. CI runs them on Linux, macOS, Windows and FreeBSD.
 
 ---
 
@@ -436,7 +436,7 @@ go run github.com/go-webgpu/goffi/cmd/variadic-test
 | **Windows** | ARM64 | AAPCS64 | Production (tested on Snapdragon X) |
 | **macOS** | AMD64 | System V | Production |
 | **macOS** | ARM64 | AAPCS64 | Production (tested on M3 Pro) |
-| **FreeBSD** | AMD64 | System V | Cross-compile verified |
+| **FreeBSD** | AMD64 | System V | Production (CI: tests in FreeBSD 14 and 15 VMs) |
 | **FreeBSD** | ARM64 | AAPCS64 | Cross-compile verified |
 | **Linux** | ARM64 | AAPCS64 | Production |
 | **Android** | ARM64 | AAPCS64 (Bionic) | Guarded preview (API 29+, NDK r29) |

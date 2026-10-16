@@ -440,7 +440,7 @@ if err != nil {
 | Linux | arm64 | AAPCS64 | CI: tests on a native runner |
 | macOS | amd64 | System V | CI: tests on a native runner |
 | macOS | arm64 | AAPCS64 | CI: tests on a native runner |
-| FreeBSD | amd64 | System V | CI: cross-compiled build and test build (tests not run yet) |
+| FreeBSD | amd64 | System V | CI: tests in FreeBSD 14 and 15 VMs |
 | FreeBSD | arm64 | AAPCS64 | CI: cross-compiled build and test build (tests not run yet) |
 | Android | arm64 | AAPCS64 (Bionic) | Guarded preview (API 29+), cross-compiled in CI |
 

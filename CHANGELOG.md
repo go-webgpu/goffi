@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **CI: the test suite runs on FreeBSD.** GitHub has no FreeBSD runners, so FreeBSD amd64 was only cross-compiled. A new CI job runs `go test` with `CGO_ENABLED=0` and `CGO_ENABLED=1` on FreeBSD 14 and 15 in a VM, on Go 1.25 and the latest stable Go, with the base system C compiler for the C-backed end-to-end tests; it is required for merging. FreeBSD arm64 is still cross-compiled only.
+
+### Fixed
+- **Tests on FreeBSD.** The first runs on FreeBSD found two gaps; neither affected programs that use goffi. The `internal/arch/amd64` tests could not start (`ld-elf.so.1: /lib/libc.so.7: Undefined symbol "environ"`): their test binary used the C library without `internal/fakecgo`, which supplies `environ` on FreeBSD, as the `ffi` package always does. Seven tests that call the system C library were skipped because they did not know its name on FreeBSD; the C and math library names now live in one place for all tests.
+
 ## [0.6.6] - 2026-10-16
 
 ### Changed

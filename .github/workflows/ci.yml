@@ -450,6 +450,57 @@ jobs:
           go version
           go test -count=1 ./...
 
+  # FreeBSD has no GitHub-hosted runner, so it runs in a VM. The cross-compile
+  # job proves FreeBSD builds; this job runs the tests there: the call path,
+  # callbacks and internal/fakecgo against FreeBSD's libc, libthr and kernel,
+  # and the C-backed end-to-end tests with the base system compiler.
+  test-freebsd:
+    name: Test - FreeBSD ${{ matrix.release }} - Go ${{ matrix.go }}
+    runs-on: ubuntu-latest
+    needs: [lint, formatting]
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ['15.1', '14.5']
+        go: ['1.25', 'stable']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Same meaning as setup-go's go-version in the other jobs: the newest
+      # 1.25.x patch release, or the newest stable release.
+      - name: Resolve Go version
+        id: go
+        shell: bash
+        run: |
+          if [ '${{ matrix.go }}' = stable ]; then
+            v=$(curl -fsSL 'https://go.dev/dl/?mode=json' | jq -r '[.[] | select(.stable)][0].version')
+          else
+            v=$(curl -fsSL 'https://go.dev/dl/?mode=json&include=all' | jq -r --arg p 'go${{ matrix.go }}.' \
+              '[.[] | select(.stable and (.version | startswith($p)))]
+               | sort_by(.version | ltrimstr($p) | tonumber) | last | .version')
+          fi
+          if [ -z "$v" ] || [ "$v" = null ]; then
+            echo "no Go release found for ${{ matrix.go }}"
+            exit 1
+          fi
+          echo "Go: $v"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Test in FreeBSD ${{ matrix.release }}
+        uses: vmactions/freebsd-vm@v1.5.9
+        env:
+          GO_VERSION: ${{ steps.go.outputs.version }}
+        with:
+          release: ${{ matrix.release }}
+          envs: GO_VERSION
+          prepare: |
+            fetch -o /tmp/go.tar.gz "https://go.dev/dl/${GO_VERSION}.freebsd-amd64.tar.gz"
+            rm -rf /usr/local/go
+            tar -C /usr/local -xzf /tmp/go.tar.gz
+          run: sh scripts/test-freebsd-vm.sh
+
   # Go tip, informational (not part of CI Success: tip can break for reasons
   # outside goffi). It shows compiler and runtime changes before a release
   # ships them, e.g. the amd64 LEAVE epilogue that made fakecgo's threadentry
@@ -661,7 +712,7 @@ jobs:
     name: CI Success
     # android-cross is deliberately absent: Android is a preview platform
     # (see the note above the android-cross job).
-    needs: [lint, lint-targets, formatting, cross-compile, test, test-go-stable, benchmarks, quality-gate, elf-linking]
+    needs: [lint, lint-targets, formatting, cross-compile, test, test-go-stable, test-freebsd, benchmarks, quality-gate, elf-linking]
     runs-on: ubuntu-latest
     if: success()
     steps:
@@ -674,6 +725,7 @@ jobs:
           echo "✅ Tests: PASSED (CGO_ENABLED=0 and CGO_ENABLED=1)"
           echo "   - Linux AMD64 + ARM64, Windows AMD64 + ARM64, macOS ARM64 + AMD64"
           echo "   - Go 1.25 (go.mod minimum) and Go stable"
+          echo "✅ FreeBSD: PASSED (tests in FreeBSD 14 and 15 VMs, amd64)"
           echo "✅ ELF Linking: PASSED (default dynamic + goffi_static)"
           echo "✅ Benchmarks: PASSED"
           echo "✅ Quality Gate: PASSED"
