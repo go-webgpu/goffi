@@ -254,6 +254,23 @@ int int_weighted3(int a, int b, int c) {
     return a + 2 * b + 3 * c;
 }
 
+// Narrow integer arguments widened to 64 bits by the callee: the result shows
+// whether the value the caller put in the register or stack slot is extended
+// the way the callee's compiler expects. gcc re-extends in the callee; clang
+// relies on the caller having extended char and short to 32 bits (Apple clang
+// 17, x86-64: narrow_s8 is `movslq %edi, %rax`).
+int64_t narrow_s8(int8_t a) { return a; }
+int64_t narrow_s16(int16_t a) { return a; }
+uint64_t narrow_u8(uint8_t a) { return a; }
+uint64_t narrow_u16(uint16_t a) { return a; }
+
+// The same on the stack: eight int64 fill the integer registers on every
+// target (6 on SysV, 4 on Win64, 8 on arm64), the narrow arguments follow.
+int64_t narrow_stack(int64_t r0, int64_t r1, int64_t r2, int64_t r3, int64_t r4, int64_t r5,
+                     int64_t r6, int64_t r7, int8_t a, int16_t b) {
+    return r0 + r1 + r2 + r3 + r4 + r5 + r6 + r7 + (int64_t)a * 100000 + b;
+}
+
 // Callbacks with stack arguments: C calls the Go callback with 1..10.
 int64_t cb_call_stack_i32x10(int64_t (*f)(int32_t, int32_t, int32_t, int32_t, int32_t,
                                           int32_t, int32_t, int32_t, int32_t, int32_t)) {

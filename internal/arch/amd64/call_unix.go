@@ -91,11 +91,22 @@ func (i *Implementation) Execute(
 			addFloat(*(*uintptr)(avalue[idx]))
 		case types.PointerType:
 			addInt(*(*uintptr)(avalue[idx]))
-		case types.SInt8Type, types.UInt8Type:
+		// Narrow integers are sign- or zero-extended to the full register, as
+		// libffi does (src/x86/ffi64.c, ffi_call_int). The psABI leaves the upper
+		// bits unspecified, but clang-built callees rely on the caller extending
+		// char and short to 32 bits: Apple clang compiles
+		// `int64_t f(int8_t a) { return a; }` to `movslq %edi, %rax`.
+		case types.SInt8Type:
+			addInt(uintptr(int64(*(*int8)(avalue[idx]))))
+		case types.UInt8Type:
 			addInt(uintptr(*(*uint8)(avalue[idx])))
-		case types.SInt16Type, types.UInt16Type:
+		case types.SInt16Type:
+			addInt(uintptr(int64(*(*int16)(avalue[idx]))))
+		case types.UInt16Type:
 			addInt(uintptr(*(*uint16)(avalue[idx])))
-		case types.SInt32Type, types.UInt32Type, types.IntType:
+		case types.SInt32Type, types.IntType:
+			addInt(uintptr(int64(*(*int32)(avalue[idx]))))
+		case types.UInt32Type:
 			addInt(uintptr(*(*uint32)(avalue[idx])))
 		case types.SInt64Type, types.UInt64Type:
 			addInt(uintptr(*(*uint64)(avalue[idx])))
