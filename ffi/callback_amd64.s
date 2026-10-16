@@ -2082,8 +2082,13 @@ TEXT ·callbackDispatcher(SB), NOSPLIT|NOFRAME, $0
 
 	CALL crosscall2(SB) // runtime.cgocallback(fn, frame, ctxt uintptr)
 
-	// Get callback result.
+	// Get callback result. callbackWrap stores it in its native register
+	// representation, so the same word serves both return registers: RAX for
+	// integer and pointer returns, XMM0 for float (low 32 bits) and double.
+	// XMM0 is caller-saved and unspecified for non-float returns, so writing
+	// it unconditionally is ABI-neutral (SysV psABI §3.2.3).
 	MOVQ (24+callbackArgs_result)(SP), AX
+	MOVQ AX, X0
 	ADDQ $(24+callbackArgs__size), SP     // remove callbackArgs struct
 
 	POP_REGS_HOST_TO_ABI0()

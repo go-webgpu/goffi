@@ -128,3 +128,54 @@ int64_t variadic_two_fixed(int64_t a, int64_t b, ...) {
     va_end(ap);
     return a + b + extra;
 }
+
+// C-to-Go callbacks with floating-point arguments and return values (#93).
+// The C compiler is the ground truth for the calling convention: these
+// callers place float/double arguments and read float/double results exactly
+// as any C library would, so the Go callback sees the real ABI rather than a
+// hand-built register frame.
+
+// float arguments arrive in the low 32 bits of XMMn / in Sn.
+int32_t cb_call_float_args(int32_t (*f)(float, float), float a, float b) {
+    return f(a, b);
+}
+
+int32_t cb_call_double_args(int32_t (*f)(double, double), double a, double b) {
+    return f(a, b);
+}
+
+// float/double results are read from XMM0 / S0 / D0.
+float cb_call_float_ret(float (*f)(int64_t), int64_t a) {
+    return f(a);
+}
+
+double cb_call_double_ret(double (*f)(int64_t), int64_t a) {
+    return f(a);
+}
+
+// Integer and floating-point arguments interleaved: each class fills its own
+// registers independently.
+double cb_call_mixed(double (*f)(int32_t, float, int64_t, double, float),
+                     int32_t a, float b, int64_t c, double d, float e) {
+    return f(a, b, c, d, e);
+}
+
+// Nine floats: the first eight in XMM0-7 / S0-S7, the ninth on the stack.
+// The result is computed by C from the callback's float return.
+typedef float (*float9_fn)(float, float, float, float, float, float, float, float, float);
+float cb_call_float9(float9_fn f) {
+    return f(1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.5f) + 0.25f;
+}
+
+// Eight doubles in registers, then a float and a double on the stack.
+typedef double (*double8_float_double_fn)(double, double, double, double, double, double, double, double,
+                                          float, double);
+double cb_call_stack_float_double(double8_float_double_fn f) {
+    return f(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.5f, 10.25);
+}
+
+// A callback whose integer result must not be disturbed by the float result
+// register: the C caller reads only RAX / X0.
+int64_t cb_call_int_ret(int64_t (*f)(double), double a) {
+    return f(a);
+}

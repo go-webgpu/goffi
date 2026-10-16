@@ -3,6 +3,7 @@
 package ffi
 
 import (
+	"math"
 	"runtime"
 	"sync"
 	"testing"
@@ -164,11 +165,10 @@ func TestCallback_Float32Args(t *testing.T) {
 	idx := callbackIndex(ptr)
 
 	var frame [128]uintptr
-	// Float32 args go in XMM registers (as float64)
-	f1 := float64(2.5)
-	f2 := float64(4.0)
-	frame[0] = *(*uintptr)(unsafe.Pointer(&f1)) // XMM0
-	frame[1] = *(*uintptr)(unsafe.Pointer(&f2)) // XMM1
+	// A float argument is single precision in the low 32 bits of XMMn / Sn,
+	// not a double. Garbage in the upper half must be ignored.
+	frame[0] = 0xDEADBEEF_00000000 | uintptr(math.Float32bits(2.5)) // XMM0 / S0
+	frame[1] = uintptr(math.Float32bits(4.0))                       // XMM1 / S1
 
 	args := &callbackArgs{
 		index:  idx,
@@ -178,13 +178,80 @@ func TestCallback_Float32Args(t *testing.T) {
 
 	callbackWrap(args)
 
-	// Result is float32 stored as float64 bits
-	resultF64 := *(*float64)(unsafe.Pointer(&args.result))
-	result = float32(resultF64)
+	// A float result is single precision in the low 32 bits, upper bits zero;
+	// the dispatcher hands this word to the caller in XMM0 / S0.
+	if want := uintptr(math.Float32bits(10.0)); args.result != want {
+		t.Errorf("result word = %#x, want %#x (float32 10.0)", args.result, want)
+	}
+	if result != 10.0 {
+		t.Errorf("callback computed %v, want 10", result)
+	}
+}
 
-	expected := float32(10.0)
-	if result < expected-0.001 || result > expected+0.001 {
-		t.Errorf("Expected result ~%.2f, got %.2f", expected, result)
+// Test a float argument passed on the stack after the eight float registers:
+// it occupies the low 4 bytes of an 8-byte slot (SysV, Linux/FreeBSD AAPCS64).
+func TestCallback_Float32StackArg(t *testing.T) {
+	var got float32
+	callback := func(_, _, _, _, _, _, _, _ float64, ninth float32) {
+		got = ninth
+	}
+
+	ptr := NewCallback(callback)
+	idx := callbackIndex(ptr)
+
+	var frame [128]uintptr
+	frame[callbackStackIndex(0)] = 0xFFFFFFFF_00000000 | uintptr(math.Float32bits(-6.5))
+
+	callbackWrap(&callbackArgs{index: idx, args: unsafe.Pointer(&frame)})
+
+	if got != -6.5 {
+		t.Errorf("ninth float argument = %v, want -6.5", got)
+	}
+}
+
+// Test that a float64 result is returned as its IEEE 754 bit pattern.
+func TestCallback_Float64Return(t *testing.T) {
+	callback := func(a float64) float64 { return a * 1.25 }
+
+	ptr := NewCallback(callback)
+	idx := callbackIndex(ptr)
+
+	var frame [128]uintptr
+	frame[0] = uintptr(math.Float64bits(3.0)) // XMM0 / D0
+
+	args := &callbackArgs{
+		index: idx,
+		args:  unsafe.Pointer(&frame),
+	}
+
+	callbackWrap(args)
+
+	if want := uintptr(math.Float64bits(3.75)); args.result != want {
+		t.Errorf("result word = %#x, want %#x (float64 3.75)", args.result, want)
+	}
+}
+
+// Test that named float types are accepted as arguments.
+func TestCallback_NamedFloatArgs(t *testing.T) {
+	type celsius float32
+	type meters float64
+	var gotC celsius
+	var gotM meters
+	callback := func(c celsius, m meters) {
+		gotC, gotM = c, m
+	}
+
+	ptr := NewCallback(callback)
+	idx := callbackIndex(ptr)
+
+	var frame [128]uintptr
+	frame[0] = uintptr(math.Float32bits(21.5))
+	frame[1] = uintptr(math.Float64bits(1.75))
+
+	callbackWrap(&callbackArgs{index: idx, args: unsafe.Pointer(&frame)})
+
+	if gotC != 21.5 || gotM != 1.75 {
+		t.Errorf("callback received (%v, %v), want (21.5, 1.75)", gotC, gotM)
 	}
 }
 

@@ -4088,9 +4088,14 @@ TEXT ·callbackDispatcher(SB), NOSPLIT|NOFRAME, $0
 
 	BL crosscall2(SB)
 
-	// Get callback result.
-	MOVD $(callbackArgs__size)(RSP), R13
-	MOVD callbackArgs_result(R13), R0
+	// Get callback result. callbackWrap stores it in its native register
+	// representation, so the same word serves both return registers: X0 for
+	// integer and pointer returns, D0 for double and S0 (= low half of D0) for
+	// float. In AAPCS64 v0-v7 are argument/result registers that a callee
+	// need not preserve, so writing V0 for a non-float return is ABI-neutral.
+	MOVD  $(callbackArgs__size)(RSP), R13
+	MOVD  callbackArgs_result(R13), R0
+	FMOVD R0, F0
 
 	// Restore LR and R27.
 	LDP 0(RSP), (R27, R30)
