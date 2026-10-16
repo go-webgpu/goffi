@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-10-16
+
 ### Changed
+- **README no longer carries version numbers.** The per-version roadmap table and the stale version footer are gone (the plan lives in `ROADMAP.md` and the milestones, the history in this file), and the platform table now says how each target is verified: native CI test runners for Linux, Windows and macOS on amd64 and arm64; cross-compiled build and test build for FreeBSD.
 - **CI: Android arm64 jobs are informational, not a merge gate.** Android is a preview platform (`docs/ANDROID.md`: physical-device startup validation is still pending), but `android-cross` was in `CI Success`'s `needs`, so an Android-only failure, including the October 2026 `setup-android` breakage outside goffi, blocked every pull request. The jobs still run and show on each PR; they go back into the required set once Android leaves preview.
 - **Docs: hold pointer arguments in `unsafe.Pointer` variables, never `uintptr`.** A `uintptr` hides the target from escape analysis, so a local it points to can stay on the goroutine stack and move before the C function runs; Go pointers stored in memory that C reads must be pinned with `runtime.Pinner`. The package docs say so now, and the README `strlen` example no longer uses a `uintptr`. Two of goffi's own tests had this bug and failed at random on linux/arm64.
 - **CI: every supported target is linted.** `.golangci.yml` no longer sets `build-tags: [linux]` (a GOOS-named tag adds files instead of switching the target, so linting off Linux type-checked nothing), and a new `lint-targets` job lints linux/arm64, darwin, windows and freebsd (amd64 and arm64) plus linux/amd64 with `CGO_ENABLED=1`; android/arm64 is linted in the informational Android job. Until now CI linted only linux/amd64.
@@ -24,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`LoadLibrary` / `GetSymbol`: names containing a NUL byte.** On Windows `GetSymbol` panicked (deprecated `syscall.StringBytePtr`); on Linux, macOS, FreeBSD and Android the name was cut at the NUL, so a different library or symbol could be loaded. Both functions now return a `*LibraryError` wrapping `syscall.EINVAL` on every OS.
 - Windows ARM64: `go test ./internal/arch/arm64` failed with `[setup failed]` because a test file imported `internal/fakecgo`, which has no Windows files.
 - `internal/fakecgo`: smaller cleanups from purego — `crosscall2` on arm64 no longer calls `runtime·load_g` ([purego#456](https://github.com/ebitengine/purego/pull/456)), `x_cgo_init` keeps `pthread_attr_t` on the stack ([purego#432](https://github.com/ebitengine/purego/pull/432)), `pthread_attr_t` has the 8-byte alignment of the C type, and the Darwin mutex/cond types use `structs.HostLayout` ([purego#502](https://github.com/ebitengine/purego/pull/502)).
-- **FreeBSD amd64: callbacks pointed into a data page** — `ffi/callback_amd64.s` carried `(linux || darwin) && amd64` while `ffi/callback.go` carried `(linux || darwin || freebsd) && amd64`, so on freebsd/amd64 the assembly trampoline table was never built and the `//go:linkname` placeholder variable became `ffi.callbackTrampoline`. The build succeeded, but `NewCallback` returned addresses in the data segment (`go tool nm`: `D`, not `T`). The assembly now builds on FreeBSD too.
+- **FreeBSD amd64: callbacks pointed into a data page** — `ffi/callback_amd64.s` carried `(linux || darwin) && amd64` while `ffi/callback.go` carried `(linux || darwin || freebsd) && amd64`, so on freebsd/amd64 the assembly trampoline table was never built and the `//go:linkname` placeholder variable became `ffi.callbackTrampoline`. The build succeeded, but `NewCallback` returned addresses in the data segment (`go tool nm`: `D` or `B` depending on the toolchain, not `T`). The assembly now builds on FreeBSD too.
 - CI: `scripts/check-callback-trampolines.sh` links a consumer for every asm-trampoline target (linux, darwin, freebsd × amd64, arm64) and fails unless `ffi.callbackTrampoline` is a text symbol.
 
 ## [0.6.4] - 2026-09-10
@@ -908,7 +911,8 @@ See [ROADMAP.md](ROADMAP.md) for detailed roadmap to v1.0.
 
 ---
 
-[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.6.4...HEAD
+[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.6.5...HEAD
+[0.6.5]: https://github.com/go-webgpu/goffi/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/go-webgpu/goffi/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/go-webgpu/goffi/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/go-webgpu/goffi/compare/v0.6.1...v0.6.2

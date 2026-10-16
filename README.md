@@ -432,39 +432,23 @@ if err != nil {
 
 ## Platform Support
 
-| Platform | Arch | ABI | Since | CI |
-|----------|------|-----|-------|----|
-| Windows | amd64 | Win64 | v0.1.0 | Tested |
-| Windows | arm64 | AAPCS64 | v0.5.0 | Tested (Snapdragon X) |
-| Linux | amd64 | System V | v0.1.0 | Tested |
-| Linux | arm64 | AAPCS64 | v0.3.0 | Cross-compile verified |
-| macOS | amd64 | System V | v0.1.1 | Tested |
-| macOS | arm64 | AAPCS64 | v0.3.7 | Tested (M3 Pro) |
-| FreeBSD | amd64 | System V | v0.5.0 | Cross-compile verified |
-| FreeBSD | arm64 | AAPCS64 | v0.5.3 | Cross-compile verified |
-| Android | arm64 | AAPCS64 (Bionic) | v0.6.1 | Guarded preview (API 29+) |
+| Platform | Arch | ABI | Verification |
+|----------|------|-----|--------------|
+| Windows | amd64 | Win64 | CI: tests on a native runner |
+| Windows | arm64 | AAPCS64 | CI: tests on a native runner |
+| Linux | amd64 | System V | CI: tests on a native runner |
+| Linux | arm64 | AAPCS64 | CI: tests on a native runner |
+| macOS | amd64 | System V | CI: tests on a native runner |
+| macOS | arm64 | AAPCS64 | CI: tests on a native runner |
+| FreeBSD | amd64 | System V | CI: cross-compiled build and test build (tests not run yet) |
+| FreeBSD | arm64 | AAPCS64 | CI: cross-compiled build and test build (tests not run yet) |
+| Android | arm64 | AAPCS64 (Bionic) | Guarded preview (API 29+), cross-compiled in CI |
 
 ---
 
 ## Roadmap
 
-| Version | Status | Highlights |
-|---------|--------|------------|
-| v0.2.0 | Released | Callback API, 2000-entry trampoline table |
-| v0.3.x | Released | ARM64 (AAPCS64), HFA, Apple Silicon |
-| v0.4.0 | Released | crosscall2 for C-thread callbacks |
-| v0.4.1 | Released | ABI compliance audit — 10/11 gaps fixed |
-| v0.4.2 | Released | purego compatibility (`-tags nofakecgo`) |
-| v0.5.1 | Released | Struct ABI, CGO_ENABLED=1, 9-16B XMM return |
-| v0.6.0 | Released | errno always-capture (`CallFunction` → `(Errno, error)`) |
-| v0.6.1 | Released | Android ARM64 preview, fakecgo rename |
-| v0.6.2 | Released | Windows scalar float returns |
-| v0.6.3 | Released | ARM64 HFA checkptr + 9-16B struct return fix |
-| **v0.6.4** | **Released** | `-tags goffi_static`, linking docs, struct examples |
-| v0.7.0 | Planned | RegisterFunc / Builder API, C-ABI host profile (#81) |
-| v1.0.0 | Planned | API stability (SemVer 2.0), security audit |
-
-See [CHANGELOG.md](CHANGELOG.md) for version history and [ROADMAP.md](ROADMAP.md) for the full plan.
+Planned work: [ROADMAP.md](ROADMAP.md) and the [milestones](https://github.com/go-webgpu/goffi/milestones). What each release changed: [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -488,7 +472,7 @@ go test -v ./ffi                       # verbose, auto-detects platform
 | [docs/ANDROID.md](docs/ANDROID.md) | Android ARM64 preview ABI + build notes |
 | [docs/ADR-001-userspace-elf-loader.md](docs/ADR-001-userspace-elf-loader.md) | Research: optional pure-Go `.so` loader |
 | [CHANGELOG.md](CHANGELOG.md) | Version history, migration guides |
-| [ROADMAP.md](ROADMAP.md) | Development roadmap to v1.0 |
+| [ROADMAP.md](ROADMAP.md) | Development roadmap |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
 | [SECURITY.md](SECURITY.md) | Security policy |
 | [examples/](examples/) | Working code examples (`simple`, `struct`) |
@@ -543,4 +527,4 @@ MIT — see [LICENSE](LICENSE).
 
 ---
 
-*goffi v0.4.1 | [GitHub](https://github.com/go-webgpu/goffi) | [pkg.go.dev](https://pkg.go.dev/github.com/go-webgpu/goffi) | [Dev.to](https://dev.to/kolkov/goffi-zero-cgo-foreign-function-interface-for-go-how-we-call-c-libraries-without-a-c-compiler-ca5)*
+*[GitHub](https://github.com/go-webgpu/goffi) | [pkg.go.dev](https://pkg.go.dev/github.com/go-webgpu/goffi) | [Dev.to](https://dev.to/kolkov/goffi-zero-cgo-foreign-function-interface-for-go-how-we-call-c-libraries-without-a-c-compiler-ca5)*

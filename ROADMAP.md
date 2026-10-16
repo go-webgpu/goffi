@@ -3,7 +3,7 @@
 > **Strategic Approach**: Build production-ready Zero-CGO FFI with benchmarked performance
 > **Philosophy**: Performance first, usability second, platform coverage third
 
-**Last Updated**: 2026-09-10 | **Current Version**: v0.6.4 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → ABI → v1.0 LTS | **Milestone**: v0.6.4 `goffi_static` → v0.7.0 RegisterFunc/Builder → v1.0.0 LTS
+**Last Updated**: 2026-10-16 | **Current Version**: v0.6.5 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → ABI → v1.0 LTS | **Milestone**: v0.6.5 fakecgo fixes + native CI → v0.6.6 callback float ABI → v0.7.0 RegisterFunc/Builder → v1.0.0 LTS
 
 ---
 
@@ -181,6 +181,16 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 - Struct pass/return examples (`examples/struct/`, #58 / PR #69)
 - Docs: avalue out-pointer double-indirection (#79 / PR #80)
 
+**v0.6.5** = fakecgo fixes + native CI on every target ✅ RELEASED (2026-10-16)
+- macOS/FreeBSD signal mask on new threads (per-OS `SIG_*`) — PR #90
+- Linux `syscall.Setuid` & co. no longer panic; thread-exit crashes on amd64 (Go 1.28 `LEAVE`) and linux/arm64 fixed; FreeBSD `libthr.so.3`; NetBSD fakecgo layouts — PR #92
+- FreeBSD amd64 callback trampolines link as code (#83 by @unxed)
+- NUL bytes in `LoadLibrary` / `GetSymbol` names rejected
+- CI: tests run natively on Linux/Windows/macOS × amd64/arm64 on Go 1.25 + stable, lint on every target
+
+**v0.6.6** = Callback float ABI (planned)
+- `float32` callback arguments and float return values on Unix amd64/arm64 ([#93](https://github.com/go-webgpu/goffi/issues/93))
+
 **v0.7.0** = RegisterFunc + Builder API (2026 Q3-Q4)
 - RegisterFunc convenience API (ADR-008)
 - Library struct + OpenLibraryBytes (ADR-009)
@@ -195,9 +205,9 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 
 ---
 
-## 📊 Current Status (v0.6.4)
+## 📊 Current Status (v0.6.5)
 
-**Phase**: `goffi_static` linking profile shipped. 9 platforms. Next: RegisterFunc/Builder ergonomics for v0.7.0
+**Phase**: fakecgo hardening and native CI on every hosted target shipped. 9 platforms. Next: callback float ABI (v0.6.6), then RegisterFunc/Builder ergonomics for v0.7.0
 
 **What Works**:
 - ✅ Dynamic library loading (`LoadLibrary`, `GetSymbol`, `FreeLibrary`)
