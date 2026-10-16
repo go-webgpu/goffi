@@ -6,27 +6,52 @@
 package ffi
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"unsafe"
 
 	"github.com/go-webgpu/goffi/types"
 )
 
-var structTestLib unsafe.Pointer
+var (
+	structTestLib unsafe.Pointer
+	// structTestLibSkip says why the C-backed tests skip; empty when the
+	// library was built and loaded.
+	structTestLibSkip string
+)
 
+// errNoCCompiler reports that there is no C compiler for the platform the
+// tests run on: none installed, or one that targets another architecture.
+var errNoCCompiler = errors.New("no C compiler for this target")
+
+// The C-backed end-to-end tests (struct, variadic, callback float ABI) build
+// testdata/structtest.c and load it. They skip only for a reason that makes
+// running them impossible here; anything else that keeps the library from
+// loading is a test failure, never a skip.
 func TestMain(m *testing.M) {
-	// Android test binaries run on-device, where invoking a host compiler is
-	// neither meaningful nor available. Keep the pure validation tests active
-	// and let only the host-built shared-library cases skip via requireStructLib.
-	if runtime.GOOS != "android" {
-		if err := buildStructTestLib(); err != nil {
-			// If gcc is not available, skip struct e2e tests gracefully.
-			// Other tests still run.
-			structTestLib = nil
+	if runtime.GOOS == "android" {
+		// Android test binaries run on-device, where invoking a host compiler
+		// is neither meaningful nor available.
+		structTestLibSkip = "android tests run on-device without a C compiler"
+	} else {
+		err := buildStructTestLib()
+		switch {
+		case err == nil:
+		case errors.Is(err, ErrStaticBuild):
+			structTestLibSkip = "dynamic loading is unavailable in this build (-tags goffi_static)"
+		case errors.Is(err, errNoCCompiler) && os.Getenv("GOFFI_REQUIRE_TESTLIB") != "1":
+			structTestLibSkip = err.Error()
+		default:
+			// CI sets GOFFI_REQUIRE_TESTLIB=1 on every runner that has a
+			// compiler for its own architecture, so losing it fails the job.
+			fmt.Fprintf(os.Stderr, "ffi tests: C test library unavailable: %v\n", err)
+			os.Exit(1)
 		}
 	}
 	code := m.Run()
@@ -52,14 +77,24 @@ func buildStructTestLib() error {
 	if cc == "" {
 		cc = "gcc"
 	}
+	ccPath, err := exec.LookPath(cc)
+	if err != nil {
+		return fmt.Errorf("%w (set CC): %v", errNoCCompiler, err)
+	}
+	// A compiler for another architecture cannot produce a library this
+	// process can load (windows-11-arm runners ship an x86-64 MinGW gcc).
+	if triple := ccTargetTriple(ccPath); triple != "" && !tripleMatchesGOARCH(triple) {
+		return fmt.Errorf("%w (set CC): %s targets %s, the tests run on %s/%s",
+			errNoCCompiler, cc, triple, runtime.GOOS, runtime.GOARCH)
+	}
 	args := []string{"-shared", "-O2", "-o", soPath, srcPath}
 	if runtime.GOOS != "windows" {
 		args = []string{"-shared", "-fPIC", "-O2", "-o", soPath, srcPath}
 	}
-	cmd := exec.Command(cc, args...)
+	cmd := exec.Command(ccPath, args...)
 	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return err
+	if err = cmd.Run(); err != nil {
+		return fmt.Errorf("%s %s: %w", cc, srcPath, err)
 	}
 
 	absPath, err := filepath.Abs(soPath)
@@ -68,16 +103,39 @@ func buildStructTestLib() error {
 	}
 	lib, err := LoadLibrary(absPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("load %s: %w", absPath, err)
 	}
 	structTestLib = lib
 	return nil
 }
 
+// ccTargetTriple returns the target triple the C compiler reports
+// (gcc and clang: -dumpmachine), or "" when it does not say.
+func ccTargetTriple(ccPath string) string {
+	out, err := exec.Command(ccPath, "-dumpmachine").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// tripleMatchesGOARCH reports whether a target triple such as
+// "x86_64-linux-gnu" or "arm64-apple-darwin24.0.0" is for runtime.GOARCH.
+func tripleMatchesGOARCH(triple string) bool {
+	arch, _, _ := strings.Cut(triple, "-")
+	switch runtime.GOARCH {
+	case "amd64":
+		return arch == "x86_64" || arch == "amd64"
+	case "arm64":
+		return arch == "aarch64" || arch == "arm64"
+	}
+	return true
+}
+
 func requireStructLib(t *testing.T) {
 	t.Helper()
 	if structTestLib == nil {
-		t.Skip("structtest library not available (gcc required)")
+		t.Skip("C test library not available: " + structTestLibSkip)
 	}
 }
 

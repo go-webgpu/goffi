@@ -320,6 +320,13 @@ jobs:
       id-token: write  # Required for Codecov OIDC tokenless upload
     env:
       CGO_ENABLED: ${{ matrix.cgo }}
+      # The C-backed end-to-end tests (ffi/testdata/structtest.c: struct,
+      # variadic and callback float ABI) build their library with the runner's
+      # C compiler. Require one for the runner's own architecture wherever it
+      # exists, so losing it fails the job instead of turning those tests into
+      # skips. windows-11-arm only has an x86-64 MinGW gcc, which cannot build
+      # a DLL an arm64 process can load; there the tests skip and say why.
+      GOFFI_REQUIRE_TESTLIB: ${{ matrix.os != 'windows-11-arm' && '1' || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -420,6 +427,7 @@ jobs:
     needs: [lint, formatting]
     env:
       CGO_ENABLED: ${{ matrix.cgo }}
+      GOFFI_REQUIRE_TESTLIB: ${{ matrix.os != 'windows-11-arm' && '1' || '' }} # see the test job
     strategy:
       fail-fast: false
       matrix:
@@ -450,6 +458,8 @@ jobs:
     name: Test - Go tip - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     needs: [lint, formatting]
+    env:
+      GOFFI_REQUIRE_TESTLIB: '1' # see the test job
     strategy:
       fail-fast: false
       matrix:
