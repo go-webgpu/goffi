@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-10-16
+
 ### Changed
 - **`CallFunction` and `CallFunctionContext` require exactly one argument value per argument type.** The documentation always said so, but nothing checked it: with fewer values, amd64 called the function with whatever the missing registers held (Unix) or indexed past the end of the slice (Windows), and arm64 returned an untyped error; extra values were ignored on every architecture. A count mismatch is now an `*InvalidCallInterfaceError` with `Field: "avalue"`, returned before the call.
 
@@ -926,7 +928,8 @@ See [ROADMAP.md](ROADMAP.md) for detailed roadmap to v1.0.
 
 ---
 
-[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.6.5...HEAD
+[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.6.6...HEAD
+[0.6.6]: https://github.com/go-webgpu/goffi/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/go-webgpu/goffi/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/go-webgpu/goffi/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/go-webgpu/goffi/compare/v0.6.2...v0.6.3
