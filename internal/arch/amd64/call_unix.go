@@ -79,12 +79,9 @@ func (i *Implementation) Execute(
 		addInt(uintptr(rvalue))
 	}
 
-	// Map arguments to registers or stack
+	// Map arguments to registers or stack. ffi.CallFunctionContext has checked
+	// that avalue holds a value for every argument type.
 	for idx, argType := range cif.ArgTypes {
-		if idx >= len(avalue) {
-			break
-		}
-
 		switch argType.Kind {
 		case types.FloatType:
 			// Use math.Float32bits to preserve exact bit pattern in XMM register.

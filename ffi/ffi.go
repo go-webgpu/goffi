@@ -90,6 +90,7 @@ package ffi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"syscall"
 	"unsafe"
 
@@ -218,11 +219,12 @@ func PrepareVariadicCallInterface(
 //   - cif: Prepared call interface (from PrepareCallInterface)
 //   - fn: Function pointer obtained from GetSymbol (must not be nil)
 //   - rvalue: Pointer to buffer for return value (can be nil for void functions)
-//   - avalue: Slice of pointers to argument values (length must match argCount from PrepareCallInterface)
+//   - avalue: Slice of pointers to argument values, one per argument type of cif
 //
 // Returns:
 //   - errno: C errno captured after the call (0 on success or Windows)
-//   - err: nil on success; ctx.Err() if context cancelled; ErrInvalidCallInterface if cif or fn is nil
+//   - err: nil on success; ctx.Err() if context cancelled; *InvalidCallInterfaceError if cif or fn
+//     is nil or len(avalue) differs from the number of argument types
 //
 // Example:
 //
@@ -304,6 +306,16 @@ func CallFunctionContext(
 			Index:  -1,
 		}
 	}
+	// One value per argument type, as libffi's ffi_call expects. A missing value
+	// would leave its register or stack slot holding whatever was there before
+	// the call; an extra one means the caller and the cif disagree.
+	if len(avalue) != len(cif.ArgTypes) {
+		return 0, &InvalidCallInterfaceError{
+			Field:  "avalue",
+			Reason: fmt.Sprintf("%d values for %d argument types", len(avalue), len(cif.ArgTypes)),
+			Index:  -1,
+		}
+	}
 
 	cerrno, err := executeFunction(cif, fn, rvalue, avalue)
 	return syscall.Errno(cerrno), err
@@ -322,11 +334,12 @@ func CallFunctionContext(
 //   - cif: Prepared call interface (from PrepareCallInterface)
 //   - fn: Function pointer obtained from GetSymbol (must not be nil)
 //   - rvalue: Pointer to buffer for return value (can be nil for void functions)
-//   - avalue: Slice of pointers to argument values (length must match argCount from PrepareCallInterface)
+//   - avalue: Slice of pointers to argument values, one per argument type of cif
 //
 // Returns:
 //   - errno: C errno captured after the call (0 on success or Windows)
-//   - err: nil on success; ErrInvalidCallInterface if cif or fn is nil
+//   - err: nil on success; *InvalidCallInterfaceError if cif or fn is nil or len(avalue)
+//     differs from the number of argument types
 //
 // Example:
 //

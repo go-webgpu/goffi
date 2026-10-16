@@ -37,9 +37,8 @@ func (i *Implementation) Execute(
 	avalue []unsafe.Pointer,
 	errnoFn uintptr,
 ) (cerrno uintptr, err error) {
-	if len(avalue) < len(cif.ArgTypes) {
-		return 0, fmt.Errorf("goffi: %d argument values for %d argument types", len(avalue), len(cif.ArgTypes))
-	}
+	// ffi.CallFunctionContext has checked that avalue holds a value for every
+	// argument type.
 	locs, stackBytes, err := layoutArgs(cif, runtime.GOOS)
 	if err != nil {
 		return 0, err
