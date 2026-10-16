@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Callbacks on Unix (amd64, arm64): `float32` arguments and float return values were wrong.** A C caller passes a `float` as single precision in the low 32 bits of XMMn / Sn (and of its 8-byte stack slot), but `callbackWrap` read the slot as a `float64` and converted it, so the Go callback received garbage (0 for typical values). For results, the dispatcher only loaded RAX / X0 and never set XMM0 / D0: a `float32` result reached C as garbage, and a `float64` result was correct only because XMM0 happened to still hold it. The arguments are now decoded from their bit patterns, and the dispatcher loads the result word, kept in its native register representation, into both the integer and the floating-point result register, as the System V and AAPCS64 calling conventions require. Named float types (`type Celsius float32`) are accepted as arguments too. `TestCallback_Float32Args` encoded its arguments as doubles and so mirrored the bug; it now uses the real layout, and new end-to-end tests let C code from `ffi/testdata/structtest.c` call Go callbacks with float and double arguments in registers and on the stack, and with float, double and integer results. Windows callbacks, which accept only `uintptr`-sized values, are unchanged. ([#93](https://github.com/go-webgpu/goffi/issues/93))
+
 ## [0.6.5] - 2026-10-16
 
 ### Changed

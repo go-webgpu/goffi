@@ -262,7 +262,7 @@ FFI overhead: 0.0001ms = 0.001% ✅
 | **Per-call allocations** | Zero (CIF reused) | reflect dispatch + sync.Pool per call |
 | **Type Safety** | ✅ TypeDescriptor validation | Go reflect.Type |
 | **Error Handling** | ✅ 5 typed errors | Generic errors |
-| **Callback float returns** | ✅ XMM0 in asm | ❌ panic |
+| **Callback float returns** | ✅ XMM0 / D0 (Unix amd64, arm64) | ❌ panic |
 | **Struct return 9-16B** | ✅ 4 modes (RAX/XMM × RAX/XMM) | ✅ 4 modes (f1/f2 + a1/a2) |
 | **Callback struct args** | ✅ ≤8B, 9-16B, >16B | ❌ panic |
 | **ARM64 HFA** | Recursive struct walk | Partial recursive (bug in nested path) |

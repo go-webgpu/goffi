@@ -6,6 +6,7 @@
 package ffi
 
 import (
+	"math"
 	"reflect"
 	"structs"
 	"sync"
@@ -117,9 +118,16 @@ var callbackWrap_call = callbackWrap
 // addCompletedHandler: dispatching on internal C threads).
 //
 // ARM64 AAPCS64 argument block layout:
-//   - Floats: D0-D7 (8 registers, 64 bytes)
+//   - Floats: D0-D7 (8 registers, 64 bytes); a float32 is S<n>, the low 32 bits
 //   - Integers: X0-X7 (8 registers, 64 bytes)
-//   - Stack arguments follow in memory
+//   - Stack arguments follow in memory, one 8-byte slot per scalar. Apple's
+//     arm64 ABI packs stack arguments to their natural size instead; that case
+//     is not handled here yet.
+//
+// The return value is stored in a.result in its native register representation
+// (integers and pointers as is, float32 as math.Float32bits zero-extended,
+// float64 as math.Float64bits). The dispatcher loads a.result into both X0 and
+// D0.
 func callbackWrap(a *callbackArgs) {
 	callbacks.mu.Lock()
 	fn := callbacks.funcs[a.index]
@@ -146,30 +154,23 @@ func callbackWrap(a *callbackArgs) {
 		var val reflect.Value
 
 		switch argType.Kind() {
-		case reflect.Float32:
+		case reflect.Float32, reflect.Float64:
+			// The dispatcher stores D0-D7 whole. A float arrives in S<n>,
+			// the low 32 bits of D<n>; on the stack it occupies the low 4
+			// bytes of an 8-byte slot (Linux/FreeBSD AAPCS64). Reinterpret
+			// those bits, do not convert a double.
+			var bits uintptr
 			if floatIdx < numFloatRegs {
-				bits := frame[floatIdx]
-				f64 := *(*float64)(unsafe.Pointer(&bits))
-				val = reflect.ValueOf(float32(f64))
+				bits = frame[floatIdx]
 				floatIdx++
 			} else {
-				bits := frame[stackIdx]
-				f64 := *(*float64)(unsafe.Pointer(&bits))
-				val = reflect.ValueOf(float32(f64))
+				bits = frame[stackIdx]
 				stackIdx++
 			}
-
-		case reflect.Float64:
-			if floatIdx < numFloatRegs {
-				bits := frame[floatIdx]
-				f64 := *(*float64)(unsafe.Pointer(&bits))
-				val = reflect.ValueOf(f64)
-				floatIdx++
+			if argType.Kind() == reflect.Float32 {
+				val = reflect.ValueOf(math.Float32frombits(uint32(bits))).Convert(argType)
 			} else {
-				bits := frame[stackIdx]
-				f64 := *(*float64)(unsafe.Pointer(&bits))
-				val = reflect.ValueOf(f64)
-				stackIdx++
+				val = reflect.ValueOf(math.Float64frombits(uint64(bits))).Convert(argType)
 			}
 
 		case reflect.Bool:
@@ -239,9 +240,13 @@ func callbackWrap(a *callbackArgs) {
 			}
 		case reflect.Pointer, reflect.UnsafePointer:
 			a.result = ret.Pointer()
-		case reflect.Float32, reflect.Float64:
-			f64 := ret.Float()
-			a.result = *(*uintptr)(unsafe.Pointer(&f64))
+		case reflect.Float32:
+			// Single precision in the low 32 bits, upper bits zero. The
+			// dispatcher copies result into both X0 and D0, so a float return
+			// reaches the caller in S0 (as libffi's closure does: ldr s0).
+			a.result = uintptr(math.Float32bits(float32(ret.Float())))
+		case reflect.Float64:
+			a.result = uintptr(math.Float64bits(ret.Float()))
 		}
 	}
 }

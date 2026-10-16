@@ -6,6 +6,7 @@
 package ffi
 
 import (
+	"math"
 	"reflect"
 	"structs"
 	"sync"
@@ -34,7 +35,7 @@ type callbackArgs struct {
 	_      structs.HostLayout
 	index  uintptr        // Callback index (0-1999)
 	args   unsafe.Pointer // Pointer to register/stack argument block
-	result uintptr        // Return value from Go callback
+	result uintptr        // Return value from Go callback, see callbackWrap
 }
 
 // NewCallback registers a Go function as a C callback and returns a function pointer.
@@ -164,9 +165,15 @@ var callbackWrap_call = callbackWrap
 //
 // The assembly trampoline has already saved all CPU registers into a contiguous
 // memory block pointed to by a.args. The memory layout follows the System V AMD64 ABI:
-//   - Floats: XMM0-XMM7 (8 registers, 64 bytes)
+//   - Floats: XMM0-XMM7 (8 registers, 64 bytes); a float32 is the low 32 bits
 //   - Integers: RDI, RSI, RDX, RCX, R8, R9 (6 registers, 48 bytes)
-//   - Stack arguments follow in memory
+//   - Stack arguments follow in memory, one 8-byte slot per scalar
+//
+// The return value is stored in a.result in its native register representation
+// (integers and pointers as is, float32 as math.Float32bits zero-extended,
+// float64 as math.Float64bits). The dispatcher loads a.result into both RAX and
+// XMM0; the register the caller does not read for the declared return type is
+// caller-saved, so writing both is ABI-neutral.
 //
 // This function uses reflection to dynamically convert the register values into
 // properly-typed Go values, which adds some overhead but provides type safety.
@@ -194,17 +201,19 @@ func callbackWrap(a *callbackArgs) {
 	var intIdx int                        // Current integer register index (0-5)
 	stackIdx := numFloatRegs + numIntRegs // Stack arguments start after registers
 
-	getFloat := func() float64 {
-		// Float64 comes from XMM register
+	// getFloatBits returns the raw 64 bits of the next SSE-class eightbyte: an
+	// XMM register while one is left, otherwise the next stack slot. A float
+	// occupies the low 32 bits (both in XMMn and in its 8-byte stack slot), a
+	// double all 64; callers decode accordingly.
+	getFloatBits := func() uint64 {
 		if floatIdx < numFloatRegs {
 			bits := frame[floatIdx]
 			floatIdx++
-			return *(*float64)(unsafe.Pointer(&bits))
-		} else {
-			bits := frame[stackIdx]
-			stackIdx++
-			return *(*float64)(unsafe.Pointer(&bits))
+			return uint64(bits)
 		}
+		bits := frame[stackIdx]
+		stackIdx++
+		return uint64(bits)
 	}
 
 	getInt := func() uintptr {
@@ -243,10 +252,12 @@ func callbackWrap(a *callbackArgs) {
 
 		switch argType.Kind() {
 		case reflect.Float32:
-			val = reflect.ValueOf(float32(getFloat()))
+			// The caller passes a single-precision value, not a double:
+			// reinterpret the low 32 bits, do not convert a float64.
+			val = reflect.ValueOf(math.Float32frombits(uint32(getFloatBits()))).Convert(argType)
 
 		case reflect.Float64:
-			val = reflect.ValueOf(getFloat())
+			val = reflect.ValueOf(math.Float64frombits(getFloatBits())).Convert(argType)
 
 		case reflect.Bool:
 			// Bool comes from integer register
@@ -305,7 +316,7 @@ func callbackWrap(a *callbackArgs) {
 			case sz <= 8:
 				// Single eightbyte: INTEGER if any member is not float/double, else SSE.
 				if isStructAllFloats(argType) {
-					*(*float64)(valPtr) = getFloat()
+					*(*uint64)(valPtr) = getFloatBits()
 				} else {
 					writePartial(valPtr, sz, getInt())
 				}
@@ -313,14 +324,14 @@ func callbackWrap(a *callbackArgs) {
 				// Two eightbytes: classify each independently.
 				// System V ABI §3.2.3: INTEGER wins over SSE within an eightbyte.
 				if classifyEightbyte(argType, 0, 8) {
-					*(*float64)(valPtr) = getFloat()
+					*(*uint64)(valPtr) = getFloatBits()
 				} else {
 					*(*uintptr)(valPtr) = getInt()
 				}
 				remaining := sz - 8
 				valPtr = unsafe.Add(valPtr, 8)
 				if classifyEightbyte(argType, 8, sz) {
-					*(*float64)(valPtr) = getFloat()
+					*(*uint64)(valPtr) = getFloatBits()
 				} else {
 					writePartial(valPtr, remaining, getInt())
 				}
@@ -373,11 +384,14 @@ func callbackWrap(a *callbackArgs) {
 			}
 		case reflect.Pointer, reflect.UnsafePointer:
 			a.result = ret.Pointer()
-		case reflect.Float32, reflect.Float64:
-			// For float returns, store the bits as uintptr
-			// The assembly code will move this to XMM0 for return
-			f64 := ret.Float()
-			a.result = *(*uintptr)(unsafe.Pointer(&f64))
+		case reflect.Float32:
+			// Single precision in the low 32 bits, upper bits zero. The
+			// dispatcher copies result into both RAX and XMM0, so a float
+			// return reaches the caller in XMM0[31:0] (SysV psABI §3.2.3;
+			// same as libffi's UNIX64_RET_XMM32, movd into %xmm0).
+			a.result = uintptr(math.Float32bits(float32(ret.Float())))
+		case reflect.Float64:
+			a.result = uintptr(math.Float64bits(ret.Float()))
 		}
 	}
 }

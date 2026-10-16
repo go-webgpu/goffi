@@ -382,7 +382,7 @@ if err != nil {
 | Per-call allocations | Zero (CIF reusable) | reflect + sync.Pool per call | Zero |
 | Struct pass/return | Full (RAX+RDX, sret) | Partial (no Windows structs) | Full |
 | Callback struct args | ≤8B, 9-16B, >16B (AMD64) | Not supported (panic) | Full |
-| Callback float returns | XMM0 in asm | Not supported (panic) | Full |
+| Callback float args/returns | XMM0 / D0 (Unix amd64, arm64; Windows callbacks are `uintptr`-only) | Args yes, returns not supported (panic) | Full |
 | ARM64 HFA detection | Recursive (nested structs) | Partial (bug in nested path) | Full |
 | Typed errors | 5 types + errors.As() | Generic | N/A |
 | Context support | Timeouts/cancellation | No | No |
