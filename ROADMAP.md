@@ -3,7 +3,7 @@
 > **Strategic Approach**: Build production-ready Zero-CGO FFI with benchmarked performance
 > **Philosophy**: Performance first, usability second, platform coverage third
 
-**Last Updated**: 2026-10-16 | **Current Version**: v0.6.5 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → ABI → v1.0 LTS | **Milestone**: v0.6.5 fakecgo fixes + native CI → v0.6.6 callback float ABI → v0.7.0 RegisterFunc/Builder → v1.0.0 LTS
+**Last Updated**: 2026-10-16 | **Current Version**: v0.6.6 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → ABI → v1.0 LTS | **Milestone**: v0.6.6 ABI fixes (callbacks, arm64 layout, integer arguments) → v0.7.0 RegisterFunc/Builder → v1.0.0 LTS
 
 ---
 
@@ -188,8 +188,12 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 - NUL bytes in `LoadLibrary` / `GetSymbol` names rejected
 - CI: tests run natively on Linux/Windows/macOS × amd64/arm64 on Go 1.25 + stable, lint on every target
 
-**v0.6.6** = Callback float ABI (planned)
+**v0.6.6** = ABI fixes ✅ RELEASED (2026-10-16)
 - `float32` callback arguments and float return values on Unix amd64/arm64 ([#93](https://github.com/go-webgpu/goffi/issues/93))
+- arm64 argument layout per AAPCS64 and Apple's arm64 ABI: mixed structs, HFA and small-struct stack overflow, darwin stack packing, no silently dropped arguments ([#96](https://github.com/go-webgpu/goffi/issues/96), [#97](https://github.com/go-webgpu/goffi/issues/97))
+- `IntTypeDescriptor` passed and returned by value ([#99](https://github.com/go-webgpu/goffi/issues/99)); signed narrow integers sign-extended on amd64 System V (clang-built callees)
+- `CallFunction` requires exactly one argument value per argument type
+- C-backed end-to-end tests fail instead of skipping when the C test library cannot be built
 
 **v0.7.0** = RegisterFunc + Builder API (2026 Q3-Q4)
 - RegisterFunc convenience API (ADR-008)
@@ -205,9 +209,9 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 
 ---
 
-## 📊 Current Status (v0.6.5)
+## 📊 Current Status (v0.6.6)
 
-**Phase**: fakecgo hardening and native CI on every hosted target shipped. 9 platforms. Next: callback float ABI (v0.6.6), then RegisterFunc/Builder ergonomics for v0.7.0
+**Phase**: ABI fixes shipped — callback float arguments/returns, arm64 argument layout per AAPCS64/Apple, integer argument handling — each proven with C callers on native runners before the fix. 9 platforms. Next: RegisterFunc/Builder ergonomics for v0.7.0
 
 **What Works**:
 - ✅ Dynamic library loading (`LoadLibrary`, `GetSymbol`, `FreeLibrary`)
