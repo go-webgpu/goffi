@@ -57,28 +57,9 @@ func TestPrepCIF(t *testing.T) {
 }
 
 func TestCallPrintf(t *testing.T) {
-	if runtime.GOOS != "linux" && runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
-		t.Skip("Test requires Linux, Windows, or macOS")
-	}
-
-	var libName, funcName string
-	var convention types.CallingConvention
-	switch runtime.GOOS {
-	case "linux":
-		// Используем базовое имя, поиск по путям сделает findLibrary
-		libName = "libc.so.6"
-		funcName = "puts"
-		convention = types.UnixCallingConvention
-	case "darwin":
-		libName = "libSystem.B.dylib"
-		funcName = "puts"
-		convention = types.UnixCallingConvention
-	case "windows":
-		libName = "msvcrt.dll"
+	libName, funcName, convention := systemLibC(t), "puts", systemConvention()
+	if runtime.GOOS == "windows" {
 		funcName = "printf"
-		convention = types.WindowsCallingConvention
-	default:
-		t.Skip("Unsupported OS")
 	}
 
 	handle, err := LoadLibrary(libName)
@@ -137,30 +118,8 @@ func TestCallPrintf(t *testing.T) {
 // The API contract (ffi.go line 43) specifies: []unsafe.Pointer{unsafe.Pointer(&arg)}
 // This means avalue[idx] points TO the argument value, so dereference is required.
 func TestPointerArgumentPassing(t *testing.T) {
-	if runtime.GOOS != "linux" && runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
-		t.Skip("Test requires Linux, Windows, or macOS")
-	}
-
 	// Test using strlen which takes a pointer and returns its length
-	var libName, funcName string
-	var convention types.CallingConvention
-
-	switch runtime.GOOS {
-	case "linux":
-		libName = "libc.so.6"
-		funcName = "strlen"
-		convention = types.UnixCallingConvention
-	case "darwin":
-		libName = "libSystem.B.dylib"
-		funcName = "strlen"
-		convention = types.UnixCallingConvention
-	case "windows":
-		libName = "msvcrt.dll"
-		funcName = "strlen"
-		convention = types.WindowsCallingConvention
-	default:
-		t.Skip("Unsupported OS")
-	}
+	libName, funcName, convention := systemLibC(t), "strlen", systemConvention()
 
 	handle, err := LoadLibrary(libName)
 	if err != nil {
@@ -215,30 +174,8 @@ func TestPointerArgumentPassing(t *testing.T) {
 // TestIntegerArgumentTypes verifies all integer types are correctly handled.
 // This is a regression test to ensure consistent dereference pattern across types.
 func TestIntegerArgumentTypes(t *testing.T) {
-	if runtime.GOOS != "linux" && runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
-		t.Skip("Test requires Linux, Windows, or macOS")
-	}
-
 	// Use abs() for int32 testing
-	var libName, funcName string
-	var convention types.CallingConvention
-
-	switch runtime.GOOS {
-	case "linux":
-		libName = "libc.so.6"
-		funcName = "abs"
-		convention = types.UnixCallingConvention
-	case "darwin":
-		libName = "libSystem.B.dylib"
-		funcName = "abs"
-		convention = types.UnixCallingConvention
-	case "windows":
-		libName = "msvcrt.dll"
-		funcName = "abs"
-		convention = types.WindowsCallingConvention
-	default:
-		t.Skip("Unsupported OS")
-	}
+	libName, funcName, convention := systemLibC(t), "abs", systemConvention()
 
 	handle, err := LoadLibrary(libName)
 	if err != nil {
@@ -893,31 +830,25 @@ func TestWindowsStackArguments10Args(t *testing.T) {
 //
 // Regression test for TASK-013 / GAP-3.
 func TestFloat32ArgEncoding(t *testing.T) {
-	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
-		t.Skip("Test requires Linux or macOS (modff with float return, Unix ABI)")
+	if runtime.GOOS == "windows" {
+		t.Skip("Test requires a Unix ABI (modff with float return)")
 	}
 
 	// Use modff: modff(float, *float) -> float
 	// modff(2.75, &intpart) returns 0.75 and sets intpart = 2.0
-	var libName string
-	switch runtime.GOOS {
-	case "linux":
-		libName = "libm.so.6"
-	case "darwin":
-		libName = "libSystem.B.dylib"
-	default:
-		t.Skip("Unsupported OS")
-	}
+	libName := systemLibM(t)
 
+	// The math library and modff exist on every Unix this test runs on: a
+	// failure to load them is a test failure, not a reason to skip.
 	handle, err := LoadLibrary(libName)
 	if err != nil {
-		t.Skipf("LoadLibrary(%s) failed: %v", libName, err)
+		t.Fatalf("LoadLibrary(%s) failed: %v", libName, err)
 	}
 	defer FreeLibrary(handle)
 
 	sym, err := GetSymbol(handle, "modff")
 	if err != nil {
-		t.Skipf("GetSymbol(modff) failed: %v", err)
+		t.Fatalf("GetSymbol(modff) failed: %v", err)
 	}
 
 	cif := &types.CallInterface{}
@@ -1021,20 +952,14 @@ func TestOverflowDetection(t *testing.T) {
 //
 // Regression test for TASK-014 / GAP-1 / Issue #19.
 func TestUnixStackSpill7Args(t *testing.T) {
-	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
-		t.Skip("Test requires Linux or macOS (Unix ABI with 6 GP registers)")
+	if runtime.GOOS == "windows" {
+		t.Skip("Test requires a Unix ABI (6 GP argument registers on amd64)")
 	}
 	if runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" {
 		t.Skip("snprintf is variadic; Apple ARM64 ABI requires variadic args on stack, not in registers")
 	}
 
-	var libName string
-	switch runtime.GOOS {
-	case "linux":
-		libName = "libc.so.6"
-	case "darwin":
-		libName = "libSystem.B.dylib"
-	}
+	libName := systemLibC(t)
 
 	handle, err := LoadLibrary(libName)
 	if err != nil {
