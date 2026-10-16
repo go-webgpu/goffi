@@ -160,9 +160,13 @@ Implementation in `internal/arch/amd64/call_unix.go`, helpers in `classification
 
 ### AAPCS64 (ARM64)
 
-- **≤ 16 bytes**: passed in GP registers (up to 2)
-- **HFA (Homogeneous Floating-point Aggregate)**: up to 4 same-type floats → D0-D3
-- **\> 16 bytes**: passed by reference
+`internal/arch/arm64/layout.go` computes where every argument goes, following AAPCS64 as libffi implements it (`allocate_to_stack` in `src/aarch64/ffi.c`):
+
+- **HFA (Homogeneous Floating-point Aggregate)**: one to four floats or doubles (possibly nested) in consecutive V registers if all of them are free; otherwise the whole HFA is copied to the stack and no more V registers are used.
+- **Other composites ≤ 16 bytes**: copied as raw bytes into consecutive X registers — floating-point members included — if enough are free; otherwise copied to the stack, and no more X registers are used.
+- **\> 16 bytes**: copied to memory owned by the caller; a pointer to the copy is passed, so the callee may modify its argument without touching the Go value.
+- **Stack arguments**: Linux, FreeBSD and Windows align each one to at least 8 bytes and widen integers to 64 bits. Apple platforms align a stack argument only to its natural alignment and store exactly its size, so two `int32` or `float` arguments share one 8-byte word; variadic arguments take whole 8-byte slots. Callbacks read their stack arguments with the same rules.
+- **Limits**: the call path copies 56 bytes of stack arguments. `PrepareCallInterface` computes the exact stack size per OS and returns `ErrTooManyArguments` when a call does not fit.
 
 ### End-to-End Testing
 
@@ -389,14 +393,14 @@ Same as System V for integer arguments — variadic args use the same 4 GP regis
 **Apple ARM64 (macOS/iOS, `GOOS=darwin`, `GOARCH=arm64`):**  
 Apple's AAPCS64 extension mandates that **variadic arguments must be passed on the stack**, even when GP or FP registers are still available. This differs from the standard AAPCS64 used on Linux ARM64, where variadic args may be placed in X1-X7.
 
-Implementation in `internal/arch/arm64/call_arm64.go` (`Execute` method):
+Implementation in `internal/arch/arm64/layout.go` (`layoutArgs`):
 
 ```go
-// At the fixed/variadic boundary on Apple ARM64, exhaust both
-// register allocators so all variadic args land on the stack.
-if cif.FixedArgCount > 0 && runtime.GOOS == "darwin" && idx == cif.FixedArgCount {
-    gprIdx = 8 // exhaust GP registers (X0-X7)
-    fprIdx = 8 // exhaust FP registers (D0-D7)
+// Apple: from the first variadic argument on, everything goes on the
+// stack in 8-byte slots.
+if stack.apple && cif.FixedArgCount > 0 && i == cif.FixedArgCount {
+    ngrn, nsrn = nRegs, nRegs
+    stack.variadic = true
 }
 ```
 

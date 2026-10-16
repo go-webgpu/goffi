@@ -8,9 +8,12 @@ package ffi
 import (
 	"math"
 	"reflect"
+	"runtime"
 	"structs"
 	"sync"
 	"unsafe"
+
+	archarm64 "github.com/go-webgpu/goffi/internal/arch/arm64"
 )
 
 // maxCallbacks is the maximum number of concurrent callbacks supported.
@@ -120,9 +123,9 @@ var callbackWrap_call = callbackWrap
 // ARM64 AAPCS64 argument block layout:
 //   - Floats: D0-D7 (8 registers, 64 bytes); a float32 is S<n>, the low 32 bits
 //   - Integers: X0-X7 (8 registers, 64 bytes)
-//   - Stack arguments follow in memory, one 8-byte slot per scalar. Apple's
-//     arm64 ABI packs stack arguments to their natural size instead; that case
-//     is not handled here yet.
+//   - Stack arguments follow in memory: one 8-byte slot per scalar on Linux and
+//     FreeBSD, natural size and alignment on Apple platforms (see
+//     internal/arch/arm64/layout.go).
 //
 // The return value is stored in a.result in its native register representation
 // (integers and pointers as is, float32 as math.Float32bits zero-extended,
@@ -143,9 +146,30 @@ func callbackWrap(a *callbackArgs) {
 
 	frame := (*[128]uintptr)(a.args)
 
-	var floatIdx int
-	var intIdx int
-	stackIdx := numFloatRegs + numIntRegs
+	// Stack arguments start right after the saved registers; their offsets
+	// follow the same rules as the call path (8-byte slots on Linux and
+	// FreeBSD, natural size and alignment on Apple platforms).
+	stackBase := unsafe.Pointer(&frame[numFloatRegs+numIntRegs])
+	stack := archarm64.NewStackAllocator(runtime.GOOS)
+
+	var floatIdx, intIdx int
+
+	// nextSlot returns the address of the next argument of class float or
+	// integer: its saved register while one is left, otherwise its stack
+	// location. Values narrower than a register sit in its low bytes.
+	nextSlot := func(isFloat bool, t reflect.Type) unsafe.Pointer {
+		if isFloat && floatIdx < numFloatRegs {
+			p := unsafe.Pointer(&frame[floatIdx])
+			floatIdx++
+			return p
+		}
+		if !isFloat && intIdx < numIntRegs {
+			p := unsafe.Pointer(&frame[numFloatRegs+intIdx])
+			intIdx++
+			return p
+		}
+		return unsafe.Add(stackBase, stack.Alloc(uintptr(t.Align()), t.Size()))
+	}
 
 	args := make([]reflect.Value, numArgs)
 
@@ -154,70 +178,32 @@ func callbackWrap(a *callbackArgs) {
 		var val reflect.Value
 
 		switch argType.Kind() {
-		case reflect.Float32, reflect.Float64:
-			// The dispatcher stores D0-D7 whole. A float arrives in S<n>,
-			// the low 32 bits of D<n>; on the stack it occupies the low 4
-			// bytes of an 8-byte slot (Linux/FreeBSD AAPCS64). Reinterpret
-			// those bits, do not convert a double.
-			var bits uintptr
-			if floatIdx < numFloatRegs {
-				bits = frame[floatIdx]
-				floatIdx++
-			} else {
-				bits = frame[stackIdx]
-				stackIdx++
-			}
-			if argType.Kind() == reflect.Float32 {
-				val = reflect.ValueOf(math.Float32frombits(uint32(bits))).Convert(argType)
-			} else {
-				val = reflect.ValueOf(math.Float64frombits(uint64(bits))).Convert(argType)
-			}
+		case reflect.Float32:
+			// A float arrives in S<n>, the low 32 bits of the saved D<n>.
+			// Reinterpret those bits, do not convert a double.
+			p := nextSlot(true, argType)
+			val = reflect.ValueOf(math.Float32frombits(*(*uint32)(p))).Convert(argType)
+
+		case reflect.Float64:
+			p := nextSlot(true, argType)
+			val = reflect.ValueOf(math.Float64frombits(*(*uint64)(p))).Convert(argType)
 
 		case reflect.Bool:
-			if intIdx < numIntRegs {
-				pos := numFloatRegs + intIdx
-				val = reflect.ValueOf(frame[pos] != 0)
-				intIdx++
-			} else {
-				val = reflect.ValueOf(frame[stackIdx] != 0)
-				stackIdx++
-			}
+			// A C _Bool is one byte; the rest of its register is unspecified.
+			p := nextSlot(false, argType)
+			val = reflect.ValueOf(*(*uint8)(p) != 0)
 
 		case reflect.Pointer:
-			if intIdx < numIntRegs {
-				pos := numFloatRegs + intIdx
-				//nolint:govet,gosec // G103: FFI callback argument
-				ptr := unsafe.Pointer(frame[pos])
-				val = reflect.NewAt(argType.Elem(), ptr)
-				intIdx++
-			} else {
-				//nolint:govet,gosec // G103: FFI callback argument
-				ptr := unsafe.Pointer(frame[stackIdx])
-				val = reflect.NewAt(argType.Elem(), ptr)
-				stackIdx++
-			}
+			p := nextSlot(false, argType)
+			val = reflect.NewAt(argType.Elem(), *(*unsafe.Pointer)(p))
 
 		case reflect.UnsafePointer:
-			if intIdx < numIntRegs {
-				pos := numFloatRegs + intIdx
-				//nolint:govet,gosec // G103: FFI callback argument
-				val = reflect.ValueOf(unsafe.Pointer(frame[pos]))
-				intIdx++
-			} else {
-				//nolint:govet,gosec // G103: FFI callback argument
-				val = reflect.ValueOf(unsafe.Pointer(frame[stackIdx]))
-				stackIdx++
-			}
+			p := nextSlot(false, argType)
+			val = reflect.ValueOf(*(*unsafe.Pointer)(p))
 
 		default:
-			if intIdx < numIntRegs {
-				pos := numFloatRegs + intIdx
-				val = reflect.NewAt(argType, unsafe.Pointer(&frame[pos])).Elem()
-				intIdx++
-			} else {
-				val = reflect.NewAt(argType, unsafe.Pointer(&frame[stackIdx])).Elem()
-				stackIdx++
-			}
+			p := nextSlot(false, argType)
+			val = reflect.NewAt(argType, p).Elem()
 		}
 
 		args[i] = val

@@ -78,6 +78,32 @@ func preparePlatformSpecific(cif *types.CallInterface) error {
 
 	cif.Flags = arch.Registry.Classifier.ClassifyReturn(cif.ReturnType, cif.Convention)
 
+	// Architectures that lay out the stack exactly (arm64: AAPCS64 and Apple
+	// packing) decide whether the arguments fit.
+	if layout, ok := arch.Registry.Caller.(arch.StackLayout); ok {
+		need, limit, err := layout.StackArgBytes(cif)
+		if err != nil {
+			return err
+		}
+		if need > limit {
+			return fmt.Errorf("%w: arguments need %d bytes of stack, platform supports %d",
+				ErrTooManyArguments, need, limit)
+		}
+	} else if err := checkStackSlots(cif); err != nil {
+		return err
+	}
+
+	// Windows-specific: requires 32-byte shadow space
+	if cif.Convention == types.WindowsCallingConvention && cif.StackBytes < 32 {
+		cif.StackBytes = 32
+	}
+
+	return nil
+}
+
+// checkStackSlots is the generic argument-count check: it counts the
+// registers each argument needs and the 8-byte stack slots that overflow.
+func checkStackSlots(cif *types.CallInterface) error {
 	var gprCount, sseCount int
 	maxGPR, maxSSE := maxGPRegisters(cif.Convention), maxSSERegisters(cif.Convention)
 	maxStack := maxStackSlots(cif.Convention)
@@ -103,12 +129,6 @@ func preparePlatformSpecific(cif *types.CallInterface) error {
 		return fmt.Errorf("%w: %d args overflow to stack, platform supports %d stack slots",
 			ErrTooManyArguments, totalStack, maxStack)
 	}
-
-	// Windows-specific: requires 32-byte shadow space
-	if cif.Convention == types.WindowsCallingConvention && cif.StackBytes < 32 {
-		cif.StackBytes = 32
-	}
-
 	return nil
 }
 
