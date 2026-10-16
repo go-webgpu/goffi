@@ -20,6 +20,13 @@ type ArgumentClassifier interface {
 	ClassifyArgument(t *types.TypeDescriptor, abi types.CallingConvention) ArgumentClassification
 }
 
+// StackLayout is implemented by architectures whose call path computes the
+// exact stack space a call needs. PrepareCallInterface uses it instead of the
+// generic register/slot count, which assumes amd64's limits.
+type StackLayout interface {
+	StackArgBytes(cif *types.CallInterface) (need, limit uintptr, err error)
+}
+
 // ArgumentClassification contains argument passing information.
 type ArgumentClassification struct {
 	GPRCount int

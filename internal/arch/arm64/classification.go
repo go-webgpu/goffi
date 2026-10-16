@@ -13,14 +13,6 @@ type classification struct {
 	FPRCount int // D0-D7/V0-V7 (8 registers)
 }
 
-type regClass uint8
-
-const (
-	classNone  regClass = 0
-	classFloat regClass = 1
-	classInt   regClass = 2
-)
-
 func alignOffset(value, alignment uintptr) uintptr {
 	if alignment == 0 {
 		return value
@@ -158,8 +150,9 @@ func classifyArgumentARM64(t *types.TypeDescriptor, abi types.CallingConvention)
 			// Non-HFA larger than 16 bytes: passed by reference
 			res.GPRCount = 1
 		} else {
-			// Non-HFA up to 16 bytes: mixed int/float register usage
-			res.GPRCount, res.FPRCount = countStructRegUsage(t)
+			// Non-HFA up to 16 bytes: copied as raw bytes into X registers,
+			// floating-point members included (AAPCS64; see layout.go).
+			res.GPRCount = int((t.Size + 7) / 8)
 		}
 	default:
 		// Integer/pointer types use GP registers (X0-X7)
@@ -167,98 +160,6 @@ func classifyArgumentARM64(t *types.TypeDescriptor, abi types.CallingConvention)
 	}
 
 	return res
-}
-
-func countStructRegUsage(desc *types.TypeDescriptor) (intCount, floatCount int) {
-	if desc == nil || desc.Kind != types.StructType {
-		return 0, 0
-	}
-	ensureStructLayout(desc)
-
-	var (
-		shift uint
-		class regClass
-	)
-
-	flush := func() {
-		if class == classNone {
-			shift = 0
-			return
-		}
-		if class == classFloat {
-			floatCount++
-		} else {
-			intCount++
-		}
-		shift = 0
-		class = classNone
-	}
-
-	var walk func(cur *types.TypeDescriptor)
-	walk = func(cur *types.TypeDescriptor) {
-		if cur == nil {
-			return
-		}
-		if cur.Kind == types.StructType {
-			offset := uintptr(0)
-			for _, member := range cur.Members {
-				if member == nil {
-					continue
-				}
-				offset = alignOffset(offset, member.Alignment)
-				walk(member)
-				offset += member.Size
-			}
-			return
-		}
-
-		alignBits := uint(cur.Alignment*8 - 1)
-		shift = (shift + alignBits) &^ alignBits
-		if shift >= 64 {
-			flush()
-			shift = 0
-		}
-
-		switch cur.Kind {
-		case types.FloatType:
-			if class == classFloat {
-				flush()
-			}
-			shift += 32
-			class |= classFloat
-		case types.DoubleType:
-			flush()
-			floatCount++
-			shift = 0
-			class = classNone
-		case types.UInt8Type, types.SInt8Type:
-			shift += 8
-			class |= classInt
-		case types.UInt16Type, types.SInt16Type:
-			shift += 16
-			class |= classInt
-		case types.UInt32Type, types.SInt32Type:
-			shift += 32
-			class |= classInt
-		case types.UInt64Type, types.SInt64Type, types.PointerType:
-			flush()
-			intCount++
-			shift = 0
-			class = classNone
-		default:
-			// Unsupported kinds are treated as int-sized to avoid undercounting.
-			flush()
-			intCount++
-			shift = 0
-			class = classNone
-		}
-	}
-
-	walk(desc)
-	if class != classNone {
-		flush()
-	}
-	return intCount, floatCount
 }
 
 // isHomogeneousFloatAggregate checks if a struct is an HFA (Homogeneous Floating-point Aggregate).

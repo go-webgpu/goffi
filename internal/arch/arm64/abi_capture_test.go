@@ -225,8 +225,11 @@ func TestExecuteCaptureStructByRefLarge(t *testing.T) {
 			[]unsafe.Pointer{unsafe.Pointer(&val)},
 		)
 
-		if out.GPR[1] != uintptr(unsafe.Pointer(&val)) {
-			t.Fatalf("by-ref GPR mismatch: 0x%x, want 0x%x", out.GPR[1], uintptr(unsafe.Pointer(&val)))
+		// AAPCS64 passes a pointer to a copy owned by the caller, so the callee
+		// can modify its argument without touching the Go value.
+		if out.GPR[1] == 0 || out.GPR[1] == uintptr(unsafe.Pointer(&val)) {
+			t.Fatalf("by-ref GPR = 0x%x, want a pointer to a copy (not &val = 0x%x)",
+				out.GPR[1], uintptr(unsafe.Pointer(&val)))
 		}
 	}
 }

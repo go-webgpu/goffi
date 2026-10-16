@@ -88,6 +88,16 @@ struct mixed_float_int return_struct_float_int(double a, int64_t b) {
     return s;
 }
 
+// Mixed int/float structs passed by value. On arm64 a composite that is not
+// an HFA goes in X registers as raw bytes, floating-point members included;
+// on SysV amd64 each eightbyte is classified on its own.
+int64_t take_mixed_int_float(struct mixed_int_float s) {
+    return s.a * 1000 + (int64_t)(s.b * 10);
+}
+int64_t take_mixed_float_int(struct mixed_float_int s) {
+    return (int64_t)(s.a * 10) * 1000 + s.b;
+}
+
 // {int64, int64}: both INTEGER, returned in RAX:RDX.
 struct return_pair_i64 { int64_t a; int64_t b; };
 struct return_pair_i64 return_struct_2ints(int64_t a, int64_t b) {
@@ -178,4 +188,73 @@ double cb_call_stack_float_double(double8_float_double_fn f) {
 // register: the C caller reads only RAX / X0.
 int64_t cb_call_int_ret(int64_t (*f)(double), double a) {
     return f(a);
+}
+
+// Stack arguments (#96). Each function weights its arguments by position, so
+// an argument read from the wrong stack offset changes the result.
+
+// Ten int32: two are passed on the stack on arm64. Apple packs them into one
+// 8-byte slot ([sp], [sp+4]); standard AAPCS64 and SysV use one slot each.
+int64_t stack_i32x10(int32_t a0, int32_t a1, int32_t a2, int32_t a3, int32_t a4,
+                     int32_t a5, int32_t a6, int32_t a7, int32_t a8, int32_t a9) {
+    return a0 + 2 * (int64_t)a1 + 3 * (int64_t)a2 + 4 * (int64_t)a3 + 5 * (int64_t)a4 +
+           6 * (int64_t)a5 + 7 * (int64_t)a6 + 8 * (int64_t)a7 + 9 * (int64_t)a8 + 10 * (int64_t)a9;
+}
+
+// Ten floats: the ninth and tenth go on the stack.
+float stack_f32x10(float a0, float a1, float a2, float a3, float a4,
+                   float a5, float a6, float a7, float a8, float a9) {
+    return a0 + 2 * a1 + 3 * a2 + 4 * a3 + 5 * a4 + 6 * a5 + 7 * a6 + 8 * a7 + 9 * a8 + 10 * a9;
+}
+
+// Eight int64 fill the registers; int8, int16, int32, int8 follow on the stack.
+// Apple: offsets 0, 2, 4, 8. Standard AAPCS64 and SysV: 0, 8, 16, 24.
+int64_t stack_narrow_mix(int64_t r0, int64_t r1, int64_t r2, int64_t r3,
+                         int64_t r4, int64_t r5, int64_t r6, int64_t r7,
+                         int8_t a, int16_t b, int32_t c, int8_t d) {
+    return r0 + r1 + r2 + r3 + r4 + r5 + r6 + r7 +
+           (int64_t)a * 1000000000 + (int64_t)b * 100000 + (int64_t)c * 10 + d;
+}
+
+// Eight floats fill the FP registers, so the {float, float} HFA goes on the
+// stack as one contiguous 8-byte block (as libffi's allocate_to_stack does).
+float stack_hfa_after_8f(float f0, float f1, float f2, float f3,
+                         float f4, float f5, float f6, float f7, struct pair_f32 s) {
+    return f0 + f1 + f2 + f3 + f4 + f5 + f6 + f7 + s.x * 10 + s.y * 100;
+}
+
+// Seven int64 leave one X register; a 16-byte non-HFA struct needs two, so it
+// is copied to the stack, not passed by reference (AAPCS64: composites of at
+// most 16 bytes go by value; libffi copies them with allocate_to_stack).
+int64_t stack_s16_after_7i(int64_t r0, int64_t r1, int64_t r2, int64_t r3,
+                           int64_t r4, int64_t r5, int64_t r6, struct pair_i64 s) {
+    return r0 + r1 + r2 + r3 + r4 + r5 + r6 + s.a * 1000 + s.b;
+}
+
+// Sixteen int64: more arguments than goffi's call path supports on amd64 (15)
+// and arm64 (8 registers + 7 stack slots). The call must fail, not drop some.
+int64_t stack_i64x16(int64_t a0, int64_t a1, int64_t a2, int64_t a3, int64_t a4, int64_t a5,
+                     int64_t a6, int64_t a7, int64_t a8, int64_t a9, int64_t a10, int64_t a11,
+                     int64_t a12, int64_t a13, int64_t a14, int64_t a15) {
+    return a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14 + 16 * a15;
+}
+
+// Sixteen doubles: eight in FP registers, eight on the stack. That passes the
+// generic argument-count check (which assumes 9 stack slots everywhere) but
+// exceeds the 7 stack slots of goffi's arm64 call path.
+double stack_f64x16(double a0, double a1, double a2, double a3, double a4, double a5,
+                    double a6, double a7, double a8, double a9, double a10, double a11,
+                    double a12, double a13, double a14, double a15) {
+    return a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14 + 16 * a15;
+}
+
+// Callbacks with stack arguments: C calls the Go callback with 1..10.
+int64_t cb_call_stack_i32x10(int64_t (*f)(int32_t, int32_t, int32_t, int32_t, int32_t,
+                                          int32_t, int32_t, int32_t, int32_t, int32_t)) {
+    return f(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+}
+
+float cb_call_stack_f32x10(float (*f)(float, float, float, float, float,
+                                      float, float, float, float, float)) {
+    return f(1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f);
 }
