@@ -379,13 +379,18 @@ jobs:
       # own link internally, while any other cgo package, c-shared or
       # c-archive forces external linking (#72). Run the suite in both modes so
       # neither can break unnoticed. windows-11-arm has no arm64 C toolchain
-      # for external linking.
+      # for external linking. Both modes run even if the first one fails.
       - name: Run tests with external and internal linking (CGO_ENABLED=1)
         if: matrix.cgo == '1' && matrix.os != 'windows-11-arm'
         shell: bash
         run: |
-          go test -count=1 -ldflags=-linkmode=external ./...
-          go test -count=1 -ldflags=-linkmode=internal ./...
+          failed=""
+          go test -count=1 -ldflags=-linkmode=external ./... || failed="$failed external"
+          go test -count=1 -ldflags=-linkmode=internal ./... || failed="$failed internal"
+          if [ -n "$failed" ]; then
+            echo "FAIL (-linkmode):$failed"
+            exit 1
+          fi
 
       # As a normal user TestSetuidEtc can only check that syscall.Set*id
       # fails with EPERM instead of panicking. As root it checks that every
@@ -467,8 +472,13 @@ jobs:
         if: matrix.cgo == '1' && matrix.os != 'windows-11-arm' # see the test job
         shell: bash
         run: |
-          go test -count=1 -ldflags=-linkmode=external ./...
-          go test -count=1 -ldflags=-linkmode=internal ./...
+          failed=""
+          go test -count=1 -ldflags=-linkmode=external ./... || failed="$failed external"
+          go test -count=1 -ldflags=-linkmode=internal ./... || failed="$failed internal"
+          if [ -n "$failed" ]; then
+            echo "FAIL (-linkmode):$failed"
+            exit 1
+          fi
 
   # goffi in one program with other code that calls C (#72): purego and an
   # ordinary cgo package, in every link mode (scripts/run-linktest.sh).
