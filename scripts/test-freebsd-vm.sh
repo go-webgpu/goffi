@@ -44,8 +44,23 @@ echo "=> go test CGO_ENABLED=1"
 CGO_ENABLED=1 go test -count=1 -v ./... ||
 	failed="$failed CGO_ENABLED=1"
 
+# goffi's tests alone link internally; other cgo code, c-shared and
+# c-archive force external linking (#72). Cover both explicitly.
+echo "=> go test CGO_ENABLED=1 -linkmode=external"
+CGO_ENABLED=1 go test -count=1 -ldflags=-linkmode=external ./... ||
+	failed="$failed CGO_ENABLED=1-external"
+
+echo "=> go test CGO_ENABLED=1 -linkmode=internal"
+CGO_ENABLED=1 go test -count=1 -ldflags=-linkmode=internal ./... ||
+	failed="$failed CGO_ENABLED=1-internal"
+
+# goffi next to purego and an ordinary cgo package, in every link mode.
+echo "=> linktest"
+sh scripts/run-linktest.sh ||
+	failed="$failed linktest"
+
 if [ -n "$failed" ]; then
 	echo "FAIL:$failed"
 	exit 1
 fi
-echo "PASS: CGO_ENABLED=0 and CGO_ENABLED=1"
+echo "PASS: CGO_ENABLED=0, CGO_ENABLED=1 (default, external, internal linking) and linktest"

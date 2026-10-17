@@ -374,6 +374,19 @@ jobs:
         shell: bash
         run: go test -count=1 -v ./internal/...
 
+      # With CGO_ENABLED=1 the linker picks internal or external linking
+      # depending on what else the program contains: goffi's tests on their
+      # own link internally, while any other cgo package, c-shared or
+      # c-archive forces external linking (#72). Run the suite in both modes so
+      # neither can break unnoticed. windows-11-arm has no arm64 C toolchain
+      # for external linking.
+      - name: Run tests with external and internal linking (CGO_ENABLED=1)
+        if: matrix.cgo == '1' && matrix.os != 'windows-11-arm'
+        shell: bash
+        run: |
+          go test -count=1 -ldflags=-linkmode=external ./...
+          go test -count=1 -ldflags=-linkmode=internal ./...
+
       # As a normal user TestSetuidEtc can only check that syscall.Set*id
       # fails with EPERM instead of panicking. As root it checks that every
       # thread of the process got the new credentials (glibc setxid
@@ -449,6 +462,40 @@ jobs:
         run: |
           go version
           go test -count=1 ./...
+
+      - name: Run tests with external and internal linking (CGO_ENABLED=1)
+        if: matrix.cgo == '1' && matrix.os != 'windows-11-arm' # see the test job
+        shell: bash
+        run: |
+          go test -count=1 -ldflags=-linkmode=external ./...
+          go test -count=1 -ldflags=-linkmode=internal ./...
+
+  # goffi in one program with other code that calls C (#72): purego and an
+  # ordinary cgo package, in every link mode (scripts/run-linktest.sh).
+  # testdata/linktest is its own module, so purego never enters goffi's
+  # go.mod. Windows has no dynamic-import stubs and is not affected.
+  link-compat:
+    name: Link compat - ${{ matrix.os }} - Go ${{ matrix.go }}
+    runs-on: ${{ matrix.os }}
+    needs: [lint, formatting]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-15-intel]
+        go: ['1.25', 'stable']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+          cache: true
+          cache-dependency-path: testdata/linktest/go.sum
+
+      - name: Run linktest
+        run: sh scripts/run-linktest.sh
 
   # FreeBSD has no GitHub-hosted runner, so it runs in a VM. The cross-compile
   # job proves FreeBSD builds; this job runs the tests there: the call path,
