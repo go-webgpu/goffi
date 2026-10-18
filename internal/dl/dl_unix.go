@@ -16,6 +16,7 @@ package dl
 
 import (
 	"fmt"
+	"runtime"
 	"structs"
 	"unsafe"
 )
@@ -88,6 +89,14 @@ func Dlopen(path string, mode int) (uintptr, error) {
 		mode: mode,
 	}
 
+	// dlerror() reports the calling thread's last error, and its string
+	// lives only until the next dlerror() on that thread. Each runtime_cgocall
+	// may run on a different thread, and another goroutine may run dl* calls
+	// on this one in between, so the failed call, the dlerror() call and the
+	// copy of its string must all happen on one locked thread.
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
 	runtime_cgocall(dlopen_wrapperABI0, unsafe.Pointer(&args))
 
 	if args.result == 0 {
@@ -109,6 +118,10 @@ func Dlsym(handle uintptr, name string) (uintptr, error) {
 		symbol: &nameBytes[0],
 	}
 
+	// See Dlopen: dlerror() must run on the thread whose dlsym failed.
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
 	runtime_cgocall(dlsym_wrapperABI0, unsafe.Pointer(&args))
 
 	if args.result == 0 {
@@ -125,7 +138,9 @@ func Dlclose(handle uintptr) error {
 	return nil
 }
 
-// dlerrorString gets error message from dlerror()
+// dlerrorString gets error message from dlerror(). The caller must hold the
+// OS thread locked since the failed dlopen/dlsym; the returned Go string is a
+// copy, so it stays valid after the thread is unlocked.
 func dlerrorString() string {
 	args := dlerrorArgs{
 		fn: dlerror_stubABI0,
