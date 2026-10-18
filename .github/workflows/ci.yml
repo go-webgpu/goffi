@@ -374,6 +374,16 @@ jobs:
         shell: bash
         run: go test -count=1 -v ./internal/...
 
+      # The race detector needs cgo. -race also turns on checkptr, which
+      # stops the test when an unsafe.Pointer conversion reaches past a Go
+      # allocation: the kind of bug code that copies arguments and results
+      # between Go memory and C registers is prone to. windows/arm64 has no
+      # race detector.
+      - name: Run tests with the race detector (cgo=1)
+        if: matrix.cgo == '1' && matrix.os != 'windows-11-arm'
+        shell: bash
+        run: go test -race -count=1 ./...
+
       # As a normal user TestSetuidEtc can only check that syscall.Set*id
       # fails with EPERM instead of panicking. As root it checks that every
       # thread of the process got the new credentials (glibc setxid
@@ -410,12 +420,10 @@ jobs:
           fail_ci_if_error: false
           verbose: true
 
-  # NOTE: Race detection requires CGO_ENABLED=1
-  # The CGO_ENABLED=1 matrix entry above already exercises the real
-  # runtime/cgo path, which is what allows the race detector to be used.
-  # Race-detector-enabled CI can be added on top of that matrix entry without
-  # any source changes if/when desired. fakecgo (CGO_ENABLED=0) is gated
-  # by `//go:build !cgo` and therefore not compiled in cgo mode.
+  # NOTE: Race detection requires CGO_ENABLED=1, so the cgo=1 entries of the
+  # test and test-go-stable matrices also run the suite with -race (real
+  # runtime/cgo path). fakecgo (CGO_ENABLED=0) is gated by `//go:build !cgo`
+  # and therefore not compiled in cgo mode.
 
   # Benchmarks - Performance validation (Linux only - reference platform)
   # The test job pins Go 1.25, the minimum in go.mod. fakecgo and the
@@ -449,6 +457,12 @@ jobs:
         run: |
           go version
           go test -count=1 ./...
+
+      # See the race step in the test job.
+      - name: Run tests with the race detector (cgo=1)
+        if: matrix.cgo == '1' && matrix.os != 'windows-11-arm'
+        shell: bash
+        run: go test -race -count=1 ./...
 
   # FreeBSD has no GitHub-hosted runner, so it runs in a VM. The cross-compile
   # job proves FreeBSD builds; this job runs the tests there: the call path,

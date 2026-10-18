@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **CI: the test suite runs with the race detector.** The race detector needs cgo, so every `CGO_ENABLED=1` test job on Linux, macOS and Windows amd64 (and the FreeBSD VM job) also runs `go test -race`; windows/arm64 has no race detector. `-race` turns on checkptr, which stops a test when an `unsafe.Pointer` conversion reaches past a Go allocation — it catches the struct argument over-read fixed below.
 - **CI: the test suite runs on FreeBSD.** GitHub has no FreeBSD runners, so FreeBSD amd64 was only cross-compiled. A new CI job runs `go test` with `CGO_ENABLED=0` and `CGO_ENABLED=1` on FreeBSD 14 and 15 in a VM, on Go 1.25 and the latest stable Go, with the base system C compiler for the C-backed end-to-end tests; it is required for merging. FreeBSD arm64 is still cross-compiled only.
 
 ### Fixed
