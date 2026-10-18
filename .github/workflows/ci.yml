@@ -127,6 +127,11 @@ jobs:
           fi
           echo "All files are properly formatted ✓"
 
+      # goffi is MIT; Apache-2.0 headers belong only on code derived from
+      # ebitengine/purego, with its copyright line (see the script).
+      - name: Check license headers
+        run: sh scripts/check-spdx.sh
+
   # Cross-compilation - Verify all 8 supported desktop platforms compile
   cross-compile:
     name: Cross-Compile

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2026 Andrey Kolkov and GoGPU Contributors
 
 // Package main demonstrates struct pass-by-value and struct return via goffi.
