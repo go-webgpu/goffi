@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2026 Andrey Kolkov and GoGPU Contributors
 
 // structlib.c — minimal C library for the struct pass/return goffi example.
