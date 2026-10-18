@@ -44,8 +44,14 @@ echo "=> go test CGO_ENABLED=1"
 CGO_ENABLED=1 go test -count=1 -v ./... ||
 	failed="$failed CGO_ENABLED=1"
 
+# The race detector needs cgo; -race also enables checkptr (see the race
+# step in ci.yml).
+echo "=> go test -race CGO_ENABLED=1"
+CGO_ENABLED=1 go test -race -count=1 ./... ||
+	failed="$failed -race"
+
 if [ -n "$failed" ]; then
 	echo "FAIL:$failed"
 	exit 1
 fi
-echo "PASS: CGO_ENABLED=0 and CGO_ENABLED=1"
+echo "PASS: CGO_ENABLED=0, CGO_ENABLED=1 and -race"

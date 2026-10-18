@@ -75,11 +75,10 @@
 //   - DO NOT call FreeLibrary while other goroutines are using GetSymbol on the same handle
 //   - Similar to io.Reader: methods are not inherently thread-safe; synchronization is caller's responsibility
 //
-// Race detector is not supported for zero-CGO libraries (race detector requires CGO_ENABLED=1,
-// which conflicts with our fakecgo implementation using build tag !cgo). This is a fundamental
-// limitation of the zero-CGO approach. However, this library contains no data races in its
-// internal implementation - all shared state (Registry, TypeDescriptors) is initialized once
-// at startup and accessed read-only thereafter.
+// The race detector needs cgo, so it is available only with CGO_ENABLED=1, where goffi uses
+// the real runtime/cgo instead of internal/fakecgo; CI runs the test suite with -race. The
+// library's own shared state (Registry, TypeDescriptors) is initialized once at startup and
+// accessed read-only thereafter.
 //
 // # Zero Dependencies
 //
