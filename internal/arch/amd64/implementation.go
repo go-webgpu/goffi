@@ -60,9 +60,10 @@ func (i *Implementation) handleReturn(
 		return nil
 	}
 
+	// Win64 returns every struct that is not 1, 2, 4 or 8 bytes through a
+	// hidden result pointer, which Execute passes as the first argument; the
+	// callee has written the result to rvalue and returned that pointer in RAX.
 	if cif.Flags&types.ReturnViaPointer != 0 {
-		// Double-indirection to satisfy checkptr (go.dev/issue/58625).
-		*(*unsafe.Pointer)(rvalue) = *(*unsafe.Pointer)(unsafe.Pointer(&retVal))
 		return nil
 	}
 
@@ -97,7 +98,14 @@ func (i *Implementation) handleReturn(
 		//   > 16 bytes : returned via hidden sret pointer (handled above before the switch)
 		size := cif.ReturnType.Size
 		if size <= 8 {
-			*(*uint64)(rvalue) = retVal
+			// One eightbyte: XMM0 when it is SSE class (System V only, see
+			// classifyReturnAMD64), RAX otherwise. rvalue is the caller's
+			// struct, not a register-sized buffer: write exactly its size.
+			word := retVal
+			if cif.Flags == types.ReturnInXMM64 {
+				word = *(*uint64)(unsafe.Pointer(&fret))
+			}
+			copy(unsafe.Slice((*byte)(rvalue), size), (*[8]byte)(unsafe.Pointer(&word))[:size])
 			break
 		}
 		// 9-16B: reconstruct from the correct register pair.

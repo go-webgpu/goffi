@@ -25,6 +25,13 @@ func classifyReturnAMD64(t *types.TypeDescriptor, abi types.CallingConvention) i
 	case types.DoubleType:
 		return types.ReturnInXMM64
 	case types.StructType:
+		// System V: a struct of one eightbyte whose members are all float or
+		// double is SSE class and comes back in XMM0 ({float}, {double},
+		// {float, float}). Win64 returns 1/2/4/8-byte structs in RAX whatever
+		// their members.
+		if runtime.GOOS != "windows" && t.Size <= 8 && classifyEightbyte(t, 0, t.Size) {
+			return types.ReturnInXMM64
+		}
 		switch t.Size {
 		case 1:
 			return types.ReturnSInt8

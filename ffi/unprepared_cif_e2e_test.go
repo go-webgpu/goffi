@@ -8,7 +8,6 @@ package ffi
 import (
 	"errors"
 	"fmt"
-	"runtime"
 	"sync"
 	"testing"
 	"unsafe"
@@ -20,7 +19,8 @@ import (
 // PrepareCallInterface: Convention, Flags and StackBytes are then zero. The
 // argument layout is recomputed from ArgTypes on every call, but how a struct
 // result comes back depends on Flags — the register pair of a 9-16 byte struct
-// on System V amd64, HFA and indirect (X8) results on arm64. These tests call
+// on System V amd64, the hidden result pointer on Win64, HFA and indirect (X8)
+// results on arm64. These tests call
 // such hand-built CallInterfaces and compare the result with what the C
 // function returned.
 
@@ -50,9 +50,6 @@ func callRecover(cif *types.CallInterface, fn, rvalue unsafe.Pointer, avalue []u
 }
 
 func TestUnpreparedCallInterface_StructReturn(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Win64 returns 16- and 24-byte structs through a hidden result pointer; covered by the Windows struct return tests")
-	}
 	requireStructLib(t)
 
 	type pairF64 struct{ A, B float64 }
@@ -118,7 +115,9 @@ func TestUnpreparedCallInterface_StructReturn(t *testing.T) {
 			want: pairI64{5, -6},
 		},
 		{
-			// Larger than 16 bytes: hidden result pointer (RDI on System V, X8 on arm64).
+			// Larger than 16 bytes: hidden result pointer (RDI on System V, RCX
+			// on Win64, X8 on arm64). Win64 returns the 16-byte cases above
+			// through it as well.
 			name: "24 bytes", sym: "return_struct_24",
 			ret:  structDesc(24, 8, i64, i64, i64),
 			buf:  unsafe.Pointer(&tripleI64{}),
@@ -153,9 +152,6 @@ func TestUnpreparedCallInterface_StructReturn(t *testing.T) {
 // One hand-built CallInterface shared by many goroutines, as a package-level
 // variable would be. Run with -race to catch writes to it.
 func TestUnpreparedCallInterface_SharedBetweenGoroutines(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Win64 returns 16-byte structs through a hidden result pointer; covered by the Windows struct return tests")
-	}
 	requireStructLib(t)
 	sym, err := GetSymbol(structTestLib, "return_struct_2doubles")
 	if err != nil {

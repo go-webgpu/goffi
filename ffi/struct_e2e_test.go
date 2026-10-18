@@ -21,10 +21,17 @@ import (
 
 var (
 	structTestLib unsafe.Pointer
+	// structTestLibPath is the absolute path of the loaded library.
+	structTestLibPath string
 	// structTestLibSkip says why the C-backed tests skip; empty when the
 	// library was built and loaded.
 	structTestLibSkip string
 )
+
+// structTestLibEnv names a library a parent test process already built; a
+// child process (see TestStructBySize_NilResult) loads it instead of
+// rebuilding, which on Windows would fail while the parent holds the DLL.
+const structTestLibEnv = "GOFFI_STRUCTTEST_LIB"
 
 // errNoCCompiler reports that there is no C compiler for the platform the
 // tests run on: none installed, or one that targets another architecture.
@@ -40,7 +47,12 @@ func TestMain(m *testing.M) {
 		// is neither meaningful nor available.
 		structTestLibSkip = "android tests run on-device without a C compiler"
 	} else {
-		err := buildStructTestLib()
+		var err error
+		if path := os.Getenv(structTestLibEnv); path != "" {
+			err = loadStructTestLib(path)
+		} else {
+			err = buildStructTestLib()
+		}
 		switch {
 		case err == nil:
 		case errors.Is(err, ErrStaticBuild):
@@ -101,11 +113,16 @@ func buildStructTestLib() error {
 	if err != nil {
 		return err
 	}
-	lib, err := LoadLibrary(absPath)
+	return loadStructTestLib(absPath)
+}
+
+func loadStructTestLib(path string) error {
+	lib, err := LoadLibrary(path)
 	if err != nil {
-		return fmt.Errorf("load %s: %w", absPath, err)
+		return fmt.Errorf("load %s: %w", path, err)
 	}
 	structTestLib = lib
+	structTestLibPath = path
 	return nil
 }
 
@@ -184,9 +201,6 @@ func TestStructArg8B_IntegerPair(t *testing.T) {
 // TestStructArg8B_FloatPair tests SSE classification: struct {float, float}.
 func TestStructArg8B_FloatPair(t *testing.T) {
 	requireStructLib(t)
-	if runtime.GOOS == "windows" {
-		t.Skip("Windows: float struct args/returns not supported via syscall.SyscallN (XMM limitation)")
-	}
 
 	sym, err := GetSymbol(structTestLib, "take_struct_2floats")
 	if err != nil {
@@ -597,13 +611,10 @@ func TestCallbackStructArgWithScalar(t *testing.T) {
 
 // TestStructReturn24B exercises the sret path for a struct larger than 16 bytes.
 // The caller provides a buffer in rvalue, goffi points the hidden return pointer
-// (RDI on amd64, X8 on arm64) at it, and the callee writes the struct directly
+// (RDI on System V amd64, RCX on Win64, X8 on arm64) at it, and the callee writes the struct directly
 // into that buffer. This covers the >16B struct return ABI, which the other
 // struct-return tests (all <= 16 bytes) do not reach.
 func TestStructReturn24B(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Windows struct returns use a separate ABI path (call_windows.go), not covered here")
-	}
 	requireStructLib(t)
 
 	sym, err := GetSymbol(structTestLib, "return_struct_24")

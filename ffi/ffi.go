@@ -322,6 +322,12 @@ func CallFunctionContext(
 	if err != nil {
 		return 0, err
 	}
+	// A struct returned through a hidden result pointer is written by the
+	// callee itself, so it needs memory even when the caller discards the
+	// result; libffi's ffi_call allocates it the same way.
+	if rvalue == nil && call.Flags&types.ReturnViaPointer != 0 {
+		rvalue = unsafe.Pointer(unsafe.SliceData(make([]byte, call.ReturnType.Size)))
+	}
 
 	cerrno, err := executeFunction(call, fn, rvalue, avalue)
 	return syscall.Errno(cerrno), err

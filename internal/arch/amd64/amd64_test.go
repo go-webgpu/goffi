@@ -20,6 +20,15 @@ func struct16BExpected(unixFlag int) int {
 	return unixFlag
 }
 
+// sseEightbyteExpected returns the expected flag for a struct of one
+// eightbyte of float/double members: XMM0 on System V, RAX on Windows.
+func sseEightbyteExpected(windowsFlag int) int {
+	if runtime.GOOS == "windows" {
+		return windowsFlag
+	}
+	return types.ReturnInXMM64
+}
+
 func TestAlign(t *testing.T) {
 	impl := &Implementation{}
 	tests := []struct {
@@ -104,6 +113,18 @@ func TestClassifyReturnAMD64(t *testing.T) {
 			struct16BExpected(types.ReturnStRaxRdx),
 		},
 		{"Struct24B", &types.TypeDescriptor{Size: 24, Kind: types.StructType}, types.ReturnViaPointer | types.ReturnVoid},
+		// One eightbyte of only float/double members: SSE class on System V
+		// (XMM0); Win64 returns it in RAX like any 1/2/4/8-byte struct.
+		{"Struct4B_Float", &types.TypeDescriptor{Size: 4, Alignment: 4, Kind: types.StructType,
+			Members: []*types.TypeDescriptor{types.FloatTypeDescriptor}}, sseEightbyteExpected(types.ReturnSInt32)},
+		{"Struct8B_Double", &types.TypeDescriptor{Size: 8, Alignment: 8, Kind: types.StructType,
+			Members: []*types.TypeDescriptor{types.DoubleTypeDescriptor}}, sseEightbyteExpected(types.ReturnInt64)},
+		{"Struct8B_TwoFloats", &types.TypeDescriptor{Size: 8, Alignment: 4, Kind: types.StructType,
+			Members: []*types.TypeDescriptor{types.FloatTypeDescriptor, types.FloatTypeDescriptor}},
+			sseEightbyteExpected(types.ReturnInt64)},
+		{"Struct8B_FloatInt32", &types.TypeDescriptor{Size: 8, Alignment: 4, Kind: types.StructType,
+			Members: []*types.TypeDescriptor{types.FloatTypeDescriptor, types.SInt32TypeDescriptor}},
+			types.ReturnInt64},
 	}
 
 	for _, tt := range tests {
@@ -395,18 +416,20 @@ func TestHandleReturn(t *testing.T) {
 	})
 
 	t.Run("ReturnViaPointer", func(t *testing.T) {
-		var dummy uint64 = 42
-		var result unsafe.Pointer
+		// Win64 hidden result pointer: the callee wrote the struct to rvalue
+		// and returned that pointer in RAX; handleReturn must not touch rvalue.
+		result := [12]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
+		want := result
 		cif := &types.CallInterface{
-			ReturnType: types.PointerTypeDescriptor,
+			ReturnType: &types.TypeDescriptor{Kind: types.StructType, Size: 12, Alignment: 4},
 			Flags:      types.ReturnViaPointer,
 		}
-		err := impl.handleReturn(cif, unsafe.Pointer(&result), uint64(uintptr(unsafe.Pointer(&dummy))), 0, 0, 0)
+		err := impl.handleReturn(cif, unsafe.Pointer(&result), uint64(uintptr(unsafe.Pointer(&result))), 0, 0, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if result != unsafe.Pointer(&dummy) {
-			t.Errorf("got %v, want %v", result, unsafe.Pointer(&dummy))
+		if result != want {
+			t.Errorf("handleReturn overwrote the result written by the callee: % x, want % x", result, want)
 		}
 	})
 }
