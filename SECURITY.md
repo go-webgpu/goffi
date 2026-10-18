@@ -2,14 +2,14 @@
 
 ## Supported Versions
 
-goffi is currently in early development (v0.1.x). We provide security updates for the following versions:
+goffi is pre-1.0. Security fixes are released as a patch of the latest minor release line; older lines are not patched.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
-| < 0.1.0 | :x:                |
+| 0.6.x   | :white_check_mark: |
+| < 0.6.0 | :x:                |
 
-Future stable releases (v1.0+) will follow semantic versioning with LTS support.
+Stable releases (v1.0+) will follow semantic versioning with long-term support.
 
 ## Reporting a Vulnerability
 
@@ -19,13 +19,8 @@ We take security seriously. If you discover a security vulnerability in goffi, p
 
 **DO NOT** open a public GitHub issue for security vulnerabilities.
 
-Instead, please report security issues by:
-
-1. **Private Security Advisory** (preferred):
-   https://github.com/go-webgpu/goffi/security/advisories/new
-
-2. **Email** to maintainers:
-   Create a private GitHub issue or contact via discussions
+Report it privately through a **GitHub Security Advisory**:
+https://github.com/go-webgpu/goffi/security/advisories/new
 
 ### What to Include
 
@@ -34,15 +29,11 @@ Please include the following information in your report:
 - **Description** of the vulnerability
 - **Steps to reproduce** the issue (include minimal code example if possible)
 - **Affected versions** (which versions are impacted)
+- **Platform** (OS, architecture, `CGO_ENABLED` value, Go version)
 - **Potential impact** (memory corruption, race condition, crash, etc.)
 - **Suggested fix** (if you have one)
-- **Your contact information** (for follow-up questions)
 
 ### Response Timeline
-
-- **Initial Response**: Within 48-72 hours
-- **Triage & Assessment**: Within 1 week
-- **Fix & Disclosure**: Coordinated with reporter
 
 We aim to:
 1. Acknowledge receipt within 72 hours
@@ -52,7 +43,7 @@ We aim to:
 
 ## Security Considerations for FFI Libraries
 
-goffi provides Foreign Function Interface (FFI) to C libraries without CGO. This introduces unique security risks related to low-level system calls and memory management.
+goffi provides a Foreign Function Interface (FFI) to C libraries without CGO. Calling C means leaving Go's memory safety: the C side can read or write anything it is given, and a wrong type description is not caught by the compiler.
 
 ### 1. Memory Safety Risks
 
@@ -61,30 +52,37 @@ goffi provides Foreign Function Interface (FFI) to C libraries without CGO. This
 **Attack Vectors**:
 - Invalid pointer addresses passed to C functions
 - Buffer overflows when C code writes beyond Go-allocated memory
-- Use-after-free when Go garbage collector moves memory
+- C code keeping a Go pointer after the call returns (the GC may free that memory)
 - Dangling pointers when C library frees memory unexpectedly
 - Type confusion between Go and C representations
 
 **Mitigation in Library**:
 - ✅ Type descriptor validation before calls
-- ✅ Bounds checking on argument counts
-- ✅ Safe `runtime.cgocall` for GC coordination
-- ✅ Assembly code thoroughly reviewed
-- 🔄 Fuzzing for memory safety (planned for v0.5.0)
+- ✅ Exactly one argument value required per argument type
+- ✅ Calls go through `runtime.cgocall` (GC-safe stack switch)
+- ✅ ABI behaviour checked by C-backed end-to-end tests on native CI runners
+- ✅ CI runs the test suite with `-race`, which also enables `checkptr` pointer checks
+- 🔄 Fuzzing (planned)
 
 **User Recommendations**:
 ```go
-// ❌ BAD - Passing Go slice directly (GC may move memory)
-data := []byte("hello")
-ffi.CallFunction(&cif, funcPtr, nil, []unsafe.Pointer{
-    unsafe.Pointer(&data[0]), // ❌ May become invalid!
-})
+// ❌ BAD - pointer hidden in a uintptr: if the goroutine stack moves,
+// the uintptr keeps the old address and C reads stale memory.
+buf := make([]byte, 64)
+addr := uintptr(unsafe.Pointer(&buf[0]))
+_, _ = ffi.CallFunction(&cif, fn, nil, []unsafe.Pointer{unsafe.Pointer(&addr)})
 
-// ✅ GOOD - Pin memory or use C-allocated buffers
-data := []byte("hello")
-dataPtr := unsafe.Pointer(unsafe.StringData("hello\x00"))
-ffi.CallFunction(&cif, funcPtr, nil, []unsafe.Pointer{dataPtr})
+// ✅ GOOD - keep pointers as unsafe.Pointer for the duration of the call.
+buf := make([]byte, 64)
+p := unsafe.Pointer(&buf[0])
+_, _ = ffi.CallFunction(&cif, fn, nil, []unsafe.Pointer{unsafe.Pointer(&p)})
+runtime.KeepAlive(buf)
+
+// ✅ If C keeps the pointer after the call returns, or a callback reads it
+// later, pin the memory (runtime.Pinner) or allocate it on the C side.
 ```
+
+C strings must be NUL-terminated (`"hello\x00"`); Go strings are not.
 
 ### 2. Race Conditions
 
@@ -98,14 +96,13 @@ Result: Type confusion, memory corruption
 ```
 
 **Mitigation**:
-- ✅ All tests run with `-race` detector
-- ✅ `runtime.cgocall` provides some synchronization
+- ✅ CI runs the test suite with `-race` on every runner that has a race detector
+- ✅ A prepared `CallInterface` is only read by `CallFunction`; a `CallInterface` built by hand is classified on a copy, never written
 - ⚠️ Users must ensure `CallInterface` is not modified during use
-- 🔄 Thread-safety documentation (v0.2.0)
 
 **User Best Practices**:
 ```go
-// ❌ BAD - Sharing CallInterface across goroutines
+// ❌ BAD - Preparing a CallInterface while another goroutine calls it
 var globalCIF types.CallInterface
 go func() {
     ffi.PrepareCallInterface(&globalCIF, ...) // Race!
@@ -117,14 +114,14 @@ go func() {
 // ✅ GOOD - One CallInterface per function, prepared once
 cif := &types.CallInterface{}
 ffi.PrepareCallInterface(cif, ...)
-// Safe to call concurrently after preparation
+// Safe to call concurrently after preparation (each goroutine with its own argument values)
 go func() { ffi.CallFunction(cif, ...) }()
 go func() { ffi.CallFunction(cif, ...) }()
 ```
 
 ### 3. Platform-Specific Assembly Bugs
 
-**Risk**: goffi uses hand-written assembly for System V (Linux) and Win64 (Windows) ABIs. Assembly bugs can cause crashes or security vulnerabilities.
+**Risk**: goffi uses hand-written assembly for the System V AMD64 and AAPCS64 ABIs (Windows AMD64 calls go through Go's `syscall.SyscallN`). Assembly bugs can cause crashes or security vulnerabilities.
 
 **Attack Vectors**:
 - Stack corruption due to incorrect frame setup
@@ -134,17 +131,12 @@ go func() { ffi.CallFunction(cif, ...) }()
 - Incorrect float/SSE register handling
 
 **Mitigation**:
-- ✅ Assembly code thoroughly reviewed by experts
-- ✅ Comprehensive tests on both platforms
-- ✅ Benchmark validation (FFI overhead within expected range)
-- ✅ Platform-specific CI/CD testing
-- 🔄 Formal ABI compliance verification (v0.5.0)
+- ✅ ABI rules taken from the ABI specifications and libffi
+- ✅ Bugs are first reproduced by a failing test, then fixed
+- ✅ Tests on native CI runners: Linux, Windows and macOS on amd64 and arm64; FreeBSD amd64 in VMs
+- ✅ C-backed end-to-end tests (struct sizes and classes, stack arguments, narrow integers, variadic, callbacks from C)
 
-**Current Status**:
-- Linux AMD64: ✅ Fully tested, production-ready
-- Windows AMD64: ✅ Fully tested, production-ready
-- macOS AMD64: 🔄 Planned for v0.5.0
-- ARM64: 🔄 Planned for v0.5.0
+**Current Status**: see the platform table in [README.md](README.md#platform-support). FreeBSD arm64 is cross-compiled only; Android arm64 is a guarded preview.
 
 ### 4. Type Safety Violations
 
@@ -162,10 +154,9 @@ ffi.CallFunction(&cif, funcPtr, nil, []unsafe.Pointer{
 ```
 
 **Mitigation**:
-- ✅ Type descriptors validate size and alignment
-- ✅ Runtime type checking in `PrepareCallInterface`
-- ✅ Comprehensive error messages with field context
-- 🔄 Enhanced type validation (v0.2.0)
+- ✅ Type descriptors are validated in `PrepareCallInterface`
+- ✅ Typed errors with field context (`TypeValidationError`, `InvalidCallInterfaceError`, …)
+- ⚠️ goffi cannot check that a descriptor matches the C prototype — that is the caller's job
 
 **User Best Practices**:
 ```go
@@ -190,15 +181,15 @@ ffi.PrepareCallInterface(&cif, types.DefaultCall,
 **Risk**: Loading arbitrary dynamic libraries can execute malicious code.
 
 **Attack Vectors**:
-- DLL hijacking on Windows (loading malicious DLL from current directory)
-- LD_PRELOAD attacks on Linux
+- DLL hijacking on Windows (loading a malicious DLL found earlier in the search order)
+- `LD_PRELOAD` / `LD_LIBRARY_PATH` attacks on Linux
 - Path traversal in library names
 - Loading libraries with constructor functions (immediate code execution)
 
 **Mitigation**:
 - ⚠️ User responsible for validating library paths
-- ⚠️ goffi uses OS-provided `LoadLibrary`/`dlopen` (no custom logic)
-- 🔄 Path validation helpers (v0.2.0)
+- ⚠️ goffi uses the OS loader (`LoadLibraryW` / `dlopen`) with its default search order — no custom path logic
+- ✅ Names containing NUL bytes are rejected
 
 **User Best Practices**:
 ```go
@@ -224,7 +215,7 @@ handle, err := ffi.LoadLibrary(libName)
 **Mitigation**:
 - ✅ `FreeLibrary()` provided for cleanup
 - ✅ Documentation emphasizes `defer ffi.FreeLibrary(handle)`
-- ✅ Context support for timeouts (`CallFunctionContext`)
+- ✅ Context support (`CallFunctionContext`) — checked before the call starts; a C function that is already running cannot be interrupted
 
 **User Best Practices**:
 ```go
@@ -238,7 +229,7 @@ defer ffi.FreeLibrary(handle) // Prevent leaks
 // ✅ Use context for timeouts
 ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 defer cancel()
-err := ffi.CallFunctionContext(ctx, &cif, funcPtr, &result, args)
+_, err = ffi.CallFunctionContext(ctx, &cif, funcPtr, unsafe.Pointer(&result), args)
 ```
 
 ## Known Security Considerations
@@ -254,72 +245,50 @@ err := ffi.CallFunctionContext(ctx, &cif, funcPtr, &result, args)
 **Mitigation**:
 - Type descriptors validated before use
 - Assembly code reviewed for stack safety
-- Comprehensive testing with race detector
+- Tests with the race detector and `checkptr`
 - User documentation emphasizes safe pointer handling
 
 ### 2. Platform-Specific Bugs
 
-**Status**: Active testing on Linux and Windows.
+**Status**: Tested on native CI runners for every production target except FreeBSD arm64.
 
 **Risk Level**: Medium
 
-**Description**: Hand-written assembly for each platform may contain ABI compliance bugs.
+**Description**: Hand-written assembly and per-platform argument layout may contain ABI compliance bugs.
 
 **Mitigation**:
-- Both platforms thoroughly tested
-- CI/CD runs tests on Linux and Windows
-- Benchmark validation ensures correctness
-- 🔄 **TODO (v0.5.0)**: Formal ABI verification tools
+- C-backed end-to-end tests on Linux, Windows, macOS (amd64 and arm64) and FreeBSD amd64
+- Each ABI fix is proven first by a test that fails on the unfixed code
+- 🔄 Formal ABI verification tools (planned)
 
-### 3. Variadic Functions NOT Supported
+### 3. Dependency Security
 
-**Status**: Known limitation (not a vulnerability).
+goffi has **no module dependencies** — `go.mod` has no `require` lines:
 
-**Risk Level**: Low
-
-**Description**: Variadic functions (`printf`, `sprintf`) are NOT supported. Attempting to use them may cause undefined behavior.
-
-**Mitigation**:
-- Clearly documented in README and CHANGELOG
-- Use non-variadic wrappers (e.g., `puts` instead of `printf`)
-- Planned support in v0.5.0
-
-### 4. Dependency Security
-
-goffi has **zero runtime dependencies**:
-
-- Pure Go implementation (no CGO)
-- No external libraries required
-- Standard library only (`unsafe`, `runtime`, `syscall`, `context`)
-
-**Testing dependencies** (not in production):
-- None (uses standard `testing` package)
-
-**Monitoring**:
-- 🔄 Dependabot enabled (when repository goes public)
-- ✅ Zero external attack surface
+- Pure Go implementation; with `CGO_ENABLED=0` no C code is compiled
+- Standard library only (`unsafe`, `runtime`, `syscall`, `context`, …)
+- Tests use only the standard `testing` package; the C-backed end-to-end tests compile `ffi/testdata/structtest.c` from source
 
 ## Security Testing
 
 ### Current Testing
 
 - ✅ Unit tests with invalid arguments
-- ✅ Race detector on all tests (`-race`)
-- ✅ Linting with golangci-lint (34+ linters)
-- ✅ Platform-specific CI/CD (Linux + Windows)
+- ✅ Race detector (with `checkptr`) on every CI runner that supports it
+- ✅ golangci-lint (errcheck, govet, ineffassign, staticcheck, unused) on every target
+- ✅ Native CI on Linux, Windows, macOS × amd64/arm64 and FreeBSD VMs
 - ✅ Benchmark validation (FFI overhead 88-114ns)
 
 ### Planned for v1.0
 
-- 🔄 Fuzzing with go-fuzz or libFuzzer
-- 🔄 Static analysis with gosec
-- 🔄 SAST/DAST scanning in CI
+- 🔄 Fuzzing
+- 🔄 Static analysis with gosec and govulncheck in CI
 - 🔄 Security audit by external experts
 - 🔄 Formal ABI compliance verification
 
 ## Security Disclosure History
 
-No security vulnerabilities have been reported or fixed yet (project is in early development).
+No security vulnerabilities have been reported or fixed yet.
 
 When vulnerabilities are addressed, they will be listed here with:
 - **CVE ID** (if assigned)
@@ -341,7 +310,6 @@ goffi does not currently have a bug bounty program. We rely on responsible discl
 If you report a valid security vulnerability:
 - ✅ Public credit in security advisory (if desired)
 - ✅ Acknowledgment in CHANGELOG
-- ✅ Our gratitude and recognition in README
 - ✅ Priority review and quick fix
 
 ---

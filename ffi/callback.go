@@ -1,8 +1,9 @@
 //go:build (linux || darwin || freebsd) && amd64
 
-// Package ffi provides callback support for Foreign Function Interface (Unix version).
-// This file implements Go function registration as C callbacks using
-// pre-compiled assembly trampolines for optimal performance.
+// Callback support (Unix amd64): Go function registration as C callbacks using
+// pre-compiled assembly trampolines. Not a package comment — the package
+// documentation lives in ffi.go.
+
 package ffi
 
 import (

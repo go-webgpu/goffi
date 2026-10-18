@@ -1,3 +1,8 @@
+// Package types describes C types and prepared calls for package ffi:
+// TypeDescriptor (size, alignment, kind and struct members of a C type, with
+// predefined descriptors for the C scalar types), CallingConvention, and
+// CallInterface, which ffi.PrepareCallInterface fills in once per function
+// signature and ffi.CallFunction reuses for every call.
 package types
 
 import (

@@ -1,7 +1,7 @@
-# Performance Guide - goffi v0.4.1
+# Performance Guide - goffi
 
 > **Comprehensive performance analysis, benchmarks, and usage guidelines**
-> **Platform**: Windows AMD64, 12th Gen Intel Core i7-1255U
+> **Platform**: Windows AMD64, 12th Gen Intel Core i7-1255U (timings measured 2026-03; allocation figures re-checked 2026-10-18)
 > **Go Version**: 1.25+
 
 ---
@@ -28,16 +28,19 @@
 
 | Benchmark | ns/op | B/op | allocs/op | Notes |
 |-----------|-------|------|-----------|-------|
-| **BenchmarkGoffiOverhead** | 88.09 | 64 | 2 | Empty C function (`getpid`) |
-| **BenchmarkGoffiIntArgs** | 113.9 | 72 | 3 | Integer argument (`abs`) |
-| **BenchmarkGoffiStringOutput** | 97.81 | 72 | 3 | String processing (`strlen`) |
+| **BenchmarkGoffiOverhead** | 88.09 | 0 | 0 | Empty C function (`getpid`) |
+| **BenchmarkGoffiIntArgs** | 113.9 | 8 | 1 | Integer argument (`abs`); the allocation is the benchmark's `avalue` literal |
+| **BenchmarkGoffiStringOutput** | 97.81 | 8 | 1 | String processing (`strlen`); same |
 | **BenchmarkDirectGo** | 0.21 | 0 | 0 | Pure Go baseline |
+
+B/op and allocs/op from 2026-10-18 (Go 1.27.2 on Windows amd64 and Go 1.27.1 on Linux amd64 give the same figures).
 
 **Key Insights**:
 - **Minimum FFI overhead**: ~88 ns (empty function)
 - **Typical overhead**: ~100-115 ns (with arguments)
 - **Overhead ratio**: ~400-500x vs direct Go call
-- **Allocations**: 0 in steady state. `syscallArgs` is heap-allocated via `sync.Pool` for callback safety (goroutine stack may move during C→Go callbacks). Pool reuse eliminates per-call allocations after warmup.
+- **Allocations**: goffi's call path allocates nothing in steady state. `syscallArgs` is heap-allocated via `sync.Pool` for callback safety (goroutine stack may move during C→Go callbacks); pool reuse removes per-call allocations after warmup.
+- **The `avalue` slice escapes** (its pointers are handed to C), so `[]unsafe.Pointer{unsafe.Pointer(&x)}` written inside the call expression allocates on every call — 8 B per argument, as the two benchmarks above do. Build the slice once and reuse it for 0 allocs/op.
 - **errno capture**: +3-5 ns per call (always-on since v0.6.0). `CALL __errno_location` + `MOVL (AX), EAX` in assembly — captures errno before thread migration can lose it.
 
 ### 2. One-Time Costs
@@ -46,7 +49,7 @@
 |-----------|-------|------|-----------|-----------|
 | **LoadLibrary** | 607.8 | 48 | 3 | Once per library |
 | **GetSymbol** | 318.1 | 40 | 2 | Once per function |
-| **PrepareCallInterface** | 63.94 | 24 | 1 | Once per function signature |
+| **PrepareCallInterface** | 63.94 | 104 | 2 | Once per function signature (B/op and allocs/op re-checked 2026-10-18; the benchmark allocates a new `CallInterface` and argument-type slice each iteration) |
 
 **Key Insights**:
 - **Library loading**: ~600 ns (amortize over thousands of calls)
@@ -71,13 +74,14 @@
 
 ### Overhead Breakdown
 
+Estimated split (not measured per component):
+
 ```
 Total FFI call time: ~100 ns
 ├── runtime.cgocall:     ~60 ns  (stack switch, GC coordination)
-├── Assembly wrapper:    ~20 ns  (register loads, MOVQ/MOVSD)
-├── JMP stub:            ~5 ns   (indirect jump)
+├── Assembly wrapper:    ~25 ns  (register loads, indirect CALL, errno capture)
 ├── Return path:         ~10 ns  (stack restore)
-└── Bookkeeping:         ~5 ns   (error handling, Go overhead)
+└── Bookkeeping:         ~5 ns   (validation, sync.Pool, Go overhead)
 ```
 
 ### Why is it acceptable for WebGPU?
@@ -156,9 +160,19 @@ func init() {
     ffi.PrepareCallInterface(&cif, types.DefaultCall, ...)
 }
 
-// Now each call is just ~100ns overhead
-func CallMyFunction(arg int) {
-    ffi.CallFunction(&cif, funcPtr, &result, args)
+// Now each call is just ~100ns overhead. Reusing the avalue slice keeps it at
+// 0 allocs/op (a slice literal per call escapes and allocates).
+// Not safe for concurrent use as written: give each goroutine its own arg/avalue.
+var (
+    arg    int32
+    result int32
+    avalue = []unsafe.Pointer{unsafe.Pointer(&arg)}
+)
+
+func CallMyFunction(x int32) int32 {
+    arg = x
+    _, _ = ffi.CallFunction(&cif, funcPtr, unsafe.Pointer(&result), avalue)
+    return result
 }
 ```
 
@@ -248,9 +262,9 @@ FFI overhead: 0.0001ms = 0.001% ✅
 | Aspect | goffi | CGO |
 |--------|-------|-----|
 | **Overhead** | ~100 ns | ~140-170 ns (Go 1.26) |
-| **Build** | Zero deps | Requires C compiler |
+| **Build** | No C compiler with `CGO_ENABLED=0` | Requires C compiler |
 | **Cross-compile** | ✅ Easy | ❌ Complex |
-| **Static binary** | ✅ Yes | ⚠️ Often requires libc |
+| **Static binary** | ⚠️ Default builds are dynamic (libc / libdl imports); `-tags goffi_static` gives a static ELF without FFI | ⚠️ Often requires libc |
 
 > **Note**: Go 1.26 (Feb 2026) reduced CGO overhead ~30% by removing the dedicated syscall P state. goffi benefits from the same improvement — both use `runtime.cgocall` internally.
 
@@ -267,7 +281,7 @@ FFI overhead: 0.0001ms = 0.001% ✅
 | **Callback struct args** | ✅ ≤8B, 9-16B, >16B | ❌ panic |
 | **ARM64 HFA** | Recursive struct walk | Partial recursive (bug in nested path) |
 | **Context support** | ✅ Timeouts/cancellation | ❌ |
-| **Platforms** | 5 (quality focus) | 9+ (breadth focus) |
+| **Platforms** | 8 desktop targets + Android preview (quality focus) | 8 GOARCH / 20+ OS×ARCH (breadth focus) |
 
 ---
 
@@ -280,7 +294,7 @@ Go 1.26 (released February 2026) [reduced cgo call overhead by ~30%](https://go.
 - **goffi benefits too** — our `runtime.cgocall` path gets the same ~30% speedup, because goffi uses the same Go runtime machinery internally
 - **CGO still requires a C compiler** at build time — goffi does not
 - **Cross-compilation** with CGO still requires cross-toolchains — `GOOS=linux GOARCH=arm64 go build` just works with goffi
-- **Static binaries** — CGO often pulls in libc, goffi produces fully static Go binaries
+- **Static binaries** — CGO often pulls in libc; goffi's default builds import libc/libdl dynamically too (needed for `dlopen`), and `-tags goffi_static` gives a fully static ELF without FFI (see README «Linking modes»)
 
 The gap between CGO and pure-Go FFI is narrowing from both directions. We welcome it.
 
@@ -288,12 +302,13 @@ The gap between CGO and pure-Go FFI is narrowing from both directions. We welcom
 
 ## Performance Roadmap
 
-### v0.5.0 - Usability + Optimization
-- [ ] Builder pattern API (less boilerplate)
-- [ ] Variadic function support
+Release planning lives in [ROADMAP.md](../ROADMAP.md) and the GitHub milestones. Performance items:
+
+- [x] Variadic function support (`PrepareVariadicCallInterface`)
+- [ ] Ergonomic API (RegisterFunc / NewFunc) without extra per-call cost
 - [ ] Assembly micro-optimizations
 
-### v1.0.0 - Production Benchmarks
+### Before v1.0.0 - Production Benchmarks
 - [ ] Comprehensive benchmarks vs CGO/purego (published)
 - [ ] Platform-specific tuning (Linux, macOS, ARM64)
 - [ ] Real-world case studies (WebGPU, Vulkan)
@@ -383,4 +398,4 @@ benchstat before.txt after.txt
 
 *Benchmarks conducted on Windows AMD64, Intel i7-1255U @ 12 cores*
 *Your results may vary depending on CPU, OS, and workload*
-*Last updated: 2026-03-02 | goffi v0.4.1*
+*Last updated: 2026-10-18*

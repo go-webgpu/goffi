@@ -3,7 +3,7 @@
 > **Strategic Approach**: Build production-ready Zero-CGO FFI with benchmarked performance
 > **Philosophy**: Performance first, usability second, platform coverage third
 
-**Last Updated**: 2026-10-18 | **Current Version**: v0.6.7 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → ABI → v1.0 LTS | **Milestone**: v0.6.7 struct ABI fixes, race detector and FreeBSD in CI → v0.7.0 RegisterFunc/Builder → v1.0.0 LTS
+**Last Updated**: 2026-10-18 | **Current Version**: v0.6.7 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → ABI → v1.0 LTS | **Next**: v0.6.8 (`CGO_ENABLED=1` link fix, [#72](https://github.com/go-webgpu/goffi/issues/72)) → v0.7.0 (ergonomic API) → v1.0.0 LTS. Live plan: [milestones](https://github.com/go-webgpu/goffi/milestones)
 
 ---
 
@@ -13,22 +13,23 @@ Build a **production-ready, zero-CGO FFI library for Go** with:
 - **Performance**: < 200ns overhead (current: 88-114ns ✅)
 - **Usability**: Simple, type-safe API
 - **Coverage**: All major platforms and calling conventions
-- **Quality**: 80%+ test coverage, comprehensive documentation
+- **Quality**: high test coverage (CI gate 70%, ~90% on amd64), every ABI bug proven by a failing test before the fix
 
 ### Key Differentiators
 
 ✅ **Zero CGO Dependency**
-- No C compiler required
+- No C compiler required with `CGO_ENABLED=0` (`CGO_ENABLED=1` is supported too)
 - Easy cross-compilation
 - Pure Go deployment
 
 ✅ **Performance First**
-- Hand-optimized assembly for each ABI
+- Hand-written assembly for System V AMD64 and AAPCS64; Win64 through Go's `syscall.SyscallN`
 - Benchmarked and validated
 - < 5% overhead for GPU operations
 
 ✅ **Production Quality**
-- 89.1% test coverage
+- ~90% test coverage on amd64
+- C-backed end-to-end ABI tests on native Linux, Windows and macOS runners (amd64 + arm64) and FreeBSD VMs
 - Typed error system
 - Comprehensive documentation
 - Active maintenance
@@ -61,10 +62,16 @@ v0.5.0 (PLATFORM COVERAGE) ✅ RELEASED 2026-03-29
 v0.5.1 (STRUCT ABI + CGO_ENABLED=1) ✅ RELEASED 2026-05-13
          ↓ (variadic + vet fixes)
 v0.5.2 (VARIADIC FUNCTIONS) ✅ RELEASED 2026-05-25
-         ↓ (RegisterFunc + builder API)
-v0.6.0 (REGISTERFUNC + BUILDER API) → 2026 Q3
-         ↓ (advanced features)
-v0.8.0 (ADVANCED FEATURES) → 2026 Q3-Q4
+         ↓ (FreeBSD arm64, HostLayout, callback stack-move fix)
+v0.5.3-v0.5.6 ✅ RELEASED 2026-05-28 … 2026-07-05
+         ↓ (errno)
+v0.6.0 (ERRNO ALWAYS-CAPTURE, BREAKING) ✅ RELEASED 2026-07-12
+         ↓ (Android preview, Windows floats, static profile, ABI fixes)
+v0.6.1-v0.6.7 ✅ RELEASED 2026-07-21 … 2026-10-18
+         ↓ (CGO_ENABLED=1 link fix)
+v0.6.8 (PATCH) → next
+         ↓ (ergonomic API, arm32, host profiles)
+v0.7.0 (ERGONOMIC API) → next minor
          ↓ (community adoption + validation)
 v1.0.0 LTS → Long-term support release (2027 Q1)
 ```
@@ -203,11 +210,25 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 - CI: `go test -race` on every cgo runner that supports it; the test suite runs on FreeBSD 14 and 15 in a VM
 - MIT license headers on original files, checked in CI
 
-**v0.7.0** = RegisterFunc + Builder API (2026 Q3-Q4)
-- RegisterFunc convenience API (ADR-008)
-- Library struct + OpenLibraryBytes (ADR-009)
-- NewFunc/Call/CallCtx ergonomic wrappers (ADR-009)
-- Enterprise C-ABI / Rust-cdylib host profile ([#81](https://github.com/go-webgpu/goffi/issues/81))
+**v0.6.8** = Patch (planned, [milestone](https://github.com/go-webgpu/goffi/milestone/9))
+- Linux and FreeBSD: `CGO_ENABLED=1` binaries that also contain other cgo code, or are linked externally (`-linkmode=external`, `c-shared`, `c-archive`), fail to link ([#72](https://github.com/go-webgpu/goffi/issues/72)). The approach is discussed in the RFC [#104](https://github.com/go-webgpu/goffi/issues/104) before anything is implemented
+- Further fixes accumulate here
+
+**v0.7.0** = Ergonomic API (planned, [milestone](https://github.com/go-webgpu/goffi/milestone/7))
+- RegisterFunc convenience API
+- Library struct + OpenLibraryBytes
+- NewFunc/Call/CallCtx ergonomic wrappers
+- Enterprise C-ABI / Rust-cdylib host profile — guide, example and CI ([#81](https://github.com/go-webgpu/goffi/issues/81))
+- Static single binary with FFI ([#74](https://github.com/go-webgpu/goffi/issues/74))
+- linux/arm (GOARCH=arm) ([#70](https://github.com/go-webgpu/goffi/issues/70))
+- libvips bindings as a real-world stress test ([#71](https://github.com/go-webgpu/goffi/issues/71)) — see below
+
+**libvips stress-test target** ([#71](https://github.com/go-webgpu/goffi/issues/71), idea by @unxed). A binding of this size exercises what goffi needs for large C APIs:
+- float arguments and results in callbacks on Unix — done ([#93](https://github.com/go-webgpu/goffi/issues/93), v0.6.6);
+- struct-by-value callback arguments on arm64 — not implemented yet (amd64 Unix only today);
+- NULL-terminated varargs (`vips_image_new_from_file`, `vips_call`) — `PrepareVariadicCallInterface` needs one CIF per argument-type combination, so ergonomics matter;
+- RegisterFunc / ergonomic API (this release) — makes a binding of this size practical.
+GObject (GValue, the type system, reference counting) belongs to the binding layer, not to goffi.
 
 **v1.0.0** = Long-term support release (2027 Q1)
 - API stability guarantee
@@ -217,42 +238,38 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 
 ---
 
-## 📊 Current Status (v0.6.6)
+## 📊 Current Status (v0.6.7)
 
-**Phase**: ABI fixes shipped — callback float arguments/returns, arm64 argument layout per AAPCS64/Apple, integer argument handling — each proven with C callers on native runners before the fix. 9 platforms. Next: RegisterFunc/Builder ergonomics for v0.7.0
+**Phase**: struct ABI fixes shipped (hand-built `CallInterface`, Win64 hidden result pointer and by-reference copies, exact-size small structs), `dlerror` read on the right thread, race detector and FreeBSD VMs in CI. Each bug was proven by a failing test first. Next: the `CGO_ENABLED=1` link fix (v0.6.8, after the RFC #104 discussion), then the ergonomic API for v0.7.0
 
 **What Works**:
 - ✅ Dynamic library loading (`LoadLibrary`, `GetSymbol`, `FreeLibrary`)
-- ✅ Function call interface (`PrepareCallInterface`)
-- ✅ Function execution (`CallFunction`, `CallFunctionContext`)
+- ✅ Function call interface (`PrepareCallInterface`, `PrepareVariadicCallInterface`)
+- ✅ Function execution (`CallFunction`, `CallFunctionContext`) with errno always captured
+- ✅ **Structs** by value as arguments and results on every ABI
 - ✅ **`-tags goffi_static`** — fully static Linux ELFs (FFI unavailable; `errors.Is(err, ErrStaticBuild)`)
-- ✅ **Benchmarks**: 64-114 ns/op FFI overhead ✨
+- ✅ **Benchmarks**: 88-114 ns/op FFI overhead (AMD64)
 - ✅ **Typed errors**: 5 error types with `errors.As()` support (+ `ErrStaticBuild` sentinel)
 - ✅ **Context support**: Timeouts and cancellation
-- ✅ **Cross-platform**: Linux + Windows + macOS (AMD64 + ARM64)
+- ✅ **Cross-platform**: Linux, Windows, macOS, FreeBSD × AMD64 + ARM64; Android arm64 preview
 - ✅ **Type system**: Predefined descriptors for common types
-- ✅ **Callbacks**: C-to-Go function calls (2000 entries)
-- ✅ **89.6% test coverage** (exceeded 80% target)
+- ✅ **Callbacks**: C-to-Go function calls (2000 entries on Unix; `syscall.NewCallback` on Windows)
+- ✅ **Test coverage**: ~90% on amd64 (CI gate: 70%)
 
 **Performance**:
 - ✅ AMD64: **88-114 ns/op** (Intel i7-1255U)
 - ✅ ARM64: **64 ns/op** (Apple M3 Pro)
 - ✅ **Verdict**: < 5% overhead for WebGPU operations (target achieved!)
 
-**Platform Support**:
-- ✅ Linux AMD64 (System V ABI)
-- ✅ Windows AMD64 (Win64 ABI)
-- ✅ macOS AMD64 (System V ABI)
-- ✅ Linux ARM64 (AAPCS64 ABI)
-- ✅ macOS ARM64 (AAPCS64 ABI) - Apple Silicon M1/M2/M3/M4
+**Platform Support**: see the table in [README.md](README.md#platform-support) — how each target is verified (native CI runner, FreeBSD VM, cross-compile, preview).
 
 **Requirements**:
-- ✅ `CGO_ENABLED=0` required (clear error message if CGO_ENABLED=1)
-- ✅ Go 1.21+ recommended
+- ✅ Go 1.25+ (the `go` line in `go.mod`)
+- ✅ `CGO_ENABLED=0` (recommended, no C compiler) or `CGO_ENABLED=1` — on Linux and FreeBSD the latter does not yet link together with other cgo code ([#72](https://github.com/go-webgpu/goffi/issues/72))
 
 **Documentation**:
 - ✅ README.md with benchmarks and requirements
-- ✅ docs/PERFORMANCE.md (comprehensive guide)
+- ✅ docs/ARCHITECTURE.md, docs/PERFORMANCE.md, docs/ANDROID.md
 - ✅ CHANGELOG.md with migration guide
 - ✅ CONTRIBUTING.md
 - ✅ CODE_OF_CONDUCT.md
@@ -262,46 +279,22 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 
 ## 📅 What's Next
 
-### **v0.5.0 - Usability + Variadic** (Q2 2025)
+The two planned releases are described above (**v0.6.8**, **v0.7.0**); their current scope is in the [milestones](https://github.com/go-webgpu/goffi/milestones). Ideas without a release yet are tracked in the Backlog milestone.
 
-**Goal**: Improve developer experience and add variadic function support
+### Ideas — not scheduled
 
-**Duration**: 2-3 months (Q2 2025)
-
-**Features**:
-1. **Builder Pattern API** (HIGH PRIORITY)
+**Usability**:
+1. **Builder-style call API**
    ```go
    lib.Call("wgpuCreateInstance").
        Arg(nil).
        ReturnPointer(&instance)
    ```
-
-2. **Variadic Function Support** (HIGH PRIORITY)
-   - System V: AL register = SSE argument count
-   - Win64: Float→GP register duplication
-   - Examples: printf, sprintf, scanf
-
-3. **Platform-Specific Struct Handling** (MEDIUM PRIORITY)
-   - Windows `#pragma pack` support
-   - MSVC vs GCC alignment differences
-
-4. **Type-Safe Argument Helpers** (MEDIUM PRIORITY)
+2. **Type-Safe Argument Helpers**
    ```go
    args := ffi.Args(ffi.Int32(42), ffi.String("hello"))
    ```
-
-**Quality Targets**:
-- Maintain 80%+ test coverage
-- 0 linter issues
-- API stability (no breaking changes)
-
----
-
-### **v0.8.0 - Advanced Features** (Q4 2025)
-
-**Goal**: Advanced FFI capabilities and tooling
-
-**Duration**: 2-3 months (Q4 2025)
+3. **Platform-Specific Struct Handling** — Windows `#pragma pack`, MSVC vs GCC alignment differences
 
 **Advanced Features**:
 1. **Codegen Tool (`goffi-gen`)** (HIGH PRIORITY)
@@ -331,19 +324,16 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
    - OpenGL context binding support
    - Thread-safe library handles
 
-**Quality Targets**:
-- Codegen tool with 90%+ C header coverage
-- Tooling documentation
-- Advanced examples (OpenGL, Vulkan)
+5. **Userspace ELF loader** (research) — load `.so` files without host `dlopen`, for static binaries ([ADR-001](docs/ADR-001-userspace-elf-loader.md))
 
 ---
 
-### **v1.0.0 - Long-Term Support Release** (Q1 2026)
+### **v1.0.0 - Long-Term Support Release** (2027 Q1)
 
 **Goal**: Production-ready LTS release with stability guarantees
 
 **Requirements**:
-- v0.8.x stable for 3+ months
+- The last 0.x release line stable for 3+ months
 - Positive community feedback
 - No critical bugs
 - API proven in production (WebGPU, Vulkan, etc.)
@@ -378,13 +368,15 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 
 **Official Documentation**:
 - README.md - Project overview
+- docs/ARCHITECTURE.md - Technical architecture
 - docs/PERFORMANCE.md - Performance guide
+- docs/ANDROID.md - Android arm64 preview
 - CHANGELOG.md - Version history
 - CONTRIBUTING.md - Development guide
 - SECURITY.md - Security policy
 
 **Development**:
-- API_TODO.md - Detailed task backlog
+- [Milestones](https://github.com/go-webgpu/goffi/milestones) and [issues](https://github.com/go-webgpu/goffi/issues) - Planned work
 - .github/workflows/ci.yml - CI/CD pipeline
 - scripts/pre-release-check.sh - Quality checks
 
@@ -397,18 +389,18 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 
 ## 📊 Quality Metrics
 
-**Current (v0.4.0)**:
-- ✅ Test coverage: 89.6% (target: 80%+)
-- ✅ Linter issues: 0
+**Current (v0.6.7)**:
+- ✅ Test coverage: 90.9% linux/amd64, 89.5% windows/amd64, 83.4% arm64 (CI, 2026-10-18; gate 70%)
+- ✅ Linter issues: 0 on every target
 - ✅ Benchmarks: 64-114 ns/op (AMD64 + ARM64)
-- ✅ Platforms: 5 (Linux, Windows, macOS × AMD64/ARM64)
-- ✅ CGO requirement: Clear error message
+- ✅ Platforms: 8 desktop targets (Linux, Windows, macOS, FreeBSD × AMD64/ARM64) + Android arm64 preview
+- ✅ Race detector in CI on every runner that supports it
 
 **Target (v1.0.0)**:
 - 🎯 Test coverage: 90%+
 - 🎯 Linter issues: 0
 - 🎯 Benchmarks: < 100ns average
-- 🎯 Platforms: 5+ (Linux, Windows, macOS × AMD64/ARM64)
+- 🎯 Platforms: all 8 desktop targets tested natively (FreeBSD arm64 included)
 - 🎯 Documentation: Comprehensive (book-style)
 - 🎯 Community: Active (10+ contributors)
 
@@ -423,8 +415,8 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 - Profiling before optimization
 
 **Quality Over Speed**:
-- Comprehensive tests (unit + integration + benchmarks)
-- Linting with 34+ security-focused linters
+- Comprehensive tests (unit + C-backed end-to-end + benchmarks)
+- golangci-lint on every target
 - Documentation updated with code
 - Security-first design
 
@@ -444,7 +436,7 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 
 **Contributing**:
 - See CONTRIBUTING.md
-- Check API_TODO.md for open tasks
+- Check the [milestones](https://github.com/go-webgpu/goffi/milestones) and open issues
 - Join discussions on roadmap priorities
 
 **Security**:
@@ -453,5 +445,5 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 
 ---
 
-*Version 1.4 (Updated 2026-02-27)*
-*Current: v0.4.0 (crosscall2 integration) | Next: v0.5.0 (Usability) | Target: v1.0.0 LTS*
+*Version 1.5 (Updated 2026-10-18)*
+*Current: v0.6.7 (struct ABI fixes) | Next: v0.6.8 (patch), v0.7.0 (ergonomic API) | Target: v1.0.0 LTS*

@@ -1,7 +1,8 @@
 //go:build windows
 
-// Package ffi provides Foreign Function Interface capabilities.
-// This file contains Windows-specific callback implementation using syscall.NewCallback.
+// Callback support (Windows) using syscall.NewCallback. Not a package
+// comment — the package documentation lives in ffi.go.
+
 package ffi
 
 import (

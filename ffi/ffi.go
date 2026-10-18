@@ -33,10 +33,10 @@
 //	    []*types.TypeDescriptor{types.DoubleTypeDescriptor},
 //	)
 //
-//	// Call the function
+//	// Call the function (the first result is the C errno after the call)
 //	var result float64
 //	arg := 16.0
-//	err = ffi.CallFunction(
+//	_, err = ffi.CallFunction(
 //	    &cif,
 //	    sqrtPtr,
 //	    unsafe.Pointer(&result),
@@ -51,8 +51,11 @@
 //
 // # Performance
 //
-// Hand-optimized assembly per platform ABI. Overhead: 88-114 ns/op with
-// errno capture. sync.Pool for callback stack-move safety (0 allocs steady state).
+// Hand-written assembly for System V AMD64 and AAPCS64; Windows AMD64 calls
+// go through syscall.SyscallN. Overhead: 88-114 ns/op with errno capture.
+// sync.Pool for callback stack-move safety: the call path allocates nothing in
+// steady state. The avalue slice escapes, so reuse it instead of building a
+// slice literal on every call.
 //
 // # Safety
 //
@@ -70,7 +73,11 @@
 //
 // This package follows Go's standard library conventions for concurrent access:
 //   - PrepareCallInterface and CallFunction are safe to call concurrently with different CallInterface instances
-//   - DO NOT use the same CallInterface from multiple goroutines simultaneously without external synchronization
+//   - A prepared CallInterface is only read by CallFunction, so many goroutines may call through it at once,
+//     each with its own argument values and result buffer
+//   - DO NOT prepare (or otherwise modify) a CallInterface while calls through it are in flight
+//   - PrepareCallInterface fills in Size and Alignment of struct descriptors whose Size is 0; prepare once
+//     before sharing such a descriptor between goroutines
 //   - Library handles (from LoadLibrary) are safe to use concurrently for read operations (GetSymbol)
 //   - DO NOT call FreeLibrary while other goroutines are using GetSymbol on the same handle
 //   - Similar to io.Reader: methods are not inherently thread-safe; synchronization is caller's responsibility
@@ -82,8 +89,9 @@
 //
 // # Zero Dependencies
 //
-// This package has zero external dependencies (except for internal/fakecgo on Linux).
-// All FFI logic is implemented in pure Go and assembly.
+// This package has zero external module dependencies. With CGO_ENABLED=0 the cgo
+// runtime comes from goffi's own internal/fakecgo (Unix). All FFI logic is
+// implemented in pure Go and assembly.
 package ffi
 
 import (

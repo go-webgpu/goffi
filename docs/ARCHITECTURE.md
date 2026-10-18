@@ -8,9 +8,9 @@
 
 **goffi** is a zero-dependency Foreign Function Interface (FFI) for Go. It calls C library functions without CGO by using:
 
-- **Hand-written assembly** for each platform ABI
+- **Hand-written assembly** for System V AMD64 and AAPCS64; on Windows amd64 the Go runtime's `syscall.SyscallN` builds the Win64 frame
 - **`runtime.cgocall`** for GC-safe Go→C stack switching
-- **`crosscall2`** for safe C→Go callback transitions (any thread)
+- **`crosscall2`** for safe C→Go callback transitions from any thread (Linux, macOS, FreeBSD); `syscall.NewCallback` on Windows
 - **Runtime type validation** via `TypeDescriptor` — no codegen, no reflection
 
 ---
@@ -73,11 +73,13 @@ ffi.PrepareCallInterface(cif, types.DefaultCall,
 1. Switches to system stack (g0)
 2. Marks goroutine as "in syscall" — allows GC to proceed
 3. Calls our assembly wrapper
+4. Restores Go stack on return
 
 Since v0.5.6, `syscallArgs` is heap-allocated via `sync.Pool` — goroutine stacks may move during C→Go callbacks (`copystack`), and assembly on g0 holds the args pointer across the call. All ABI-boundary structs use `structs.HostLayout` (Go 1.23+) to guarantee C-compatible memory layout.
 
 Since v0.6.0, `CallFunction` always captures C `errno` inside the assembly trampoline — the only thread-safe window (before `exitsyscall` can migrate the goroutine). Returns `(syscall.Errno, error)`. Uses `__errno_location` (Linux) / `__error` (macOS/FreeBSD) resolved via `//go:cgo_import_dynamic`.
-4. Restores Go stack on return
+
+On Windows amd64 the call goes through `syscall.SyscallN` instead (`internal/arch/amd64/call_windows.go`); its second result carries the raw XMM0 bits, which is how float and double results are returned there.
 
 We access it via `//go:linkname`:
 
@@ -88,9 +90,9 @@ func runtime_cgocall(fn uintptr, arg unsafe.Pointer) int32
 
 ### Layer 3: Platform Assembly
 
-Hand-written assembly for each ABI. The function receives a struct pointer containing all arguments, loads registers, calls the target, and saves return values.
+Hand-written assembly for System V AMD64 and AAPCS64. The function receives a struct pointer containing all arguments, loads registers, calls the target, captures errno and saves return values.
 
-**System V AMD64** (`syscall_unix_amd64.s`):
+**System V AMD64** (`internal/syscall/syscall_unix_amd64.s`):
 
 ```asm
 TEXT syscallN(SB), NOSPLIT|NOFRAME, $0
@@ -102,15 +104,9 @@ TEXT syscallN(SB), NOSPLIT|NOFRAME, $0
     // Save RAX (int return), RDX (second return), XMM0 (float return)
 ```
 
-**Win64** (`syscall_windows_amd64.s`):
+**Win64** — no goffi assembly. `internal/arch/amd64/call_windows.go` packs the arguments into `uintptr` slots (a hidden result pointer first when the result needs one) and calls `syscall.SyscallN`, which loads RCX, RDX, R8, R9 and XMM0–XMM3 from those slots and provides the 32-byte shadow space.
 
-```asm
-// 4 GP registers: RCX, RDX, R8, R9
-// 4 SSE registers: XMM0-XMM3
-// 32-byte shadow space mandatory
-```
-
-**AAPCS64 ARM64** (`syscall_unix_arm64.s`):
+**AAPCS64 ARM64** (`internal/syscall/syscall_arm64.s`, Linux, macOS, Windows and FreeBSD):
 
 ```asm
 // 8 GP registers: X0-X7
@@ -133,7 +129,7 @@ TEXT syscallN(SB), NOSPLIT|NOFRAME, $0
 | **Struct ≤8B** | RAX (XMM0 if all members are float/double) | RAX if 1, 2, 4 or 8 bytes, else hidden sret pointer | X0 (S0/D0 for a single float/double) |
 | **Struct 9-16B** | RAX + RDX (per eightbyte class) | Hidden sret pointer | X0 + X1 |
 | **Struct >16B** | Hidden sret pointer | Hidden sret pointer | Hidden sret pointer |
-| **HFA** | N/A | N/A | D0-D3 (up to 4 floats) |
+| **HFA** | N/A | N/A | S0-S3 / D0-D3 (up to 4 float or double members) |
 
 ---
 
@@ -155,8 +151,8 @@ Implementation in `internal/arch/amd64/call_unix.go`, helpers in `classification
 
 ### Win64 (Windows AMD64)
 
-- **Exactly 1, 2, 4, or 8 bytes**: passed as integer by value (same register slot)
-- **All other sizes**: passed by reference — caller passes a pointer
+- **Exactly 1, 2, 4, or 8 bytes**: passed as integer by value (same register slot), whatever the members are — struct members never go to XMM
+- **All other sizes**: passed by reference — goffi copies the struct and passes a pointer to the copy, so the callee may modify it without touching the Go value (libffi `src/x86/ffiw64.c` does the same)
 
 ### AAPCS64 (ARM64)
 
@@ -170,15 +166,15 @@ Implementation in `internal/arch/amd64/call_unix.go`, helpers in `classification
 
 ### End-to-End Testing
 
-Struct argument passing is verified by `ffi/struct_e2e_test.go`, which compiles a C test library (`testdata/structtest.c`) via gcc at test time. Five scenarios are tested:
+The ABI is verified against real C callers and callees: `TestMain` in `ffi/struct_e2e_test.go` compiles a C test library (`testdata/structtest.c`) at test time, and the `ffi/*_e2e_test.go` files call it. Covered, among others:
 
-1. **≤8B integer pair** (`{int32, uint32}`) — INTEGER class, single GP register
-2. **≤8B float pair** (`{float, float}`) — SSE class, single XMM register
-3. **16B integer pair** (`{int64, int64}`) — two INTEGER eightbytes, two GP registers
-4. **24B triple** (`{int64, int64, int64}`) — MEMORY class, copied to stack
-5. **Struct + scalar** — mixed register allocation
+- struct arguments by class: `{int32, uint32}`, `{float, float}`, `{int64, int64}`, 24-byte MEMORY structs, struct + scalar, mixed int/float structs (`struct_e2e_test.go`, `struct_mixed_e2e_test.go`);
+- byte structs of 1–9, 12, 15, 16, 17, 24 and 32 bytes, as argument and as result, including a nil result buffer where a hidden result pointer is needed (`struct_sizes_e2e_test.go`);
+- 9–16 byte results in each register pair (`struct_return_e2e_amd64_test.go`) and struct results of a hand-built `CallInterface` (`unprepared_cif_e2e_test.go`);
+- stack arguments, narrow and `int` integers, variadic calls, the one-value-per-argument rule (`stack_args_e2e_test.go`, `narrow_int_e2e_test.go`, `int_type_e2e_test.go`, `variadic_e2e_test.go`, `avalue_count_e2e_test.go`);
+- callbacks called from C: float arguments and results, stack arguments, foreign threads (`callback_float_e2e_test.go`, `callback_stack_e2e_test.go`, `callback_cthread_test.go`).
 
-The test library is built with `$CC` (default `gcc`; the FreeBSD CI job uses the base system `cc`). The tests skip only on Android (test binaries run on the device), in a `goffi_static` build, or when there is no C compiler for the test's architecture; with `GOFFI_REQUIRE_TESTLIB=1`, which CI sets wherever such a compiler exists, a missing compiler fails the run as well. A library that fails to build or load always fails the run. CI runs them on Linux, macOS, Windows and FreeBSD.
+The test library is built with `$CC` (default `gcc`; the FreeBSD CI job uses the base system `cc`). The tests skip only on Android (test binaries run on the device), in a `goffi_static` build, or when there is no C compiler for the test's architecture; with `GOFFI_REQUIRE_TESTLIB=1`, which CI sets wherever such a compiler exists, a missing compiler fails the run as well. A library that fails to build or load always fails the run. CI runs them on Linux, macOS and Windows (amd64 and arm64) and on FreeBSD amd64; on windows-11-arm they skip, because the runner only has an x86-64 MinGW compiler.
 
 ---
 
@@ -200,7 +196,7 @@ Classification uses `reflect.Type` (not `types.TypeDescriptor`) since callback s
 
 ABI rules for returning structs depend on size:
 
-- **≤ 8 bytes**: returned in RAX (INTEGER) or XMM0 (SSE) on AMD64, X0 or D0 on ARM64
+- **≤ 8 bytes**: returned in RAX (INTEGER) or XMM0 (SSE, System V only) on AMD64, X0 or S0/D0 on ARM64; written to the caller's buffer with the struct's exact size. On Win64 only 1, 2, 4 and 8 bytes come back in RAX — every other size uses a hidden result pointer passed in RCX
 - **9-16 bytes** (AMD64): two eightbytes, each returned in GP or XMM per classification. Four modes:
 
 | Struct layout | Eightbyte 0 | Eightbyte 1 | Registers | Flag |
@@ -218,17 +214,21 @@ Implementation in `internal/arch/amd64/implementation.go`:
 ```go
 case types.StructType:
     size := cif.ReturnType.Size
-    switch {
-    case size <= 8:
-        *(*uint64)(rvalue) = retVal
-    case size <= 16:
-        *(*uint64)(rvalue) = retVal           // RAX → bytes 0-7
-        remaining := size - 8
-        src := (*[8]byte)(unsafe.Pointer(&retVal2))
-        dst := (*[8]byte)(unsafe.Add(rvalue, 8))
-        copy(dst[:remaining], src[:remaining]) // RDX → bytes 8-15
+    if size <= 8 {
+        // One eightbyte: XMM0 when it is SSE class, RAX otherwise.
+        // rvalue is the caller's struct: write exactly its size.
+        word := retVal
+        if cif.Flags == types.ReturnInXMM64 {
+            word = *(*uint64)(unsafe.Pointer(&fret))
+        }
+        copy(unsafe.Slice((*byte)(rvalue), size), (*[8]byte)(unsafe.Pointer(&word))[:size])
+        break
     }
+    // 9-16B: reconstruct from the register pair selected by cif.Flags
+    // (ReturnStRaxRdx, ReturnStRaxXmm0, ReturnStXmm0Rax, ReturnStXmm0Xmm1).
 ```
+
+A `CallInterface` filled in by hand (without `PrepareCallInterface`) has `Flags == 0`; for a struct result it is classified on each call on a copy, so the shared value is never written. Its struct `ReturnType` must have `Size` and `Alignment` set.
 
 ---
 
@@ -275,11 +275,14 @@ B    ·callbackDispatcher    // branch (no link — preserves LR)
 ### Usage
 
 ```go
-cb := ffi.NewCallback(func(status uint32, adapter uintptr, msg uintptr, ud uintptr) {
+cb := ffi.NewCallback(func(status, adapter, msg, ud uintptr) uintptr {
     // Safe even when called from a C thread
+    return 0
 })
 // Pass cb (uintptr) as a function pointer argument to C code
 ```
+
+Signature rules differ per platform. On Unix, arguments may be integers of any width, `bool`, `float32`/`float64`, pointers and (amd64) structs, with zero or one result. On Windows, `syscall.NewCallback` requires `uintptr`-sized arguments and exactly one `uintptr`-sized result; floats must be passed as bits (`math.Float64bits`). On Android, `NewCallback` panics (see [ANDROID.md](ANDROID.md)).
 
 ---
 
@@ -320,11 +323,12 @@ pointType := &types.TypeDescriptor{
 
 `PrepareCallInterface` validates all types at preparation time:
 
-- Nil checks on all descriptors
-- Size > 0 for non-void types
-- Struct members recursively validated
-- Alignment power-of-two check
-- Argument count within platform limits
+- Nil checks on the CIF, the return type and every argument type
+- Every type kind must be one goffi supports
+- Struct members must be present and are validated recursively; a struct with `Size == 0` gets its size and alignment computed from its members
+- Argument count and stack size within platform limits (`ErrTooManyArguments`)
+
+At call time `CallFunction` additionally requires exactly one `avalue` entry per argument type, and a non-nil function pointer.
 
 Five typed error types for precise error handling: `InvalidCallInterfaceError`, `LibraryError`, `CallingConventionError`, `TypeValidationError`, `UnsupportedPlatformError`.
 
@@ -340,6 +344,8 @@ Under `-tags goffi_static`, dynamic loading is unavailable: `LoadLibrary` / `Get
 | Static no-FFI | `CGO_ENABLED=0 go build -tags goffi_static` | no (`ErrStaticBuild`) | `FROM scratch`, air-gapped CLI |
 
 See README [Linking modes](../README.md#linking-modes-linux) and [ADR-001](./ADR-001-userspace-elf-loader.md). Helper: `scripts/check-elf-linking.sh`.
+
+**`CGO_ENABLED=1` on Linux and FreeBSD** ([#72](https://github.com/go-webgpu/goffi/issues/72)): goffi's `cgo_import_dynamic` stubs work only with the Go **internal** linker. `cmd/link` rejects a relocation from Go code to a dynamically imported symbol when it links externally (`cmd/link/internal/ld/data.go`; Darwin, OpenBSD, AIX and Solaris are exempt). A goffi-only `CGO_ENABLED=1` build links internally and works; any other cgo package in the binary, `-linkmode=external`, `c-shared` or `c-archive` switches to the external linker and the link fails. The fix is discussed in [#104](https://github.com/go-webgpu/goffi/issues/104).
 
 ### avalue Indirection Convention
 
@@ -384,11 +390,13 @@ A new CIF must be prepared for each unique combination of variadic argument type
 
 ### Platform Differences
 
-**System V AMD64 (Linux, macOS Intel, FreeBSD):**  
-Standard AAPCS64 and System V ABI pass variadic arguments in the same registers as fixed arguments, up to the register count limit. `PrepareVariadicCallInterface` on these platforms is functionally identical to `PrepareCallInterface` — `FixedArgCount` is stored in `CallInterface` but the argument marshalling loop is unchanged.
+**System V AMD64 (Linux, macOS Intel, FreeBSD) and AAPCS64 (Linux, FreeBSD):**  
+Variadic arguments go in the same registers as fixed arguments, up to the register count limit. `PrepareVariadicCallInterface` on these platforms is functionally identical to `PrepareCallInterface` — `FixedArgCount` is stored in `CallInterface` but the argument marshalling loop is unchanged.
 
-**Win64 (Windows AMD64/ARM64):**  
-Same as System V for integer arguments — variadic args use the same 4 GP registers. `PrepareVariadicCallInterface` behaves identically to `PrepareCallInterface`.
+**Windows (AMD64/ARM64):**  
+Integer variadic arguments use the same registers as fixed ones (RCX, RDX, R8, R9 on AMD64; X0–X7 on ARM64). `PrepareVariadicCallInterface` behaves identically to `PrepareCallInterface`.
+
+The end-to-end tests (`ffi/variadic_e2e_test.go`, `cmd/variadic-test`) cover integer variadic arguments.
 
 **Apple ARM64 (macOS/iOS, `GOOS=darwin`, `GOARCH=arm64`):**  
 Apple's AAPCS64 extension mandates that **variadic arguments must be passed on the stack**, even when GP or FP registers are still available. This differs from the standard AAPCS64 used on Linux ARM64, where variadic args may be placed in X1-X7.
@@ -437,7 +445,7 @@ go run github.com/go-webgpu/goffi/cmd/variadic-test
 | **macOS** | AMD64 | System V | Production |
 | **macOS** | ARM64 | AAPCS64 | Production (tested on M3 Pro) |
 | **FreeBSD** | AMD64 | System V | Production (CI: tests in FreeBSD 14 and 15 VMs) |
-| **FreeBSD** | ARM64 | AAPCS64 | Cross-compile verified |
+| **FreeBSD** | ARM64 | AAPCS64 | Cross-compiled in CI (build and test build; tests not run yet) |
 | **Linux** | ARM64 | AAPCS64 | Production |
 | **Android** | ARM64 | AAPCS64 (Bionic) | Guarded preview (API 29+, NDK r29) |
 
@@ -457,12 +465,17 @@ go run github.com/go-webgpu/goffi/cmd/variadic-test
 | `types/types.go` | TypeDescriptor, CallingConvention, constants |
 | `internal/arch/amd64/classification.go` | Argument/return type classification |
 | `internal/arch/amd64/implementation.go` | Return value handling (`handleReturn`) |
-| `internal/arch/amd64/call_unix.go` | Unix AMD64 execution |
-| `internal/arch/arm64/implementation.go` | ARM64 AAPCS64 implementation |
+| `internal/arch/amd64/call_unix.go` | Unix AMD64 argument packing |
+| `internal/arch/amd64/call_windows.go` | Win64 calls via `syscall.SyscallN` |
+| `internal/arch/arm64/implementation.go` | ARM64 AAPCS64 return handling |
 | `internal/arch/arm64/classification.go` | HFA detection, ARM64 classification |
-| `internal/syscall/syscall_unix_amd64.s` | System V AMD64 assembly |
-| `internal/syscall/syscall_windows_amd64.s` | Win64 assembly |
-| `internal/syscall/syscall_unix_arm64.s` | ARM64 assembly |
+| `internal/arch/arm64/layout.go` | AAPCS64 / Apple argument layout (calls and callbacks) |
+| `internal/arch/arm64/call_arm64.go` | ARM64 argument packing |
+| `internal/syscall/syscall_unix_amd64.s` | System V AMD64 assembly (call + errno capture) |
+| `internal/syscall/syscall_arm64.s` | ARM64 assembly (Linux, macOS, Windows, FreeBSD) |
+| `internal/dl/` | `dlopen` / `dlsym` / `dlerror` bindings (Unix) |
+| `internal/fakecgo/` | cgo runtime for `CGO_ENABLED=0` (Unix) |
+| `ffi/callback_amd64.s`, `ffi/callback_arm64.s` | Callback trampolines and dispatchers |
 
 ---
 
@@ -477,4 +490,4 @@ go run github.com/go-webgpu/goffi/cmd/variadic-test
 
 ---
 
-*Current version: v0.4.1 | Last updated: 2026-03-02*
+*Last updated: 2026-10-18*
