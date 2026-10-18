@@ -30,17 +30,17 @@ _, _ = ffi.CallFunction(cif, sym, unsafe.Pointer(&result), args)
 
 | | Feature | Details |
 |---|---------|---------|
-| **Zero CGO** | Pure Go | No C compiler needed. `go get` and build. |
-| **Fast** | 88–114 ns/op | Pre-computed CIF, zero per-call allocations |
+| **Zero CGO** | Pure Go | No C compiler needed with `CGO_ENABLED=0`. `go get` and build. |
+| **Fast** | 88–114 ns/op | Pre-computed CIF; the call path allocates nothing (reuse the `avalue` slice, see [Performance](#performance)) |
 | **Cross-platform** | 8 desktop targets + Android preview | Windows, Linux, macOS, FreeBSD × AMD64 + ARM64; Android arm64/API 29+ candidate pending physical-device startup proof |
-| **Callbacks** | C→Go safe where validated | `crosscall2` integration on desktop targets; Android callbacks fail explicitly until a physical-thread proof exists |
+| **Callbacks** | C→Go safe where validated | `crosscall2` on Linux, macOS and FreeBSD; `syscall.NewCallback` on Windows; Android callbacks fail explicitly until a physical-thread proof exists |
 | **Type-safe** | Runtime validation | 5 typed error types with `errors.As()` support |
 | **Struct pass/return** | Full ABI | System V: INTEGER/SSE classification, ≤8B (RAX/XMM0), 9–16B (RAX/XMM × RAX/XMM), >16B (sret). Win64: 1/2/4/8B in RAX, other sizes via hidden pointer. arm64: HFA in S/D registers, ≤16B in X0–X1, >16B via X8 |
 | **Variadic** | `printf`/`sprintf` | `PrepareVariadicCallInterface` — Apple ARM64 stack-force included |
 | **errno** | Always captured | Thread-safe assembly-level capture — first pure-Go FFI on Linux |
 | **Context** | Timeouts | `CallFunctionContext(ctx, ...)` cancellation |
 | **Race detector** | `-race` compatible | `CGO_ENABLED=1 go test -race` runs in CI on every runner with a race detector |
-| **Tested** | 89% coverage | CI on Linux, Windows, macOS (CGO=0 and CGO=1) and in FreeBSD 14/15 VMs |
+| **Tested** | ~90% coverage on amd64 | CI on Linux, Windows, macOS × amd64/arm64 (CGO=0 and CGO=1) and in FreeBSD 14/15 VMs |
 
 ---
 
@@ -59,16 +59,20 @@ go get github.com/go-webgpu/goffi
 
 ### Requirements
 
-goffi works under **both** `CGO_ENABLED=0` and `CGO_ENABLED=1`. The default — `CGO_ENABLED=0`, no C compiler required — is still the recommended path for the gogpu ecosystem and most users; nothing about that mode has changed.
+goffi builds under **both** `CGO_ENABLED=0` and `CGO_ENABLED=1`. `CGO_ENABLED=0` needs no C compiler and is the recommended mode for the gogpu ecosystem and most users. The Go toolchain enables cgo by default when it finds a C compiler (check `go env CGO_ENABLED`), so set `CGO_ENABLED=0` explicitly if you want that mode.
 
 ```bash
-# CGO_ENABLED=0 (default, no C compiler needed)
+# CGO_ENABLED=0 (recommended, no C compiler needed)
 CGO_ENABLED=0 go build ./...
 
-# CGO_ENABLED=1 (for binaries that already link other CGO libraries,
-# e.g. gocv, libavcodec wrappers, native database drivers)
+# CGO_ENABLED=1 (needs a C compiler; e.g. for go test -race, which requires cgo on Linux)
 CGO_ENABLED=1 go build ./...
+
+# FreeBSD with CGO_ENABLED=0: fakecgo must export environ/__progname for libc
+CGO_ENABLED=0 go build -gcflags=github.com/go-webgpu/goffi/internal/fakecgo=-std ./...
 ```
+
+> **Known issue — Linux and FreeBSD, `CGO_ENABLED=1`:** a binary that contains goffi **and other cgo code** (any package with `import "C"`, including purego), or that is linked with `-linkmode=external`, `-buildmode=c-shared` or `c-archive`, currently fails to link with `unhandled relocation … (SDYNIMPORT …)` ([#72](https://github.com/go-webgpu/goffi/issues/72); the fix is discussed in [#104](https://github.com/go-webgpu/goffi/issues/104)). macOS and Windows are not affected. Workarounds are listed under [Known Limitations](#known-limitations).
 
 > **How?** goffi uses Go's `cgo_import_dynamic` for dynamic library loading. Under `CGO_ENABLED=0` the cgo runtime is supplied by `internal/fakecgo`; under `CGO_ENABLED=1` the standard `runtime/cgo` is linked in. Both modes share the same FFI fast path and ABIs.
 
@@ -289,6 +293,8 @@ _, _ = ffi.CallFunction(&cif, fn, unsafe.Pointer(&ret),
 
 `syscallArgs` is heap-allocated via `sync.Pool` for callback safety (goroutine stack may move during C→Go callbacks). Pool reuse gives 0 allocs/op in steady state.
 
+The `avalue` slice escapes to the heap (its pointers are handed to C), so a slice literal built on every call — `[]unsafe.Pointer{unsafe.Pointer(&x)}` — costs one allocation per call (8 B per argument). Build the slice once and reuse it to keep calls at 0 allocs/op.
+
 At 60 FPS with ~50 FFI calls per frame, overhead is **5 µs per frame** — 0.03% of the 16.6 ms budget. Unmeasurable in profiling.
 
 See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for detailed analysis, optimization strategies, and when NOT to use goffi.
@@ -312,7 +318,7 @@ Assembly Wrapper              ← Hand-written: load GP/SSE registers per ABI
 C Function                    ← External library
 ```
 
-**Three ABIs, hand-written assembly for each:**
+**Three ABIs** — hand-written assembly for System V and AAPCS64; on Windows amd64 the Go runtime's `syscall.SyscallN` builds the Win64 frame:
 
 | ABI | GP Registers | FP Registers | Notes |
 |-----|-------------|-------------|-------|
@@ -328,20 +334,23 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full technical deep div
 
 WebGPU fires async callbacks from internal Metal/Vulkan threads. These threads have no goroutine — calling Go directly would crash.
 
-goffi uses `crosscall2` for safe C→Go transitions from any thread:
+goffi uses `crosscall2` (Linux, macOS, FreeBSD) and `syscall.NewCallback` (Windows) for safe C→Go transitions from any thread:
 
 ```go
-cb := ffi.NewCallback(func(status uint32, adapter uintptr, msg uintptr, ud uintptr) {
+// uintptr-sized arguments and one uintptr result work on every platform;
+// Windows callbacks accept only that shape.
+cb := ffi.NewCallback(func(status, adapter, msg, ud uintptr) uintptr {
     // Safe even when called from a C thread
     result.handle = adapter
     close(done)
+    return 0
 })
 
 _, _ = ffi.CallFunction(cif, wgpuRequestAdapter, nil, args)
 <-done // Wait for GPU driver callback
 ```
 
-2000 pre-compiled trampoline entries per process. AMD64: 5 bytes/entry. ARM64: 8 bytes/entry.
+On Unix: 2000 pre-compiled trampoline entries per process (AMD64: 5 bytes/entry, ARM64: 8 bytes/entry); float32/float64 arguments and results are supported there. Windows callbacks take `uintptr`-sized arguments only (`syscall.NewCallback` rules).
 
 ---
 
@@ -382,7 +391,7 @@ if err != nil {
 | ARM64 HFA detection | Recursive (nested structs) | Partial (bug in nested path) | Full |
 | Typed errors | 5 types + errors.As() | Generic | N/A |
 | Context support | Timeouts/cancellation | No | No |
-| C-thread callbacks | crosscall2 | crosscall2 | Full |
+| C-thread callbacks | crosscall2 (Unix), `syscall.NewCallback` (Windows) | crosscall2 | Full |
 | String/bool/slice args | Raw pointers only | Auto-marshaling | Full |
 | Platform breadth | 8 desktop targets + Android preview | 8 GOARCH / 20+ OS×ARCH | All |
 | AMD64 overhead | 88–114 ns | Not published | ~140 ns (Go 1.26 claims ~30% reduction) |
@@ -398,6 +407,11 @@ if err != nil {
 ---
 
 ## Known Limitations
+
+**Linux and FreeBSD: `CGO_ENABLED=1` together with other cgo code does not link** ([#72](https://github.com/go-webgpu/goffi/issues/72), fix discussed in [#104](https://github.com/go-webgpu/goffi/issues/104))
+- Affects binaries that also contain another `import "C"` package (purego, database drivers, …) or are linked with `-linkmode=external`, `-buildmode=c-shared` or `c-archive`. goffi alone with `CGO_ENABLED=1` links (internal linker). macOS and Windows are not affected.
+- goffi + a plain cgo package: add `-ldflags=-linkmode=internal`. This does not help with purego, c-shared or c-archive.
+- goffi + purego: build with `CGO_ENABLED=0 -tags nofakecgo` (see the purego entry below).
 
 **Linux: default builds are dynamically linked** ([#74](https://github.com/go-webgpu/goffi/issues/74))
 - Importing goffi records `libdl`/`libc` via `cgo_import_dynamic` even with `CGO_ENABLED=0`. Use `-tags goffi_static` for a fully static ELF (no runtime `.so` loading), or build against musl for Alpine. See [Linking modes](#linking-modes-linux).
@@ -419,8 +433,9 @@ if err != nil {
 - **Workaround A:** Build with `-tags nofakecgo` to disable goffi's fakecgo, relying on purego's copy:
   ```bash
   CGO_ENABLED=0 go build -tags nofakecgo ./...
+  # FreeBSD: also -gcflags=github.com/ebitengine/purego/internal/fakecgo=-std
   ```
-- **Workaround B:** Build with `CGO_ENABLED=1`. In cgo mode the real `runtime/cgo` supplies the symbols and both libraries' `fakecgo` packages are gated out by `//go:build !cgo`.
+- **Workaround B (macOS only for now):** Build with `CGO_ENABLED=1`. In cgo mode the real `runtime/cgo` supplies the symbols and both libraries' `fakecgo` packages are gated out by `//go:build !cgo`. On Linux and FreeBSD this currently fails to link ([#72](https://github.com/go-webgpu/goffi/issues/72), see above).
 - **Workaround C (Recommended for complete integration):** Use [pureffi](https://github.com/unxed/pureffi).
   `pureffi` is a 1:1, drop-in API-compatible wrapper over `goffi` that acts as a transparent replacement for `purego` via Go's `replace` directive. It completely eliminates the need for compilation tags, resolves the duplicate symbol conflict, and natively fixes Apple Silicon variadic ABI stack-packing.
 
@@ -451,8 +466,9 @@ Planned work: [ROADMAP.md](ROADMAP.md) and the [milestones](https://github.com/g
 ## Testing
 
 ```bash
-go test ./...                          # all tests
-go test -cover ./...                   # with coverage (89%)
+go test ./...                          # all tests (C-backed e2e tests need a C compiler, else they skip)
+go test -cover ./...                   # with coverage (CI gate: 70%)
+CGO_ENABLED=1 go test -race ./...      # race detector (needs cgo and a C compiler)
 go test -bench=. -benchmem ./ffi       # benchmarks
 go test -v ./ffi                       # verbose, auto-detects platform
 ```
@@ -479,7 +495,7 @@ go test -v ./ffi                       # verbose, auto-detects platform
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-1. Fork → feature branch → tests (80%+ coverage) → lint → PR
+1. Fork → branch from `main` → tests (CI gate: 70% coverage) → lint → PR to `main`
 2. Conventional commits: `feat:`, `fix:`, `docs:`, `test:`
 
 ---

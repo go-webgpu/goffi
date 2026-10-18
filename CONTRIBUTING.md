@@ -2,145 +2,36 @@
 
 Thank you for considering contributing to goffi! This document outlines the development workflow and guidelines.
 
-## Git Workflow (Git-Flow)
+## Git Workflow (GitHub Flow)
 
-This project uses Git-Flow branching model for development.
+goffi uses GitHub Flow: one long-lived branch, `main`, and short-lived branches that reach it through pull requests.
 
-### Branch Structure
-
-```
-main                 # Production-ready code (tagged releases)
-  └─ develop         # Integration branch for next release
-       ├─ feature/*  # New features
-       ├─ experiment/* # FFI research and prototypes
-       ├─ bugfix/*   # Bug fixes
-       └─ hotfix/*   # Critical fixes from main
-```
-
-### Branch Purposes
-
-- **main**: Production-ready code. Only releases are merged here.
-- **develop**: Active development branch. All features merge here first.
-- **feature/\***: New features. Branch from `develop`, merge back to `develop`.
-- **experiment/\***: FFI research, platform support, assembly prototypes. Branch from `develop`.
-- **bugfix/\***: Bug fixes. Branch from `develop`, merge back to `develop`.
-- **hotfix/\***: Critical production fixes. Branch from `main`, merge to both `main` and `develop`.
-
-### Workflow Commands
-
-#### Starting a New Feature
+- **main** is always releasable. It is protected: changes land only through a pull request whose required CI checks are green, after a maintainer's review.
+- **Your branch**: create it from `main` in your fork. Suggested prefixes: `feat/`, `fix/`, `docs/`, `test/`, `ci/`, `refactor/`, `experiment/` (research and prototypes).
+- **One topic per pull request.** A large change is easier to review as several pull requests, each building and passing tests on its own.
+- **Releases** are cut by the maintainers from `main`: a release pull request updates `CHANGELOG.md` and `ROADMAP.md`, then the tag is created on the merged commit.
 
 ```bash
-# Create feature branch from develop
-git checkout develop
-git pull origin develop
-git checkout -b feature/my-new-feature
+# Fork go-webgpu/goffi on GitHub, then:
+git clone https://github.com/<you>/goffi.git
+cd goffi
+git remote add upstream https://github.com/go-webgpu/goffi.git
 
-# Work on your feature...
-git add .
-git commit -m "feat: add my new feature"
+git fetch upstream
+git switch -c fix/my-fix upstream/main
 
-# When done, merge back to develop
-git checkout develop
-git merge --no-ff feature/my-new-feature
-git branch -d feature/my-new-feature
-git push origin develop
+# Work, test, commit...
+git commit -m "fix(ffi): describe the fix"
+
+# Keep the branch current by rebasing, not merging main into it
+git fetch upstream
+git rebase upstream/main
+
+git push origin fix/my-fix
+# Open a pull request against go-webgpu/goffi:main
 ```
 
-#### Experimenting with FFI (Assembly, Platform Support)
-
-```bash
-# Create experiment branch from develop
-git checkout develop
-git pull origin develop
-git checkout -b experiment/arm64-support
-
-# Prototype assembly, test platforms...
-git add .
-git commit -m "experiment: ARM64 AAPCS64 ABI prototype"
-
-# Push to share progress
-git push origin experiment/arm64-support
-
-# When stable, merge to develop
-git checkout develop
-git merge --no-ff experiment/arm64-support
-```
-
-#### Fixing a Bug
-
-```bash
-# Create bugfix branch from develop
-git checkout develop
-git pull origin develop
-git checkout -b bugfix/fix-issue-123
-
-# Fix the bug...
-git add .
-git commit -m "fix: resolve issue #123"
-
-# Merge back to develop
-git checkout develop
-git merge --no-ff bugfix/fix-issue-123
-git branch -d bugfix/fix-issue-123
-git push origin develop
-```
-
-#### Creating a Release
-
-```bash
-# Create release branch from develop
-git checkout develop
-git pull origin develop
-git checkout -b release/v0.2.0
-
-# Update version numbers, CHANGELOG, etc.
-git add .
-git commit -m "chore: prepare release v0.2.0"
-
-# Merge to main and tag
-git checkout main
-git merge --no-ff release/v0.2.0
-git tag -a v0.2.0 -m "Release v0.2.0"
-
-# Merge back to develop
-git checkout develop
-git merge --no-ff release/v0.2.0
-
-# Delete release branch
-git branch -d release/v0.2.0
-
-# Push everything
-git push origin main develop --tags
-```
-
-#### Hotfix (Critical Production Bug)
-
-```bash
-# Create hotfix branch from main
-git checkout main
-git pull origin main
-git checkout -b hotfix/critical-bug
-
-# Fix the bug...
-git add .
-git commit -m "fix: critical production bug"
-
-# Merge to main and tag
-git checkout main
-git merge --no-ff hotfix/critical-bug
-git tag -a v0.1.1 -m "Hotfix v0.1.1"
-
-# Merge to develop
-git checkout develop
-git merge --no-ff hotfix/critical-bug
-
-# Delete hotfix branch
-git branch -d hotfix/critical-bug
-
-# Push everything
-git push origin main develop --tags
-```
+For a bug fix, the best pull request first adds a test that fails on `main` and then the fix that makes it pass.
 
 ## Commit Message Guidelines
 
@@ -162,9 +53,9 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/) specificatio
 - **style**: Code style changes (formatting, etc.)
 - **refactor**: Code refactoring (e.g., assembly optimization)
 - **test**: Adding or updating tests
+- **ci**: CI configuration
 - **chore**: Maintenance tasks (build, dependencies, etc.)
 - **perf**: Performance improvements (critical for FFI!)
-- **experiment**: Research and prototypes (platform support, new ABIs)
 
 ### Examples
 
@@ -174,10 +65,20 @@ fix: correct Win64 shadow space handling in assembly
 docs: update PERFORMANCE.md with ARM64 benchmarks
 refactor: optimize System V register loading sequence
 test: add race detector tests for concurrent FFI calls
-chore: update golangci-lint configuration
-perf: reduce FFI overhead to 80ns with assembly tweaks
-experiment: prototype macOS Apple Silicon support
+ci: run the test suite on FreeBSD in a VM
+perf: reduce FFI overhead with assembly tweaks
 ```
+
+## License Headers
+
+goffi is MIT licensed. Every new source file (Go, assembly, scripts, tests) starts with an SPDX header:
+
+```go
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2026 Andrey Kolkov and GoGPU Contributors
+```
+
+Use the Apache-2.0 header only for code actually copied or adapted from [purego](https://github.com/ebitengine/purego), and keep its `The Ebitengine Authors` copyright line; code derived from the Go runtime keeps the Go Authors' BSD header. Do not copy the header of a neighbouring file — the header follows where the code comes from. CI checks this (`scripts/check-spdx.sh`).
 
 ## Code Quality Standards
 
@@ -185,38 +86,57 @@ experiment: prototype macOS Apple Silicon support
 
 1. **Format code**:
    ```bash
+   gofmt -l $(git ls-files '*.go')   # must print nothing
    go fmt ./...
    ```
 
-2. **Run linter**:
+2. **Run linter** — on your host and on the other targets (goffi is pure Go, so `GOOS`/`GOARCH` select exactly the files each target compiles):
    ```bash
    golangci-lint run --config=.golangci.yml ./...
-   ```
 
-3. **Run tests with race detector**:
+   for t in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+     GOOS=${t%/*} GOARCH=${t#*/} CGO_ENABLED=0 golangci-lint run --allow-serial-runners ./...
+   done
+   for a in amd64 arm64; do
+     GOOS=freebsd GOARCH=$a CGO_ENABLED=0 \
+       GOFLAGS=-gcflags=github.com/go-webgpu/goffi/internal/fakecgo=-std \
+       golangci-lint run --allow-serial-runners ./...
+   done
+   ```
+   Never lint another target with `--build-tags linux`: a GOOS-named tag adds `*_linux.go` files to the host's files instead of switching the target.
+
+3. **Run tests** (C-backed end-to-end tests need a C compiler for the target, otherwise they skip):
    ```bash
-   go test -race ./...
+   CGO_ENABLED=0 go test ./...
+   CGO_ENABLED=1 go test ./...
    ```
 
-4. **Run benchmarks** (FFI performance critical!):
+4. **Run tests with race detector** (needs cgo and a C compiler — Linux, macOS, or WSL on Windows):
    ```bash
-   go test -bench=BenchmarkGoffi -benchmem ./ffi
+   CGO_ENABLED=1 go test -race ./...
    ```
 
-5. **Pre-release check** (comprehensive):
+5. **Run benchmarks** (FFI performance critical!):
+   ```bash
+   go test -run='^$' -bench=BenchmarkGoffi -benchmem ./ffi
+   ```
+
+6. **Pre-release check** (comprehensive):
    ```bash
    bash scripts/pre-release-check.sh
    ```
 
 ### Pull Request Requirements
 
-- [ ] Code is formatted (`go fmt ./...`)
-- [ ] Linter passes (`golangci-lint run`)
-- [ ] All tests pass with race detector (`go test -race ./...`)
+- [ ] Code is formatted (`gofmt` prints nothing)
+- [ ] Linter passes on every target (see above)
+- [ ] All tests pass, including with the race detector where available
+- [ ] Bug fixes come with a regression test that fails without the fix
 - [ ] Benchmarks don't regress (FFI overhead < 200ns)
-- [ ] New code has tests (minimum 70% coverage, current: 89.1%)
-- [ ] Platform-specific code tested on target OS
+- [ ] New code has tests (CI gate: 70% coverage)
+- [ ] Platform-specific code tested on target OS (CI runs native Linux, Windows and macOS runners on amd64 and arm64, plus FreeBSD VMs)
 - [ ] Assembly changes validated on real hardware
+- [ ] New files carry the MIT SPDX header (see [License Headers](#license-headers))
 - [ ] Documentation updated (if applicable)
 - [ ] Commit messages follow conventions
 - [ ] No sensitive data (credentials, tokens, etc.)
@@ -225,19 +145,18 @@ experiment: prototype macOS Apple Silicon support
 
 ### Prerequisites
 
-- **Go 1.25 or later** (required for latest runtime.cgocall features)
-- **golangci-lint** (code quality)
-- **GCC or Clang** (for race detector, optional but recommended)
+- **Go 1.25 or later** (the `go` line in `go.mod`)
+- **golangci-lint v2** (code quality)
+- **A C compiler** (gcc or clang) — optional; needed for the race detector, `CGO_ENABLED=1` builds and the C-backed end-to-end tests
 - **Platform access**:
-  - Linux AMD64 (primary development)
-  - Windows AMD64 (cross-platform testing)
-  - WSL2 with Go (alternative for Windows developers)
+  - Linux, macOS or Windows; WSL2 works for Linux testing on Windows
+  - CI covers the other targets
 
 ### Install Dependencies
 
 ```bash
-# Install golangci-lint
-go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+# Install golangci-lint v2
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 
 # Verify installation
 golangci-lint --version
@@ -254,14 +173,17 @@ go test ./...
 go test -cover ./...
 
 # Run with race detector (CRITICAL for FFI!)
-go test -race ./...
+CGO_ENABLED=1 go test -race ./...
+
+# Fail instead of skipping when the C test library cannot be built (what CI does)
+GOFFI_REQUIRE_TESTLIB=1 go test ./ffi
 
 # Run benchmarks
-go test -bench=. -benchmem ./ffi
+go test -run='^$' -bench=. -benchmem ./ffi
 
-# Run platform-specific tests
-GOOS=linux GOARCH=amd64 go test ./...
-GOOS=windows GOARCH=amd64 go test ./...
+# Cross-compile check for another target (tests run only on that target)
+GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build ./...
+GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go test -c -o /dev/null ./ffi
 ```
 
 ### Running Linter
@@ -280,66 +202,59 @@ golangci-lint run --config=.golangci.yml --verbose ./...
 goffi/
 ├── .github/
 │   ├── CODEOWNERS           # Code ownership
-│   └── workflows/           # CI/CD
-│       └── ci.yml          # GitHub Actions
+│   └── workflows/
+│       └── ci.yml           # GitHub Actions
 ├── .golangci.yml            # Linter configuration
 ├── .codecov.yml             # Codecov configuration
-├── scripts/
-│   └── pre-release-check.sh # Pre-release validation
-├── docs/
-│   └── PERFORMANCE.md       # Performance guide & benchmarks
+├── cmd/
+│   └── variadic-test/       # Variadic ABI check binary
+├── docs/                    # ARCHITECTURE, PERFORMANCE, ANDROID, ADR-001
 ├── examples/
-│   └── simple/             # Usage examples
-├── experiments/             # Research & prototypes (not production)
-├── ffi/                     # Core FFI package
-│   ├── ffi.go              # Public API
-│   ├── ffi_test.go         # Tests
-│   └── benchmark_test.go   # Performance benchmarks
-├── types/                   # Type system
-│   ├── types.go            # Type descriptors
-│   └── types_test.go       # Type tests
+│   ├── simple/              # Minimal usage
+│   └── struct/              # Struct pass/return
+├── ffi/                     # Public API: LoadLibrary, PrepareCallInterface, CallFunction, NewCallback
+│   ├── callback_*.s         # Callback trampolines (Unix)
+│   └── testdata/structtest.c # C library for end-to-end tests
+├── types/                   # Type descriptors, CallInterface
 ├── internal/
-│   ├── arch/               # Architecture-specific code
-│   ├── syscall/            # Low-level syscalls
-│   │   ├── call_unix.s     # System V AMD64 assembly
-│   │   └── call_windows.s  # Win64 assembly
-│   ├── runtime/            # Go runtime integration
-│   ├── fakecgo/            # runtime.cgocall implementation
-│   └── dl/                 # Dynamic library loading
-├── reference/              # External reference code (gitignored)
-│   ├── libffi/            # libffi reference
-│   └── purego/            # purego comparison
-├── CHANGELOG.md            # Version history
-├── API_TODO.md             # API improvement backlog
-├── CONTRIBUTING.md         # This file
-├── CODE_OF_CONDUCT.md      # Community standards
-└── README.md               # Main documentation
+│   ├── arch/                # ABI classification and argument packing (amd64, arm64)
+│   ├── syscall/             # Assembly call path + errno capture (System V amd64, arm64)
+│   ├── dl/                  # dlopen/dlsym/dlerror bindings (Unix)
+│   ├── fakecgo/             # cgo runtime for CGO_ENABLED=0 (Unix)
+│   └── runtime/             # Legacy Linux asmcgocall hook (not imported by any package)
+├── scripts/                 # pre-release-check, check-spdx, ELF/Android/FreeBSD checks
+├── CHANGELOG.md             # Version history
+├── ROADMAP.md               # Development roadmap
+├── CONTRIBUTING.md          # This file
+├── CODE_OF_CONDUCT.md       # Community standards
+├── SECURITY.md              # Security policy
+└── README.md                # Main documentation
 ```
 
 ## Adding New Features
 
 1. Check if issue exists, if not create one
 2. Discuss approach in the issue (especially for assembly/platform changes!)
-3. Create feature or experiment branch from `develop`
+3. Create a branch from `main`
 4. Implement feature with tests
 5. **Test on target platform** (critical for FFI!)
 6. Run benchmarks to ensure no performance regression
-7. Update documentation (README.md, PERFORMANCE.md, etc.)
+7. Update documentation (README.md, docs/, CHANGELOG.md `[Unreleased]`)
 8. Run quality checks (`scripts/pre-release-check.sh`)
-9. Create pull request to `develop`
+9. Create a pull request to `main`
 10. Wait for code review
-11. Address feedback
-12. Merge when approved
+11. Address feedback by pushing commits to the same branch
+12. A maintainer merges when CI is green and the review is approved
 
 ## Platform-Specific Development
 
 ### Adding New Platform Support
 
-1. Research platform ABI (System V, Win64, AAPCS64, etc.)
-2. Create `experiment/platform-name` branch
-3. Implement assembly in `internal/syscall/call_platform.s`
-4. Add platform detection in `internal/arch/`
-5. Write platform-specific tests
+1. Research platform ABI (System V, Win64, AAPCS64, etc.) — the ABI specification and libffi are the references
+2. Create an `experiment/platform-name` branch
+3. Implement the call path in `internal/syscall/syscall_<os>_<arch>.s` (or reuse an existing one) and the argument packing in `internal/arch/<arch>/`
+4. Register the implementation in `internal/arch/` and add build constraints
+5. Write platform-specific tests, including C-backed end-to-end tests
 6. Run benchmarks on real hardware
 7. Document limitations and ABI details
 8. Update CHANGELOG.md with platform support
@@ -356,7 +271,7 @@ goffi/
 Example assembly header:
 ```asm
 // System V AMD64 ABI Implementation
-// Specification: https://refspecs.linuxbase.org/elf/x86_64-abi-0.99.pdf
+// Specification: https://gitlab.com/x86-psABIs/x86-64-ABI
 // Registers: RDI, RSI, RDX, RCX, R8, R9 (GP), XMM0-7 (FP)
 // Red zone: 128 bytes below RSP
 ```
@@ -393,7 +308,9 @@ Example assembly header:
 - Use `testing` package (standard library)
 - Test both success and error cases
 - Use table-driven tests when appropriate
-- **Always test with race detector** (`-race`)
+- **Always test with race detector** (`-race`) where available
+- Hold Go pointers passed to C as `unsafe.Pointer`, never `uintptr` (a stack copy leaves a `uintptr` stale); use `runtime.Pinner` for memory C or a callback frame reads later
+- Tests must build with the oldest supported Go (the `go` line in `go.mod`)
 - Write benchmarks for performance-critical code
 - Test on all supported platforms
 
@@ -404,14 +321,14 @@ Example assembly header:
 - Benchmark before/after changes: `benchstat before.txt after.txt`
 - Target: < 200ns FFI overhead (current: 88-114ns)
 - Avoid allocations in hot paths
-- Reuse `CallInterface` objects
+- Reuse `CallInterface` objects and `avalue` slices
 
 ## Getting Help
 
 - Check existing issues and discussions
 - Read documentation in `docs/`
 - Review `CHANGELOG.md` for known limitations
-- Review `API_TODO.md` for planned improvements
+- Review [ROADMAP.md](ROADMAP.md) and the [milestones](https://github.com/go-webgpu/goffi/milestones) for planned work
 - Ask questions in GitHub Issues: https://github.com/go-webgpu/goffi/issues
 
 ## License
