@@ -281,3 +281,62 @@ float cb_call_stack_f32x10(float (*f)(float, float, float, float, float,
                                       float, float, float, float, float)) {
     return f(1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f);
 }
+
+// Structs of N bytes, returned and passed by value. Which sizes travel in
+// registers differs per target: Win64 uses a register only for 1, 2, 4 and 8
+// bytes and a hidden result pointer / a pointer to a caller-owned copy for every
+// other size; System V amd64 and AAPCS64 use registers up to 16 bytes. The Go
+// tests check every byte of the result, that nothing past the struct is
+// written, and that the callee's writes to its by-value argument never reach
+// the caller's value (the volatile stores cannot be optimized away).
+#define BYTES_FUNCS(N)                                                    \
+    struct bytes##N { uint8_t b[N]; };                                    \
+    struct bytes##N return_bytes##N(uint8_t seed) {                       \
+        struct bytes##N s;                                                \
+        for (int i = 0; i < N; i++) s.b[i] = (uint8_t)(seed + i * 7);     \
+        return s;                                                         \
+    }                                                                     \
+    int64_t take_bytes##N(struct bytes##N s) {                            \
+        int64_t sum = 0;                                                  \
+        volatile uint8_t *p = s.b;                                        \
+        for (int i = 0; i < N; i++) { sum = sum * 31 + p[i]; p[i] = 0xEE; } \
+        return sum;                                                       \
+    }
+
+BYTES_FUNCS(1)
+BYTES_FUNCS(2)
+BYTES_FUNCS(3)
+BYTES_FUNCS(4)
+BYTES_FUNCS(5)
+BYTES_FUNCS(6)
+BYTES_FUNCS(7)
+BYTES_FUNCS(8)
+BYTES_FUNCS(9)
+BYTES_FUNCS(12)
+BYTES_FUNCS(15)
+BYTES_FUNCS(16)
+BYTES_FUNCS(17)
+BYTES_FUNCS(24)
+BYTES_FUNCS(32)
+
+// Small structs of floating-point members. System V amd64 returns an eightbyte
+// of only float/double members in XMM0 (12 bytes: XMM0:XMM1); AAPCS64 returns
+// an HFA of one to four members in S0-S3 / D0-D3, a single-member one included;
+// Win64 returns an 8-byte struct in RAX whatever its members, and 12 bytes
+// through a hidden result pointer. A mixed eightbyte is INTEGER on System V.
+struct one_f32 { float a; };
+struct one_f32 return_struct_1float(float a) { struct one_f32 s = {a}; return s; }
+
+struct one_f64 { double a; };
+struct one_f64 return_struct_1double(double a) { struct one_f64 s = {a}; return s; }
+
+struct pair_f32 return_struct_2floats(float a, float b) { struct pair_f32 s = {a, b}; return s; }
+
+struct three_f32 { float a, b, c; };
+struct three_f32 return_struct_3floats(float a, float b, float c) {
+    struct three_f32 s = {a, b, c};
+    return s;
+}
+
+struct f32_i32 { float a; int32_t b; };
+struct f32_i32 return_struct_float_int32(float a, int32_t b) { struct f32_i32 s = {a, b}; return s; }

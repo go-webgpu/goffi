@@ -24,49 +24,71 @@ func (i *Implementation) Execute(
 	// First 4 args: RCX, RDX, R8, R9 (integer) or XMM0-XMM3 (float).
 	// Args 5+: on the stack.
 	// syscall.SyscallN handles the full Win64 stack layout including shadow space.
-	args := make([]uintptr, len(cif.ArgTypes))
+	//
+	// A struct result that is not 1, 2, 4 or 8 bytes is returned through a
+	// hidden pointer to caller memory passed as the first argument, shifting
+	// the others by one slot (libffi src/x86/ffiw64.c). rvalue is that memory;
+	// ffi.CallFunctionContext supplies a buffer when the caller passes nil.
+	sret := cif.Flags&types.ReturnViaPointer != 0
+	first := 0
+	if sret {
+		first = 1
+	}
+	args := make([]uintptr, first+len(cif.ArgTypes))
+	if sret {
+		args[0] = uintptr(rvalue)
+	}
+
+	// Structs passed by reference get a copy: the callee owns the memory and
+	// may write to it, and that must not reach the caller's Go value. The
+	// copies are heap memory kept alive until the call returns.
+	var copies [][]byte
 
 	for idx := range cif.ArgTypes {
 		argType := cif.ArgTypes[idx]
+		slot := first + idx
 
 		switch argType.Kind {
 		case types.PointerType:
-			args[idx] = *(*uintptr)(avalue[idx])
+			args[slot] = *(*uintptr)(avalue[idx])
 		case types.SInt8Type, types.UInt8Type:
-			args[idx] = uintptr(*(*uint8)(avalue[idx]))
+			args[slot] = uintptr(*(*uint8)(avalue[idx]))
 		case types.SInt16Type, types.UInt16Type:
-			args[idx] = uintptr(*(*uint16)(avalue[idx]))
+			args[slot] = uintptr(*(*uint16)(avalue[idx]))
 		case types.SInt32Type, types.UInt32Type, types.IntType:
-			args[idx] = uintptr(*(*uint32)(avalue[idx]))
+			args[slot] = uintptr(*(*uint32)(avalue[idx]))
 		case types.SInt64Type, types.UInt64Type:
-			args[idx] = uintptr(*(*uint64)(avalue[idx]))
+			args[slot] = uintptr(*(*uint64)(avalue[idx]))
 		case types.FloatType:
 			// Use math.Float32bits to preserve the exact 32-bit IEEE-754 pattern
 			// in the XMM register slot. Widening to float64 corrupts the bit pattern
 			// because callee reads only the lower 32 bits from the XMM register.
-			args[idx] = uintptr(math.Float32bits(*(*float32)(avalue[idx])))
+			args[slot] = uintptr(math.Float32bits(*(*float32)(avalue[idx])))
 		case types.DoubleType:
 			// Pass float64 as raw bit pattern
-			args[idx] = *(*uintptr)(avalue[idx])
+			args[slot] = *(*uintptr)(avalue[idx])
 		case types.StructType:
 			// Windows x64 ABI: structs of exactly 1, 2, 4, or 8 bytes are passed by
 			// value (integer register / stack slot). All other sizes are passed by
 			// reference — the caller passes a pointer to a copy of the struct.
 			switch argType.Size {
 			case 1:
-				args[idx] = uintptr(*(*uint8)(avalue[idx]))
+				args[slot] = uintptr(*(*uint8)(avalue[idx]))
 			case 2:
-				args[idx] = uintptr(*(*uint16)(avalue[idx]))
+				args[slot] = uintptr(*(*uint16)(avalue[idx]))
 			case 4:
-				args[idx] = uintptr(*(*uint32)(avalue[idx]))
+				args[slot] = uintptr(*(*uint32)(avalue[idx]))
 			case 8:
-				args[idx] = *(*uintptr)(avalue[idx])
+				args[slot] = *(*uintptr)(avalue[idx])
 			default:
-				args[idx] = uintptr(avalue[idx])
+				cp := make([]byte, argType.Size)
+				copy(cp, unsafe.Slice((*byte)(avalue[idx]), argType.Size))
+				copies = append(copies, cp)
+				args[slot] = uintptr(unsafe.Pointer(unsafe.SliceData(cp)))
 			}
 		default:
 			// For unknown/composite types, treat as pointer to value
-			args[idx] = uintptr(avalue[idx])
+			args[slot] = uintptr(avalue[idx])
 		}
 	}
 
@@ -76,6 +98,8 @@ func (i *Implementation) Execute(
 	ret, floatRet, _ := syscall.SyscallN(uintptr(fn), args...)
 
 	runtime.KeepAlive(avalue)
+	runtime.KeepAlive(rvalue)
+	runtime.KeepAlive(copies)
 
 	returnBits := ret
 	if cif.ReturnType.Kind == types.FloatType || cif.ReturnType.Kind == types.DoubleType {

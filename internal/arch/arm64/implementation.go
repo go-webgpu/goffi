@@ -58,8 +58,12 @@ func (i *Implementation) handleReturn(
 		return nil
 	}
 
-	// Handle HFA returns (1-4 floats/doubles in D0-D3)
-	if cif.Flags&(types.ReturnHFA2|types.ReturnHFA3|types.ReturnHFA4) != 0 {
+	// Handle HFA returns (1-4 floats/doubles in D0-D3). classifyReturnARM64
+	// marks a one-member HFA ({float}, {double}) with the bare element flag,
+	// without an HFA count bit.
+	if cif.Flags&(types.ReturnHFA2|types.ReturnHFA3|types.ReturnHFA4) != 0 ||
+		(cif.ReturnType.Kind == types.StructType &&
+			(cif.Flags == types.ReturnInXMM32 || cif.Flags == types.ReturnInXMM64)) {
 		return i.handleHFAReturn(cif, rvalue, fret)
 	}
 
@@ -85,8 +89,10 @@ func (i *Implementation) handleReturn(
 	case types.UInt64Type, types.SInt64Type, types.PointerType:
 		*(*uint64)(rvalue) = retLo
 	case types.StructType:
-		if cif.ReturnType.Size <= 8 {
-			*(*uint64)(rvalue) = retLo
+		if size := cif.ReturnType.Size; size <= 8 {
+			// rvalue is the caller's struct, not a register-sized buffer:
+			// write exactly its size.
+			copy(unsafe.Slice((*byte)(rvalue), size), (*[8]byte)(unsafe.Pointer(&retLo))[:size])
 		} else if cif.ReturnType.Size <= 16 {
 			// 9-16 byte struct returned in X0-X1.
 			// Write hi word via copy to avoid oversized cast on packed structs.

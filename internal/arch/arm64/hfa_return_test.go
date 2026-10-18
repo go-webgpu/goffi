@@ -123,3 +123,50 @@ func TestHandleHFAReturn_Float32(t *testing.T) {
 		t.Errorf("float32[1] = %f, want 2.71", buf[1])
 	}
 }
+
+// TestHandleReturn_SingleMemberHFA checks that handleReturn reads a struct of
+// one float or double from S0/D0: classifyReturnARM64 marks it with the bare
+// element flag, without an HFA count bit.
+func TestHandleReturn_SingleMemberHFA(t *testing.T) {
+	impl := &Implementation{}
+
+	f32 := &types.TypeDescriptor{Kind: types.StructType, Size: 4, Alignment: 4,
+		Members: []*types.TypeDescriptor{types.FloatTypeDescriptor}}
+	var outF32 float32
+	cif := &types.CallInterface{ReturnType: f32, Flags: classifyReturnARM64(f32, types.UnixCallingConvention)}
+	if err := impl.handleReturn(cif, unsafe.Pointer(&outF32), 0xdead, 0,
+		[4]uint64{uint64(math.Float32bits(1.25))}); err != nil {
+		t.Fatal(err)
+	}
+	if outF32 != 1.25 {
+		t.Errorf("{float} result = %v, want 1.25", outF32)
+	}
+
+	f64 := &types.TypeDescriptor{Kind: types.StructType, Size: 8, Alignment: 8,
+		Members: []*types.TypeDescriptor{types.DoubleTypeDescriptor}}
+	var outF64 float64
+	cif = &types.CallInterface{ReturnType: f64, Flags: classifyReturnARM64(f64, types.UnixCallingConvention)}
+	if err := impl.handleReturn(cif, unsafe.Pointer(&outF64), 0xdead, 0,
+		[4]uint64{math.Float64bits(-6.5)}); err != nil {
+		t.Fatal(err)
+	}
+	if outF64 != -6.5 {
+		t.Errorf("{double} result = %v, want -6.5", outF64)
+	}
+}
+
+// TestHandleReturn_SmallStructExactSize checks that a struct result smaller
+// than 8 bytes is written with its own size, not as a whole X0 word.
+func TestHandleReturn_SmallStructExactSize(t *testing.T) {
+	impl := &Implementation{}
+	ret := &types.TypeDescriptor{Kind: types.StructType, Size: 3, Alignment: 1,
+		Members: []*types.TypeDescriptor{types.UInt8TypeDescriptor, types.UInt8TypeDescriptor, types.UInt8TypeDescriptor}}
+	cif := &types.CallInterface{ReturnType: ret, Flags: classifyReturnARM64(ret, types.UnixCallingConvention)}
+	buf := [8]byte{0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC}
+	if err := impl.handleReturn(cif, unsafe.Pointer(&buf[0]), 0x1122334455030201, 0, [4]uint64{}); err != nil {
+		t.Fatal(err)
+	}
+	if want := [8]byte{1, 2, 3, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC}; buf != want {
+		t.Errorf("3-byte struct result: buffer = % x, want % x", buf, want)
+	}
+}

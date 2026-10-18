@@ -18,7 +18,7 @@ import (
 // SysV AMD64 ABI: both eightbytes are SSE class → ReturnStXmm0Xmm1.
 func TestStructReturn16B_TwoDoubles(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("Windows: XMM struct returns not captured by syscall.SyscallN")
+		t.Skip("System V register-pair classification; Win64 returns 16-byte structs through a hidden result pointer (see TestStructBySize_Return)")
 	}
 	requireStructLib(t)
 
@@ -68,7 +68,7 @@ func TestStructReturn16B_TwoDoubles(t *testing.T) {
 // SysV AMD64 ABI: eightbyte0 INTEGER (RAX), eightbyte1 SSE (XMM0) → ReturnStRaxXmm0.
 func TestStructReturn16B_IntFloat(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("Windows: XMM struct returns not captured by syscall.SyscallN")
+		t.Skip("System V register-pair classification; Win64 returns 16-byte structs through a hidden result pointer (see TestStructBySize_Return)")
 	}
 	requireStructLib(t)
 
@@ -121,7 +121,7 @@ func TestStructReturn16B_IntFloat(t *testing.T) {
 // SysV AMD64 ABI: eightbyte0 SSE (XMM0), eightbyte1 INTEGER (RAX) → ReturnStXmm0Rax.
 func TestStructReturn16B_FloatInt(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("Windows: XMM struct returns not captured by syscall.SyscallN")
+		t.Skip("System V register-pair classification; Win64 returns 16-byte structs through a hidden result pointer (see TestStructBySize_Return)")
 	}
 	requireStructLib(t)
 
@@ -174,7 +174,7 @@ func TestStructReturn16B_FloatInt(t *testing.T) {
 // SysV AMD64 ABI: both eightbytes INTEGER → ReturnStRaxRdx.
 func TestStructReturn16B_TwoInts(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("Windows: 16B struct returns use sret, not RAX:RDX (Win64 ABI)")
+		t.Skip("System V register-pair classification; Win64 returns 16-byte structs through a hidden result pointer (see TestStructBySize_Return)")
 	}
 	requireStructLib(t)
 
