@@ -223,8 +223,9 @@ func PrepareVariadicCallInterface(
 //
 // Returns:
 //   - errno: C errno captured after the call (0 on success or Windows)
-//   - err: nil on success; ctx.Err() if context cancelled; *InvalidCallInterfaceError if cif or fn
-//     is nil or len(avalue) differs from the number of argument types
+//   - err: nil on success; ctx.Err() if context cancelled; *InvalidCallInterfaceError if cif, fn or
+//     cif.ReturnType is nil, len(avalue) differs from the number of argument types, or a struct
+//     result of a CallInterface not filled by PrepareCallInterface has no Size or Alignment
 //
 // Example:
 //
@@ -317,7 +318,12 @@ func CallFunctionContext(
 		}
 	}
 
-	cerrno, err := executeFunction(cif, fn, rvalue, avalue)
+	call, err := callInterfaceForCall(cif)
+	if err != nil {
+		return 0, err
+	}
+
+	cerrno, err := executeFunction(call, fn, rvalue, avalue)
 	return syscall.Errno(cerrno), err
 }
 
@@ -338,8 +344,9 @@ func CallFunctionContext(
 //
 // Returns:
 //   - errno: C errno captured after the call (0 on success or Windows)
-//   - err: nil on success; *InvalidCallInterfaceError if cif or fn is nil or len(avalue)
-//     differs from the number of argument types
+//   - err: nil on success; *InvalidCallInterfaceError if cif, fn or cif.ReturnType is nil,
+//     len(avalue) differs from the number of argument types, or a struct result of a
+//     CallInterface not filled by PrepareCallInterface has no Size or Alignment
 //
 // Example:
 //

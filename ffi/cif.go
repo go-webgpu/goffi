@@ -101,6 +101,47 @@ func preparePlatformSpecific(cif *types.CallInterface) error {
 	return nil
 }
 
+// callInterfaceForCall returns the CallInterface CallFunctionContext executes.
+//
+// PrepareCallInterface sets Flags for every struct result (no classification
+// returns 0 for a struct, see TestPrepareCallInterface_StructReturnFlagsNonZero),
+// so a struct result with Flags == 0 means the CallInterface was filled in by
+// hand. Arguments are laid out from ArgTypes on every call either way, but a
+// struct result is read according to Flags: the register pair of a 9-16 byte
+// struct on System V amd64, HFA and indirect (X8) results on arm64. For such a
+// CallInterface the result is classified here, on a copy: the caller's
+// CallInterface and its type descriptors may be shared between goroutines and
+// are never written. A CallInterface from PrepareCallInterface is returned as is.
+func callInterfaceForCall(cif *types.CallInterface) (*types.CallInterface, error) {
+	ret := cif.ReturnType
+	if ret == nil {
+		return nil, &InvalidCallInterfaceError{
+			Field:  "returnType",
+			Reason: "must not be nil",
+			Index:  -1,
+		}
+	}
+	if ret.Kind != types.StructType || cif.Flags != 0 {
+		return cif, nil
+	}
+	if ret.Size == 0 || ret.Alignment == 0 {
+		return nil, &InvalidCallInterfaceError{
+			Field:  "returnType",
+			Reason: "struct size and alignment are not set; prepare the call interface with PrepareCallInterface",
+			Index:  -1,
+		}
+	}
+	if arch.Registry.Classifier == nil {
+		return nil, types.ErrUnsupportedArchitecture
+	}
+	prepared := *cif
+	if prepared.Convention == types.DefaultCall {
+		prepared.Convention = types.DefaultConvention()
+	}
+	prepared.Flags = arch.Registry.Classifier.ClassifyReturn(ret, prepared.Convention)
+	return &prepared, nil
+}
+
 // checkStackSlots is the generic argument-count check: it counts the
 // registers each argument needs and the 8-byte stack slots that overflow.
 func checkStackSlots(cif *types.CallInterface) error {
