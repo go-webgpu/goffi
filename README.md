@@ -35,12 +35,12 @@ _, _ = ffi.CallFunction(cif, sym, unsafe.Pointer(&result), args)
 | **Cross-platform** | 8 desktop targets + Android preview | Windows, Linux, macOS, FreeBSD × AMD64 + ARM64; Android arm64/API 29+ candidate pending physical-device startup proof |
 | **Callbacks** | C→Go safe where validated | `crosscall2` integration on desktop targets; Android callbacks fail explicitly until a physical-thread proof exists |
 | **Type-safe** | Runtime validation | 5 typed error types with `errors.As()` support |
-| **Struct pass/return** | Full ABI | Args: INTEGER/SSE classification. Returns: ≤8B (RAX/XMM0), 9–16B (4 modes: RAX/XMM × RAX/XMM), >16B (sret) |
+| **Struct pass/return** | Full ABI | System V: INTEGER/SSE classification, ≤8B (RAX/XMM0), 9–16B (RAX/XMM × RAX/XMM), >16B (sret). Win64: 1/2/4/8B in RAX, other sizes via hidden pointer. arm64: HFA in S/D registers, ≤16B in X0–X1, >16B via X8 |
 | **Variadic** | `printf`/`sprintf` | `PrepareVariadicCallInterface` — Apple ARM64 stack-force included |
 | **errno** | Always captured | Thread-safe assembly-level capture — first pure-Go FFI on Linux |
 | **Context** | Timeouts | `CallFunctionContext(ctx, ...)` cancellation |
-| **Race detector** | `-race` compatible | `CGO_ENABLED=1 go test -race` works cleanly |
-| **Tested** | 89% coverage | CI on Linux, Windows, macOS (CGO=0 and CGO=1) |
+| **Race detector** | `-race` compatible | `CGO_ENABLED=1 go test -race` runs in CI on every runner with a race detector |
+| **Tested** | 89% coverage | CI on Linux, Windows, macOS (CGO=0 and CGO=1) and in FreeBSD 14/15 VMs |
 
 ---
 
@@ -243,11 +243,7 @@ _, _ = ffi.CallFunction(&distCif, distFn,
 // dist == 25
 ```
 
-Structs >16 bytes are returned via hidden pointer (sret) — goffi handles this transparently.
-
-> **Note:** On Windows AMD64, struct arguments containing float fields are not supported
-> due to `syscall.SyscallN` limitations. Use integer-only structs for cross-platform code,
-> or pass float fields as individual arguments.
+Structs >16 bytes (on Windows AMD64: every struct whose size is not 1, 2, 4 or 8 bytes) are returned via a hidden pointer (sret) — goffi handles this transparently. Windows AMD64 passes struct arguments of other sizes as a pointer to a copy, so the callee never modifies your value.
 
 See [`examples/struct/`](examples/struct/) for a complete working example with compile-and-run.
 

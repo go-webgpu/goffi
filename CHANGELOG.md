@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.7] - 2026-10-18
+
 ### Changed
 - **License headers follow the code's origin.** goffi is MIT; only code derived from ebitengine/purego keeps purego's Apache-2.0 header and copyright line. Five original files written by the maintainer (`cmd/variadic-test/main.go`, `examples/struct/main.go`, `examples/struct/structlib.c`, `ffi/struct_return_e2e_amd64_test.go`, `ffi/variadic_e2e_test.go`) had an Apache-2.0 header copied from elsewhere and now carry the MIT header. Original files contributed under an Apache-2.0 header keep it until their authors agree to the change. A new CI check (`scripts/check-spdx.sh`) rejects an Apache-2.0 header without purego's copyright line on any other file.
 
@@ -946,7 +948,8 @@ See [ROADMAP.md](ROADMAP.md) for detailed roadmap to v1.0.
 
 ---
 
-[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.6.6...HEAD
+[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.6.7...HEAD
+[0.6.7]: https://github.com/go-webgpu/goffi/compare/v0.6.6...v0.6.7
 [0.6.6]: https://github.com/go-webgpu/goffi/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/go-webgpu/goffi/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/go-webgpu/goffi/compare/v0.6.3...v0.6.4

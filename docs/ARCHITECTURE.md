@@ -130,8 +130,8 @@ TEXT syscallN(SB), NOSPLIT|NOFRAME, $0
 | **Stack Alignment** | 16-byte | 16-byte | 16-byte |
 | **Int Return** | RAX | RAX | X0 |
 | **Float Return** | XMM0 | XMM0 | D0 |
-| **Struct ≤8B** | RAX | RAX | X0 |
-| **Struct 9-16B** | RAX + RDX | N/A (sret) | X0 + X1 |
+| **Struct ≤8B** | RAX (XMM0 if all members are float/double) | RAX if 1, 2, 4 or 8 bytes, else hidden sret pointer | X0 (S0/D0 for a single float/double) |
+| **Struct 9-16B** | RAX + RDX (per eightbyte class) | Hidden sret pointer | X0 + X1 |
 | **Struct >16B** | Hidden sret pointer | Hidden sret pointer | Hidden sret pointer |
 | **HFA** | N/A | N/A | D0-D3 (up to 4 floats) |
 

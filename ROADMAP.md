@@ -3,7 +3,7 @@
 > **Strategic Approach**: Build production-ready Zero-CGO FFI with benchmarked performance
 > **Philosophy**: Performance first, usability second, platform coverage third
 
-**Last Updated**: 2026-10-16 | **Current Version**: v0.6.6 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → ABI → v1.0 LTS | **Milestone**: v0.6.6 ABI fixes (callbacks, arm64 layout, integer arguments) → v0.7.0 RegisterFunc/Builder → v1.0.0 LTS
+**Last Updated**: 2026-10-18 | **Current Version**: v0.6.7 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → ABI → v1.0 LTS | **Milestone**: v0.6.7 struct ABI fixes, race detector and FreeBSD in CI → v0.7.0 RegisterFunc/Builder → v1.0.0 LTS
 
 ---
 
@@ -194,6 +194,14 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 - `IntTypeDescriptor` passed and returned by value ([#99](https://github.com/go-webgpu/goffi/issues/99)); signed narrow integers sign-extended on amd64 System V (clang-built callees)
 - `CallFunction` requires exactly one argument value per argument type
 - C-backed end-to-end tests fail instead of skipping when the C test library cannot be built
+
+**v0.6.7** = Struct ABI fixes + race detector and FreeBSD in CI ✅ RELEASED (2026-10-18)
+- Struct results of a `types.CallInterface` filled without `PrepareCallInterface` classified on each call
+- Windows amd64: structs of sizes other than 1, 2, 4 and 8 bytes returned through the hidden result pointer and passed as a pointer to a copy
+- Struct results smaller than 8 bytes written with their exact size; System V struct arguments read with their exact size; one-eightbyte float structs (System V) and single-`float`/`double` structs (arm64) read from the floating-point register
+- `LoadLibrary` / `GetSymbol` errors read on the thread whose `dlopen` / `dlsym` failed
+- CI: `go test -race` on every cgo runner that supports it; the test suite runs on FreeBSD 14 and 15 in a VM
+- MIT license headers on original files, checked in CI
 
 **v0.7.0** = RegisterFunc + Builder API (2026 Q3-Q4)
 - RegisterFunc convenience API (ADR-008)
