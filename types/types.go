@@ -97,6 +97,17 @@ var (
 )
 
 // CallInterface represents a prepared function call interface.
+//
+// Fill it with PrepareCallInterface (or PrepareVariadicCallInterface) from
+// package ffi: that validates the types, computes the sizes of struct types,
+// checks the argument count against the platform limit and classifies the
+// result once. A CallInterface written as a struct literal (Convention, Flags
+// and StackBytes left at zero) still works with ffi.CallFunction: arguments are
+// laid out from ArgTypes on every call, and a struct result is classified on
+// every call, which costs an allocation. Struct types in such a CallInterface
+// must have Size and Alignment set, and a variadic function needs
+// FixedArgCount (Apple arm64 passes variadic arguments on the stack), which
+// PrepareVariadicCallInterface sets.
 type CallInterface struct {
 	Convention    CallingConvention
 	ArgCount      int
