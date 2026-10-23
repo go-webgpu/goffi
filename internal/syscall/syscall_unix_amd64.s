@@ -52,7 +52,7 @@ TEXT syscallN(SB), NOSPLIT|NOFRAME, $0
 	PUSHQ BP
 	MOVQ  SP, BP
 	SUBQ  $STACK_SIZE, SP
-	MOVQ  DI, PTR_ADDRESS(BP) // save the pointer
+	MOVQ  DI, PTR_ADDRESS(SP) // save the pointer
 	MOVQ  DI, R11             // R11 = args pointer
 
 	// Load float arguments into XMM0-XMM7 (offsets 128-184)
@@ -105,7 +105,7 @@ TEXT syscallN(SB), NOSPLIT|NOFRAME, $0
 
 	// Restore args pointer and save C function return values.
 	// DI was clobbered by the CALL (it held a1/RDI before the call).
-	MOVQ PTR_ADDRESS(BP), DI
+	MOVQ PTR_ADDRESS(SP), DI
 	MOVQ AX, 192(DI) // r1: integer return in RAX
 	MOVQ DX, 200(DI) // r2: second integer return in RDX (9-16 byte structs)
 	MOVQ X0, 128(DI) // f1: float return in XMM0
