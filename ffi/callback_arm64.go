@@ -76,6 +76,12 @@ func validateCallbackSignature(typ reflect.Type) {
 			reflect.Pointer, reflect.UnsafePointer, reflect.Bool:
 			// Valid types
 		default:
+			// Struct arguments land here. The amd64 dispatcher classifies
+			// aggregates (System V eightbytes); the arm64 one has no AAPCS64
+			// equivalent yet, so the signature is rejected up front rather
+			// than silently misread. See docs/CALLBACK_ABI.md -- it describes
+			// what the implementation needs and how to test it, and the
+			// pointer workaround for callers.
 			panic("ffi: unsupported callback argument type: " + argType.Kind().String())
 		}
 	}
