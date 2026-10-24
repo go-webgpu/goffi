@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Unix amd64: crash when a goroutine exits locked to its thread after a call.** `syscallN` saved its argument pointer above its own frame, into its caller's frame on the g0 stack. A goroutine that made a goffi call and then exited without `runtime.UnlockOSThread` crashed the process with SIGSEGV when its thread exited. Linux, macOS and FreeBSD amd64 were affected; arm64 and Windows were not. ([#108](https://github.com/go-webgpu/goffi/issues/108), [#109](https://github.com/go-webgpu/goffi/pull/109), reported and fixed by @aardwulf89)
+
 ## [0.6.7] - 2026-10-18
 
 ### Changed
