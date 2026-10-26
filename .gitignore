@@ -1,25 +1,42 @@
+# Ignore by directory or anchored path, never by a bare file name: a bare
+# name matches in every directory and hides public files there. Private
+# directories (.claude/, .pm/) stay unanchored so a nested one is ignored too.
+
 # Binaries
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-bin/
-dist/
+/bin/
+/dist/
 
-# Test artifacts
+# Example binaries: a build in an example directory leaves a binary without
+# an extension (cross-built ones too). Only sources are tracked there.
+/examples/*/*
+!/examples/*/*.go
+!/examples/*/*.c
+!/examples/*/*.h
+!/examples/*/go.mod
+!/examples/*/go.sum
+!/examples/*/*.md
+
+# Test artifacts, coverage, profiles
 *.test
 *.out
-coverage.txt
+*.prof
+coverage.*
 profile.cov
+/coverage/
 
 # Dependency directories
-vendor/
+/vendor/
 
 # Go workspace file
 go.work
+go.work.sum
 
-# Development artifacts
+# Editor and tool leftovers, logs
 *.swp
 *.swo
 *~
@@ -37,34 +54,29 @@ go.work
 # Build artifacts
 *.o
 *.a
-.gocache/
+/.gocache/
 
-# Project-specific
-gops_config.yaml
-project_docs_*.md
-project_structure.txt
-/tmp
-/coverage
-docs/dev/
-docs/feature-requests/
-/docs/build
-/docs/_site
-INDEX.md
+# Project-specific: a local docs generator config and its outputs in the root
+/gops_config.yaml
+/project_docs_*.md
+/project_structure.txt
+/docs/build/
+/docs/_site/
 
-# AI specific (private development folders)
+# Private: temporary files, development docs, agent configuration, project
+# management, tool state, reference clones (never tracked)
+/tmp/
+/docs/dev/
+/docs/feature-requests/
 .claude/
-.goda/
-.goco/
+.pm/
+/.goda/
+/.goco/
+/.gode/
+/reference/
 
-# Private reference libraries (research materials)
-reference/
-
-# Development experiments and temporary files
-test_*
-experiments/
-QUICK_START*.md
-RESEARCH*.md
-
-# Go modules (don't ignore go.mod and go.sum)
-!go.mod
-!go.sum
+# Scratch files and experiments in the root
+/test_*
+/experiments/
+/QUICK_START*.md
+/RESEARCH*.md
