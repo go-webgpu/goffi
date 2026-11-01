@@ -283,9 +283,24 @@ func PrepareVariadicCallInterface(
 //
 // Safety:
 //   - All argument pointers must remain valid during the call
-//   - Hold pointer arguments in unsafe.Pointer variables, never uintptr: a
-//     uintptr hides the target from escape analysis, so a local it points to
-//     can stay on the goroutine stack and move before the C function runs
+//   - Hold pointer arguments in unsafe.Pointer (or *T) variables, never
+//     uintptr, all the way from where the address is taken to avalue. That
+//     includes the parameters of your own binding wrappers: a wrapper such as
+//     func MapMemory(..., ppData uintptr) loses the pointer even when the
+//     caller writes uintptr(unsafe.Pointer(&local)) in its argument list. The
+//     compiler keeps a uintptr's target alive and unmoved only in the argument
+//     list of a call to a function implemented in assembly or marked
+//     //go:uintptrescapes (package unsafe, rule (4)); CallFunction and your
+//     wrapper are ordinary Go functions. A local reachable only through a
+//     uintptr stays on the goroutine stack, the stack can move before the C
+//     function runs, and C then reads or writes the old address.
+//   - Memory reachable from rvalue and avalue through pointer-typed values is
+//     kept alive and in place for the call: CallFunction lets avalue escape, so
+//     such memory is allocated on the heap, which the GC does not move.
+//   - If C keeps a pointer to Go memory after the call returns, or reads it
+//     from a uintptr-typed C struct field or an out-parameter slot that must
+//     stay uintptr, pin it with runtime.Pinner for as long as C uses it, or
+//     use memory allocated by C
 //   - Return value buffer must be large enough for the result type
 //   - Use runtime.KeepAlive() if needed to prevent premature GC of arguments
 func CallFunctionContext(

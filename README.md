@@ -143,7 +143,8 @@ func main() {
 	}
 
 	// Call strlen — avalue elements are pointers TO argument values.
-	// Keep pointer arguments in unsafe.Pointer variables, never uintptr.
+	// Keep pointer arguments in unsafe.Pointer variables, never uintptr —
+	// in your binding wrappers' parameters too (see SECURITY.md).
 	testStr := "Hello, goffi!\x00"
 	strPtr := unsafe.Pointer(unsafe.StringData(testStr))
 	var length uint64

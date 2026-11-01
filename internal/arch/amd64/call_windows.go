@@ -3,6 +3,7 @@
 package amd64
 
 import (
+	"fmt"
 	"math"
 	"runtime"
 	"syscall"
@@ -10,6 +11,10 @@ import (
 
 	"github.com/go-webgpu/goffi/types"
 )
+
+// maxWindowsSlots is the number of argument slots (RCX, RDX, R8, R9 and 9
+// stack slots) the Windows call path accepts.
+const maxWindowsSlots = 4 + 9
 
 // Execute implements arch.FunctionCaller for Windows AMD64.
 // errnoFn is always 0 on Windows (ErrnoFnAddr returns 0); cerrno is always 0.
@@ -33,6 +38,12 @@ func (i *Implementation) Execute(
 	first := 0
 	if sret {
 		first = 1
+	}
+	// PrepareCallInterface allows 4 register slots and 9 stack slots
+	// (ffi/cif.go maxStackSlots); a CallInterface filled in by hand skips that
+	// check, so it is repeated here.
+	if n := first + len(cif.ArgTypes); n > maxWindowsSlots {
+		return 0, fmt.Errorf("goffi: %d argument slots exceed the Windows call path limit of %d", n, maxWindowsSlots)
 	}
 	args := make([]uintptr, first+len(cif.ArgTypes))
 	if sret {

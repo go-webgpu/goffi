@@ -96,12 +96,12 @@ Hand-written assembly for System V AMD64 and AAPCS64. The function receives a st
 
 ```asm
 TEXT syscallN(SB), NOSPLIT|NOFRAME, $0
-    // R11 = args struct pointer
-    // Load 6 GP registers: RDI, RSI, RDX, RCX, R8, R9
+    // R12 = args struct pointer (callee-saved across the call)
+    // Reserve nstack words (rounded to 16 bytes) and copy the stack arguments
     // Load 8 SSE registers: XMM0-XMM7
-    // Push stack-spill args if needed
+    // Load 6 GP registers: RDI, RSI, RDX, RCX, R8, R9
     CALL R10                    // call target function
-    // Save RAX (int return), RDX (second return), XMM0 (float return)
+    // Save RAX (int return), RDX (second return), XMM0/XMM1 (float returns)
 ```
 
 **Win64** — no goffi assembly. `internal/arch/amd64/call_windows.go` packs the arguments into `uintptr` slots (a hidden result pointer first when the result needs one) and calls `syscall.SyscallN`, which loads RCX, RDX, R8, R9 and XMM0–XMM3 from those slots and provides the 32-byte shadow space.
@@ -141,13 +141,11 @@ ABI rules for passing structs as arguments depend on size and platform:
 
 Per §3.2.3, each struct is classified by its eightbytes (8-byte chunks):
 
-- **≤ 8 bytes**: single eightbyte. If all fields are float/double → SSE (XMM register). Otherwise → INTEGER (GP register). INTEGER wins over SSE within the same eightbyte (merge rule).
-- **9-16 bytes**: two eightbytes, each classified independently. First 8 bytes → GP or XMM. Remaining bytes → GP or XMM. Both classifications use the same INTEGER-wins merge rule.
-- **\> 16 bytes**: MEMORY class. Caller copies struct bytes onto the stack in 8-byte chunks.
+- **≤ 8 bytes**: single eightbyte. If all fields in it are float/double → SSE (XMM register). Otherwise → INTEGER (GP register). INTEGER wins over SSE within the same eightbyte (merge rule). Fields of nested structs are classified by their offsets, at any depth.
+- **9-16 bytes**: two eightbytes, each classified independently with the same rule.
+- **\> 16 bytes**: MEMORY class. Caller copies struct bytes onto the stack in 8-byte words.
 
-Implementation in `internal/arch/amd64/call_unix.go`, helpers in `classification.go`:
-- `isStructAllFloats(t)` — returns true if all members are float/double
-- `classifyEightbyte(t, startOff, endOff)` — per-eightbyte SSE classification with merge rule
+`internal/arch/amd64/layout_sysv.go` assigns every argument its registers or stack words, as libffi does (`ffi_prep_cif_machdep` and `ffi_call_int` in `src/x86/ffi64.c`): an argument goes in registers only if every one of its eightbytes gets a register of its class; otherwise the whole argument goes on the stack and the registers left stay free for later arguments. `PrepareCallInterface`, the call (`call_unix.go`) and the callback decoder (`ffi/callback.go`) use the same allocator. The stack area is sized from the arguments, up to 64 KiB (`amd64.MaxStackBytes`); a call that needs more returns `ErrTooManyArguments` at prepare time, or an error at call time for a hand-built `CallInterface`. Eightbyte classification: `classifyEightbyte` in `classification.go`.
 
 ### Win64 (Windows AMD64)
 
@@ -172,6 +170,7 @@ The ABI is verified against real C callers and callees: `TestMain` in `ffi/struc
 - byte structs of 1–9, 12, 15, 16, 17, 24 and 32 bytes, as argument and as result, including a nil result buffer where a hidden result pointer is needed (`struct_sizes_e2e_test.go`);
 - 9–16 byte results in each register pair (`struct_return_e2e_amd64_test.go`) and struct results of a hand-built `CallInterface` (`unprepared_cif_e2e_test.go`);
 - stack arguments, narrow and `int` integers, variadic calls, the one-value-per-argument rule (`stack_args_e2e_test.go`, `narrow_int_e2e_test.go`, `int_type_e2e_test.go`, `variadic_e2e_test.go`, `avalue_count_e2e_test.go`);
+- the stack layout: by-value structs of 40, 64 and 96 bytes (webgpu.h shapes), 24 stack words, 9–16 byte structs that must go to the stack whole, nested float structs, too many arguments as an error, in calls and callbacks (`stack_layout_e2e_test.go`); an out-pointer written after the goroutine stack moved (`pointer_contract_e2e_test.go`);
 - callbacks called from C: float arguments and results, stack arguments, foreign threads (`callback_float_e2e_test.go`, `callback_stack_e2e_test.go`, `callback_cthread_test.go`).
 
 The test library is built with `$CC` (default `gcc`; the FreeBSD CI job uses the base system `cc`). The tests skip only on Android (test binaries run on the device), in a `goffi_static` build, or when there is no C compiler for the test's architecture; with `GOFFI_REQUIRE_TESTLIB=1`, which CI sets wherever such a compiler exists, a missing compiler fails the run as well. A library that fails to build or load always fails the run. CI runs them on Linux, macOS and Windows (amd64 and arm64) and on FreeBSD amd64; on windows-11-arm they skip, because the runner only has an x86-64 MinGW compiler.
@@ -182,9 +181,10 @@ The test library is built with `$CC` (default `gcc`; the FreeBSD CI job uses the
 
 When C code calls a goffi callback with struct arguments, the callback dispatch (`callbackWrap` in `callback.go`) reconstructs struct values from CPU registers and stack using `reflect.Type`:
 
-- **≤ 8 bytes**: single eightbyte in GP or XMM register. `isStructAllFloats()` determines classification (recursive, supports nested structs).
-- **9-16 bytes**: two eightbytes, each classified independently via `classifyEightbyte()` using `reflect.StructField.Offset`.
+- **≤ 16 bytes**: one or two eightbytes, each classified by `classifyEightbyte()` from the fields' offsets (nested structs and arrays included). If the registers left cannot take every eightbyte, the C caller put the whole struct on the stack, and the callback reads it from there.
 - **\> 16 bytes**: MEMORY class — C caller copies bytes onto stack. Callback reads consecutive stack slots directly. No assembly changes needed.
+
+Registers and stack words are assigned by the allocator the call path uses (`internal/arch/amd64/layout_sysv.go`). `NewCallback` counts the signature's stack words and panics past 64 KiB.
 
 Classification uses `reflect.Type` (not `types.TypeDescriptor`) since callback signatures are Go functions registered via `NewCallback()`.
 

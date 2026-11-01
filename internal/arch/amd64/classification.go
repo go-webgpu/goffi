@@ -70,28 +70,34 @@ func classifyReturnAMD64(t *types.TypeDescriptor, abi types.CallingConvention) i
 	}
 }
 
-// isStructAllFloats returns true if every member of a flat struct is float or double.
-// Per System V AMD64 ABI §3.2.3: if any member in an eightbyte is INTEGER class,
-// the entire eightbyte is classified as INTEGER (INTEGER wins over SSE).
-func isStructAllFloats(t *types.TypeDescriptor) bool {
-	if len(t.Members) == 0 {
-		return false
-	}
-	for _, m := range t.Members {
+// classifyEightbyte reports whether the eightbyte [startOff, endOff) of struct
+// t is SSE class: every scalar member that starts in it, at any nesting depth,
+// is a float or double (System V AMD64 ABI §3.2.3: the classes of all fields
+// in an eightbyte are merged and INTEGER wins; libffi classify_argument walks
+// nested structs the same way). An eightbyte with no member is not SSE.
+func classifyEightbyte(t *types.TypeDescriptor, startOff, endOff uintptr) bool {
+	hasField, allFloat := false, true
+	walkScalarMembers(t, 0, func(off uintptr, m *types.TypeDescriptor) bool {
+		if off < startOff || off >= endOff {
+			return true
+		}
+		hasField = true
 		if m.Kind != types.FloatType && m.Kind != types.DoubleType {
+			allFloat = false
 			return false
 		}
-	}
-	return true
+		return true
+	})
+	return hasField && allFloat
 }
 
-// classifyEightbyte returns true if all struct fields whose offset falls within
-// [startOff, endOff) are SSE types (float or double).
-// Returns false if any field in the range is INTEGER class, or if no fields lie in the range.
-func classifyEightbyte(t *types.TypeDescriptor, startOff, endOff uintptr) bool {
+// walkScalarMembers calls fn with the offset (from base) of every non-struct
+// member of struct t, nested structs included, in layout order, until fn
+// returns false. Offsets follow each member's alignment, as
+// PrepareCallInterface lays the struct out. It returns false when fn stopped
+// the walk.
+func walkScalarMembers(t *types.TypeDescriptor, base uintptr, fn func(off uintptr, m *types.TypeDescriptor) bool) bool {
 	var offset uintptr
-	allFloat := true
-	hasField := false
 	for _, m := range t.Members {
 		if m == nil {
 			continue
@@ -99,16 +105,16 @@ func classifyEightbyte(t *types.TypeDescriptor, startOff, endOff uintptr) bool {
 		if m.Alignment > 0 {
 			offset = (offset + m.Alignment - 1) &^ (m.Alignment - 1)
 		}
-		if offset >= startOff && offset < endOff {
-			hasField = true
-			if m.Kind != types.FloatType && m.Kind != types.DoubleType {
-				allFloat = false
-				break
+		if m.Kind == types.StructType {
+			if !walkScalarMembers(m, base+offset, fn) {
+				return false
 			}
+		} else if !fn(base+offset, m) {
+			return false
 		}
 		offset += m.Size
 	}
-	return hasField && allFloat
+	return true
 }
 
 // classifyArgumentAMD64 for x86_64

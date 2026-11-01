@@ -9,9 +9,12 @@ package ffi
 import (
 	"math"
 	"reflect"
+	"strconv"
 	"structs"
 	"sync"
 	"unsafe"
+
+	archamd64 "github.com/go-webgpu/goffi/internal/arch/amd64"
 )
 
 // maxCallbacks is the maximum number of concurrent callbacks supported.
@@ -23,9 +26,10 @@ const maxCallbacks = 2000
 // called from C code. Functions are stored as reflect.Value to enable dynamic
 // invocation with proper type checking and argument marshaling.
 var callbacks struct {
-	mu    sync.Mutex                  // Protects funcs and count
-	funcs [maxCallbacks]reflect.Value // Registered callback functions
-	count int                         // Number of active callbacks
+	mu         sync.Mutex                  // Protects funcs, stackWords and count
+	funcs      [maxCallbacks]reflect.Value // Registered callback functions
+	stackWords [maxCallbacks]int           // Stack words of each callback's arguments
+	count      int                         // Number of active callbacks
 }
 
 // callbackArgs represents the argument block passed from assembly to callbackWrap.
@@ -78,7 +82,7 @@ func NewCallback(fn any) uintptr {
 
 	// Validate function signature
 	typ := val.Type()
-	validateCallbackSignature(typ)
+	stackWords := validateCallbackSignature(typ)
 
 	// Register callback in global registry
 	callbacks.mu.Lock()
@@ -90,6 +94,7 @@ func NewCallback(fn any) uintptr {
 
 	idx := callbacks.count
 	callbacks.funcs[idx] = val
+	callbacks.stackWords[idx] = stackWords
 	callbacks.count++
 
 	// Return address to corresponding trampoline entry
@@ -98,7 +103,8 @@ func NewCallback(fn any) uintptr {
 
 // validateCallbackSignature checks if a function type is valid for callbacks.
 // This function enforces the constraints required by the FFI calling convention.
-func validateCallbackSignature(typ reflect.Type) {
+// It returns how many stack words the arguments occupy.
+func validateCallbackSignature(typ reflect.Type) int {
 	// Validate input arguments
 	numIn := typ.NumIn()
 	for i := 0; i < numIn; i++ {
@@ -133,6 +139,13 @@ func validateCallbackSignature(typ reflect.Type) {
 	default:
 		panic("ffi: callbacks can only return zero or one value")
 	}
+
+	words := callbackStackWords(typ)
+	if words > callbackMaxStackWords {
+		panic("ffi: callback arguments need " + strconv.Itoa(words) + " stack words, at most " +
+			strconv.Itoa(callbackMaxStackWords) + " are supported")
+	}
+	return words
 }
 
 // trampolineEntryAddr calculates the address of a specific trampoline entry.
@@ -182,6 +195,7 @@ func callbackWrap(a *callbackArgs) {
 	// Retrieve the registered callback function
 	callbacks.mu.Lock()
 	fn := callbacks.funcs[a.index]
+	stackWords := callbacks.stackWords[a.index]
 	callbacks.mu.Unlock()
 
 	typ := fn.Type()
@@ -189,87 +203,43 @@ func callbackWrap(a *callbackArgs) {
 
 	// Argument block layout (System V AMD64 ABI):
 	// [XMM0-7: 64 bytes][RDI,RSI,RDX,RCX,R8,R9: 48 bytes][stack args...]
-	const (
-		numFloatRegs = 8 // XMM0-XMM7
-		numIntRegs   = 6 // RDI, RSI, RDX, RCX, R8, R9
-	)
-
-	// Cast args pointer to array for easy indexing
-	// Each register is 8 bytes (64-bit)
-	frame := (*[128]uintptr)(a.args) // Large enough for registers + reasonable stack args
-
-	var floatIdx int                      // Current float register index (0-7)
-	var intIdx int                        // Current integer register index (0-5)
-	stackIdx := numFloatRegs + numIntRegs // Stack arguments start after registers
-
-	// getFloatBits returns the raw 64 bits of the next SSE-class eightbyte: an
-	// XMM register while one is left, otherwise the next stack slot. A float
-	// occupies the low 32 bits (both in XMMn and in its 8-byte stack slot), a
-	// double all 64; callers decode accordingly.
-	getFloatBits := func() uint64 {
-		if floatIdx < numFloatRegs {
-			bits := frame[floatIdx]
-			floatIdx++
-			return uint64(bits)
-		}
-		bits := frame[stackIdx]
-		stackIdx++
-		return uint64(bits)
-	}
-
-	getInt := func() uintptr {
-		var value uintptr
-		if intIdx < numIntRegs {
-			value = frame[numFloatRegs+intIdx]
-			intIdx++
-		} else {
-			// All register slots are used: value is on the stack
-			value = frame[stackIdx]
-			stackIdx++
-		}
-		return value
-	}
-
-	// Write only some bytes to a struct to avoid overwrite.
-	writePartial := func(dest unsafe.Pointer, size uintptr, value uintptr) {
-		switch {
-		case size == 1:
-			*(*uint8)(dest) = uint8(value)
-		case size == 2:
-			*(*uint16)(dest) = uint16(value)
-		case size <= 4:
-			*(*uint32)(dest) = uint32(value)
-		default:
-			*(*uintptr)(dest) = value
-		}
-	}
+	// Arguments are assigned registers and stack words by the same allocator
+	// the call path uses (internal/arch/amd64/layout_sysv.go), so an argument
+	// that does not fit in the registers left is read from the stack whole.
+	// The frame covers exactly the stack words the signature declares
+	// (counted by validateCallbackSignature), which the C caller wrote.
+	frame := unsafe.Slice((*uintptr)(a.args), callbackStackBase+stackWords)
+	var alloc archamd64.SysVAllocator
 
 	// Build argument slice for reflection Call
 	args := make([]reflect.Value, numArgs)
 
 	for i := 0; i < numArgs; i++ {
 		argType := typ.In(i)
+		p := placeCallbackArg(&alloc, argType)
+		// word is the scalar argument's register or stack word. A float
+		// occupies the low 32 bits (both in XMMn and in its 8-byte stack
+		// slot), a double all 64.
+		word := func() uintptr {
+			if p.onStack {
+				return frame[p.first]
+			}
+			return frame[p.idx[0]]
+		}
 		var val reflect.Value
 
 		switch argType.Kind() {
 		case reflect.Float32:
 			// The caller passes a single-precision value, not a double:
 			// reinterpret the low 32 bits, do not convert a float64.
-			val = reflect.ValueOf(math.Float32frombits(uint32(getFloatBits()))).Convert(argType)
+			val = reflect.ValueOf(math.Float32frombits(uint32(word()))).Convert(argType)
 
 		case reflect.Float64:
-			val = reflect.ValueOf(math.Float64frombits(getFloatBits())).Convert(argType)
+			val = reflect.ValueOf(math.Float64frombits(uint64(word()))).Convert(argType)
 
 		case reflect.Bool:
 			// Bool comes from integer register
-			if intIdx < numIntRegs {
-				pos := numFloatRegs + intIdx
-				val = reflect.ValueOf(frame[pos] != 0)
-				intIdx++
-			} else {
-				val = reflect.ValueOf(frame[stackIdx] != 0)
-				stackIdx++
-			}
+			val = reflect.ValueOf(word() != 0)
 
 		case reflect.Pointer:
 			// Pointers come from integer registers.
@@ -279,87 +249,38 @@ func callbackWrap(a *callbackArgs) {
 			// 1. The pointer came from C code which is responsible for its lifetime
 			// 2. We're only using it for the duration of this callback invocation
 			// 3. reflect.NewAt creates a proper typed pointer from the address
-			if intIdx < numIntRegs {
-				pos := numFloatRegs + intIdx
-				// Double-indirection: reinterpret uintptr bits as pointer without
-				// triggering checkptr arithmetic check (go.dev/issue/58625).
-				ptr := *(*unsafe.Pointer)(unsafe.Pointer(&frame[pos]))
-				val = reflect.NewAt(argType.Elem(), ptr)
-				intIdx++
-			} else {
-				ptr := *(*unsafe.Pointer)(unsafe.Pointer(&frame[stackIdx]))
-				val = reflect.NewAt(argType.Elem(), ptr)
-				stackIdx++
-			}
+			w := word()
+			// Double-indirection: reinterpret uintptr bits as pointer without
+			// triggering checkptr arithmetic check (go.dev/issue/58625).
+			ptr := *(*unsafe.Pointer)(unsafe.Pointer(&w))
+			val = reflect.NewAt(argType.Elem(), ptr)
 
 		case reflect.UnsafePointer:
-			if intIdx < numIntRegs {
-				pos := numFloatRegs + intIdx
-				val = reflect.ValueOf(*(*unsafe.Pointer)(unsafe.Pointer(&frame[pos])))
-				intIdx++
-			} else {
-				val = reflect.ValueOf(*(*unsafe.Pointer)(unsafe.Pointer(&frame[stackIdx])))
-				stackIdx++
-			}
+			w := word()
+			val = reflect.ValueOf(*(*unsafe.Pointer)(unsafe.Pointer(&w)))
 
 		case reflect.Struct:
+			// The struct's bytes as whole words: from its registers, one per
+			// eightbyte, when they fit, otherwise from its stack words.
 			sz := argType.Size()
-			structData := make([]byte, max(sz, 8))
-			var valPtr unsafe.Pointer
-			if sz > 0 {
-				valPtr = unsafe.Pointer(&structData[0])
-			}
-
-			switch {
-			case sz == 0:
-				// Zero-size struct: no fields to populate
-
-			case sz <= 8:
-				// Single eightbyte: INTEGER if any member is not float/double, else SSE.
-				if isStructAllFloats(argType) {
-					*(*uint64)(valPtr) = getFloatBits()
-				} else {
-					writePartial(valPtr, sz, getInt())
-				}
-			case sz <= 16:
-				// Two eightbytes: classify each independently.
-				// System V ABI §3.2.3: INTEGER wins over SSE within an eightbyte.
-				if classifyEightbyte(argType, 0, 8) {
-					*(*uint64)(valPtr) = getFloatBits()
-				} else {
-					*(*uintptr)(valPtr) = getInt()
-				}
-				remaining := sz - 8
-				valPtr = unsafe.Add(valPtr, 8)
-				if classifyEightbyte(argType, 8, sz) {
-					*(*uint64)(valPtr) = getFloatBits()
-				} else {
-					writePartial(valPtr, remaining, getInt())
-				}
-			default:
-				// MEMORY class (> 16 bytes): copy from the stack in 8-byte chunks.
-				// Per SysV ABI §3.2.3: MEMORY class structs bypass registers entirely.
-				nChunks := (sz + 7) / 8
-				for k := range nChunks {
-					chunkPtr := unsafe.Add(valPtr, k*8)
-					chunk := frame[stackIdx]
-					bytesLeft := sz - k*8
-					if bytesLeft >= 8 {
-						*(*uintptr)(chunkPtr) = chunk
-					} else {
-						writePartial(chunkPtr, bytesLeft, chunk)
-					}
-					stackIdx++
+			words := make([]uintptr, (sz+7)/8)
+			if p.onStack {
+				copy(words, frame[p.first:p.first+len(words)])
+			} else {
+				for k := range p.n {
+					words[k] = frame[p.idx[k]]
 				}
 			}
 			val = reflect.New(argType)
-			valByteSlice := unsafe.Slice((*byte)(val.UnsafePointer()), sz)
-			copy(valByteSlice, structData)
+			if sz > 0 {
+				copy(unsafe.Slice((*byte)(val.UnsafePointer()), sz),
+					unsafe.Slice((*byte)(unsafe.Pointer(unsafe.SliceData(words))), sz))
+			}
 			val = val.Elem()
 
 		default:
 			// All other integer types (int, uint, int32, etc.)
-			value := getInt()
+			value := word()
 			val = reflect.NewAt(argType, unsafe.Pointer(&value)).Elem()
 		}
 
@@ -405,44 +326,146 @@ func callbackWrap(a *callbackArgs) {
 var _callbackTrampoline byte
 var trampolineBaseAddr = uintptr(unsafe.Pointer(&_callbackTrampoline))
 
-// isStructAllFloats returns true if every member of a flat struct is float or double.
-// Per System V AMD64 ABI §3.2.3: if any member in an eightbyte is INTEGER class,
-// the entire eightbyte is classified as INTEGER (INTEGER wins over SSE).
-func isStructAllFloats(structType reflect.Type) bool {
-	if structType.NumField() == 0 {
-		return false
-	}
+// Layout of the callback argument block (callback_amd64.s): XMM0-XMM7, then
+// RDI, RSI, RDX, RCX, R8, R9, then the caller's stack arguments.
+const (
+	callbackSSERegs   = 8                   // XMM0-XMM7
+	callbackStackBase = callbackSSERegs + 6 // first stack word
+	// callbackMaxStackWords bounds the stack words a callback reads, as
+	// MaxStackBytes bounds them for a call. They lie in the C caller's frame,
+	// above the trampoline's saved registers; the C caller wrote every one
+	// the signature declares.
+	callbackMaxStackWords = archamd64.MaxStackBytes / 8
+)
 
-	for i := range structType.NumField() {
-		field := structType.Field(i)
-		if field.Type.Kind() == reflect.Struct {
-			if !isStructAllFloats(field.Type) {
-				return false
-			}
-		} else if field.Type.Kind() != reflect.Float32 && field.Type.Kind() != reflect.Float64 {
-			return false
-		}
+// callbackStructClasses classifies a struct argument like the call path does
+// (internal/arch/amd64/layout_sysv.go): n eightbytes of the given classes, or
+// memory for a struct over 16 bytes.
+func callbackStructClasses(t reflect.Type) (sse [2]bool, n int, memory bool) {
+	sz := t.Size()
+	if sz > 16 {
+		return sse, 0, true
 	}
-	return true
+	n = int((sz + 7) / 8)
+	for i := range n {
+		start := uintptr(i) * 8
+		sse[i] = classifyEightbyte(t, start, min(start+8, sz))
+	}
+	return sse, n, false
 }
 
-// classifyEightbyte returns true if all struct fields whose offset falls within
-// [startOff, endOff) are SSE types (float or double).
-// Returns false if any field in the range is INTEGER class, or if no fields lie in the range.
-//
-// CAUTION: Does not currently support nested structs.
-func classifyEightbyte(structType reflect.Type, startOff, endOff uintptr) bool {
-	allFloat := true
-	hasField := false
-	for i := range structType.NumField() {
-		field := structType.Field(i)
-		if field.Offset >= startOff && field.Offset < endOff {
-			hasField = true
-			if field.Type.Kind() != reflect.Float32 && field.Type.Kind() != reflect.Float64 {
-				allFloat = false
-				break
-			}
+// countClasses returns how many of the first n eightbytes are INTEGER and SSE.
+func countClasses(sse [2]bool, n int) (ngpr, nsse int) {
+	for i := range n {
+		if sse[i] {
+			nsse++
+		} else {
+			ngpr++
 		}
 	}
+	return ngpr, nsse
+}
+
+// classifyEightbyte reports whether the eightbyte [startOff, endOff) of a
+// struct is SSE class: every scalar field that starts in it, at any nesting
+// depth, is float32 or float64 (psABI §3.2.3: the classes of the fields in an
+// eightbyte are merged and INTEGER wins). An eightbyte with no field is not SSE.
+func classifyEightbyte(structType reflect.Type, startOff, endOff uintptr) bool {
+	hasField, allFloat := false, true
+	walkScalarFields(structType, 0, func(off uintptr, k reflect.Kind) bool {
+		if off < startOff || off >= endOff {
+			return true
+		}
+		hasField = true
+		if k != reflect.Float32 && k != reflect.Float64 {
+			allFloat = false
+			return false
+		}
+		return true
+	})
 	return hasField && allFloat
+}
+
+// walkScalarFields calls fn with the offset (from base) and kind of every
+// non-struct field of t, nested structs and arrays included, until fn returns
+// false. It returns false when fn stopped the walk.
+func walkScalarFields(t reflect.Type, base uintptr, fn func(off uintptr, k reflect.Kind) bool) bool {
+	switch t.Kind() {
+	case reflect.Struct:
+		for i := range t.NumField() {
+			f := t.Field(i)
+			if !walkScalarFields(f.Type, base+f.Offset, fn) {
+				return false
+			}
+		}
+		return true
+	case reflect.Array:
+		elem := t.Elem()
+		for i := range t.Len() {
+			if !walkScalarFields(elem, base+uintptr(i)*elem.Size(), fn) {
+				return false
+			}
+		}
+		return true
+	default:
+		return fn(base, t.Kind())
+	}
+}
+
+// callbackPlacement says where one callback argument is in the argument
+// block: the frame index of each eightbyte in a register, or the frame index
+// of its first stack word.
+type callbackPlacement struct {
+	n       int    // eightbytes in registers
+	idx     [2]int // frame index of each eightbyte in a register
+	onStack bool
+	first   int // frame index of the first stack word when onStack
+}
+
+// placeCallbackArg assigns the next argument, of type t, its registers or
+// stack words with the System V rules of the call path
+// (internal/arch/amd64/layout_sysv.go).
+func placeCallbackArg(alloc *archamd64.SysVAllocator, t reflect.Type) callbackPlacement {
+	var (
+		sse    [2]bool
+		n      = 1
+		memory bool
+		size   uintptr = 8
+		align  uintptr = 8
+	)
+	switch t.Kind() {
+	case reflect.Float32, reflect.Float64:
+		sse[0] = true
+	case reflect.Struct:
+		sse, n, memory = callbackStructClasses(t)
+		size, align = t.Size(), uintptr(t.Align())
+	}
+
+	var p callbackPlacement
+	if ngpr, nsse := countClasses(sse, n); !memory && alloc.Fits(ngpr, nsse) {
+		p.n = n
+		for k := range n {
+			if sse[k] {
+				p.idx[k] = alloc.SSE()
+			} else {
+				p.idx[k] = callbackSSERegs + alloc.GPR()
+			}
+		}
+		return p
+	}
+	if size > 0 {
+		p.onStack = true
+		p.first = callbackStackBase + alloc.Stack(size, align)
+	}
+	return p
+}
+
+// callbackStackWords returns how many stack words the arguments of a callback
+// of type typ occupy.
+func callbackStackWords(typ reflect.Type) int {
+	var alloc archamd64.SysVAllocator
+	for i := range typ.NumIn() {
+		placeCallbackArg(&alloc, typ.In(i))
+	}
+	return int(alloc.StackBytes() / 8)
 }
