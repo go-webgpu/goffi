@@ -3,7 +3,7 @@
 > **Strategic Approach**: Build production-ready Zero-CGO FFI with benchmarked performance
 > **Philosophy**: Performance first, usability second, platform coverage third
 
-**Last Updated**: 2026-10-18 | **Current Version**: v0.6.7 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → ABI → v1.0 LTS | **Next**: v0.6.8 (`CGO_ENABLED=1` link fix, [#72](https://github.com/go-webgpu/goffi/issues/72)) → v0.7.0 (ergonomic API) → v1.0.0 LTS. Live plan: [milestones](https://github.com/go-webgpu/goffi/milestones)
+**Last Updated**: 2026-11-01 | **Current Version**: v0.6.8 | **Strategy**: Benchmarks → Callbacks → ARM64 → Runtime → ABI → v1.0 LTS | **Next**: v0.6.9 (`CGO_ENABLED=1` link fix, [#72](https://github.com/go-webgpu/goffi/issues/72)) → v0.7.0 (ergonomic API) → v1.0.0 LTS. Live plan: [milestones](https://github.com/go-webgpu/goffi/milestones)
 
 ---
 
@@ -67,9 +67,9 @@ v0.5.3-v0.5.6 ✅ RELEASED 2026-05-28 … 2026-07-05
          ↓ (errno)
 v0.6.0 (ERRNO ALWAYS-CAPTURE, BREAKING) ✅ RELEASED 2026-07-12
          ↓ (Android preview, Windows floats, static profile, ABI fixes)
-v0.6.1-v0.6.7 ✅ RELEASED 2026-07-21 … 2026-10-18
+v0.6.1-v0.6.8 ✅ RELEASED 2026-07-21 … 2026-11-01
          ↓ (CGO_ENABLED=1 link fix)
-v0.6.8 (PATCH) → next
+v0.6.9 (PATCH) → next
          ↓ (ergonomic API, arm32, host profiles)
 v0.7.0 (ERGONOMIC API) → next minor
          ↓ (community adoption + validation)
@@ -210,8 +210,15 @@ v1.0.0 LTS → Long-term support release (2027 Q1)
 - CI: `go test -race` on every cgo runner that supports it; the test suite runs on FreeBSD 14 and 15 in a VM
 - MIT license headers on original files, checked in CI
 
-**v0.6.8** = Patch (planned, [milestone](https://github.com/go-webgpu/goffi/milestone/9))
+**v0.6.8** = System V amd64 argument layout ✅ RELEASED (2026-11-01)
+- System V amd64: struct arguments over 72 bytes no longer panic; the stack area is sized from the arguments, as libffi does ([#112](https://github.com/go-webgpu/goffi/issues/112))
+- System V amd64: a 9–16 byte struct that does not fit in the registers left goes on the stack whole; nested struct members are classified by their offsets — in calls, results and callbacks ([#112](https://github.com/go-webgpu/goffi/issues/112))
+- Unix amd64: no crash when a goroutine exits locked to its thread after a call ([#108](https://github.com/go-webgpu/goffi/issues/108))
+- Documented: a Go address stays pointer-typed all the way to `avalue`, binding wrappers included
+
+**v0.6.9** = Patch (planned, [milestone](https://github.com/go-webgpu/goffi/milestones))
 - Linux and FreeBSD: `CGO_ENABLED=1` binaries that also contain other cgo code, or are linked externally (`-linkmode=external`, `c-shared`, `c-archive`), fail to link ([#72](https://github.com/go-webgpu/goffi/issues/72)). The approach is discussed in the RFC [#104](https://github.com/go-webgpu/goffi/issues/104) before anything is implemented
+- arm64 and Windows amd64: stack-argument area sized from the arguments instead of the fixed 7 and 9 words
 - Further fixes accumulate here
 
 **v0.7.0** = Ergonomic API (planned, [milestone](https://github.com/go-webgpu/goffi/milestone/7))
@@ -238,9 +245,9 @@ GObject (GValue, the type system, reference counting) belongs to the binding lay
 
 ---
 
-## 📊 Current Status (v0.6.7)
+## 📊 Current Status (v0.6.8)
 
-**Phase**: struct ABI fixes shipped (hand-built `CallInterface`, Win64 hidden result pointer and by-reference copies, exact-size small structs), `dlerror` read on the right thread, race detector and FreeBSD VMs in CI. Each bug was proven by a failing test first. Next: the `CGO_ENABLED=1` link fix (v0.6.8, after the RFC #104 discussion), then the ergonomic API for v0.7.0
+**Phase**: System V amd64 argument layout follows libffi (large by-value structs, structs that must go to the stack whole, nested struct classification) in calls, results and callbacks; the #108 thread-exit crash is fixed. Each bug was proven by a failing test first. Next: the `CGO_ENABLED=1` link fix (v0.6.9, after the RFC #104 discussion), then the ergonomic API for v0.7.0
 
 **What Works**:
 - ✅ Dynamic library loading (`LoadLibrary`, `GetSymbol`, `FreeLibrary`)
@@ -279,7 +286,7 @@ GObject (GValue, the type system, reference counting) belongs to the binding lay
 
 ## 📅 What's Next
 
-The two planned releases are described above (**v0.6.8**, **v0.7.0**); their current scope is in the [milestones](https://github.com/go-webgpu/goffi/milestones). Ideas without a release yet are tracked in the Backlog milestone.
+The two planned releases are described above (**v0.6.9**, **v0.7.0**); their current scope is in the [milestones](https://github.com/go-webgpu/goffi/milestones). Ideas without a release yet are tracked in the Backlog milestone.
 
 ### Ideas — not scheduled
 
@@ -389,7 +396,7 @@ The two planned releases are described above (**v0.6.8**, **v0.7.0**); their cur
 
 ## 📊 Quality Metrics
 
-**Current (v0.6.7)**:
+**Current (v0.6.8)**:
 - ✅ Test coverage: 90.9% linux/amd64, 89.5% windows/amd64, 83.4% arm64 (CI, 2026-10-18; gate 70%)
 - ✅ Linter issues: 0 on every target
 - ✅ Benchmarks: 64-114 ns/op (AMD64 + ARM64)
@@ -445,5 +452,5 @@ The two planned releases are described above (**v0.6.8**, **v0.7.0**); their cur
 
 ---
 
-*Version 1.5 (Updated 2026-10-18)*
-*Current: v0.6.7 (struct ABI fixes) | Next: v0.6.8 (patch), v0.7.0 (ergonomic API) | Target: v1.0.0 LTS*
+*Version 1.6 (Updated 2026-11-01)*
+*Current: v0.6.8 (System V amd64 argument layout) | Next: v0.6.9 (patch), v0.7.0 (ergonomic API) | Target: v1.0.0 LTS*

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.8] - 2026-11-01
+
 ### Changed
 - **Documented: a Go address must stay pointer-typed all the way to `avalue`.** The compiler keeps a `uintptr`'s target alive and unmoved only in the argument list of a call to a function implemented in assembly or marked `//go:uintptrescapes`; `CallFunction` and a binding's own wrapper functions are ordinary Go functions. A local whose address travels as a `uintptr` — for example through a wrapper parameter `ppData uintptr` — can stay on the goroutine stack, and when the stack moves during the call C writes into the old stack (found in wgpu's Vulkan `vkMapMemory` binding). The `CallFunctionContext` documentation and `SECURITY.md` now state the rule, the out-pointer pattern and when `runtime.Pinner` is needed, and that memory reachable from `rvalue` and `avalue` through pointer-typed values stays in place for the call. A new test lets C write through an out-pointer after a callback has moved the goroutine stack.
 - **Documentation brought in line with the code.** The `ffi` package documentation now has a compiling example (`CallFunction` returns the errno first) and states that a prepared `CallInterface` may be shared by goroutines; it no longer starts with a file comment from `callback.go` (three callback files carried `// Package ffi` comments). The `types` package has a package comment. README, `docs/ARCHITECTURE.md`, `docs/PERFORMANCE.md`, `CONTRIBUTING.md`, `SECURITY.md` and `ROADMAP.md` now describe the current state: the Linux/FreeBSD `CGO_ENABLED=1` link limitation with other cgo code and its workarounds ([#72](https://github.com/go-webgpu/goffi/issues/72)) — README previously suggested `CGO_ENABLED=1` for exactly that case; the FreeBSD `-gcflags` needed with `CGO_ENABLED=0`; Windows amd64 calls through `syscall.SyscallN` rather than goffi assembly; callback signature rules per platform (the README callback example panicked on Windows); `avalue` slices escape, so building one per call costs one allocation; default builds are dynamically linked, not static; the GitHub Flow contribution workflow (there is no `develop` branch), license headers, and lint on every target; supported versions and reporting in `SECURITY.md`; the v0.6.8 and v0.7.0 plans and the libvips stress-test target ([#71](https://github.com/go-webgpu/goffi/issues/71)) in `ROADMAP.md`.
@@ -959,7 +961,8 @@ See [ROADMAP.md](ROADMAP.md) for detailed roadmap to v1.0.
 
 ---
 
-[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.6.7...HEAD
+[Unreleased]: https://github.com/go-webgpu/goffi/compare/v0.6.8...HEAD
+[0.6.8]: https://github.com/go-webgpu/goffi/compare/v0.6.7...v0.6.8
 [0.6.7]: https://github.com/go-webgpu/goffi/compare/v0.6.6...v0.6.7
 [0.6.6]: https://github.com/go-webgpu/goffi/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/go-webgpu/goffi/compare/v0.6.4...v0.6.5
