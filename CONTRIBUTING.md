@@ -121,11 +121,6 @@ Use the Apache-2.0 header only for code actually copied or adapted from [purego]
    go test -run='^$' -bench=BenchmarkGoffi -benchmem ./ffi
    ```
 
-6. **Pre-release check** (comprehensive):
-   ```bash
-   bash scripts/pre-release-check.sh
-   ```
-
 ### Pull Request Requirements
 
 - [ ] Code is formatted (`gofmt` prints nothing)
@@ -222,7 +217,7 @@ goffi/
 │   ├── dl/                  # dlopen/dlsym/dlerror bindings (Unix)
 │   ├── fakecgo/             # cgo runtime for CGO_ENABLED=0 (Unix)
 │   └── runtime/             # Legacy Linux asmcgocall hook (not imported by any package)
-├── scripts/                 # pre-release-check, check-spdx, ELF/Android/FreeBSD checks
+├── scripts/                 # check-spdx, ELF/Android/FreeBSD checks
 ├── CHANGELOG.md             # Version history
 ├── ROADMAP.md               # Development roadmap
 ├── CONTRIBUTING.md          # This file
@@ -240,7 +235,7 @@ goffi/
 5. **Test on target platform** (critical for FFI!)
 6. Run benchmarks to ensure no performance regression
 7. Update documentation (README.md, docs/, CHANGELOG.md `[Unreleased]`)
-8. Run quality checks (`scripts/pre-release-check.sh`)
+8. Run the checks above: format, lint on every target, tests and the race detector
 9. Create a pull request to `main`
 10. Wait for code review
 11. Address feedback by pushing commits to the same branch
