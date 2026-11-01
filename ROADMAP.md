@@ -385,7 +385,6 @@ The two planned releases are described above (**v0.6.9**, **v0.7.0**); their cur
 **Development**:
 - [Milestones](https://github.com/go-webgpu/goffi/milestones) and [issues](https://github.com/go-webgpu/goffi/issues) - Planned work
 - .github/workflows/ci.yml - CI/CD pipeline
-- scripts/pre-release-check.sh - Quality checks
 
 **Reference**:
 - libffi: https://github.com/libffi/libffi
