@@ -78,9 +78,33 @@ p := unsafe.Pointer(&buf[0])
 _, _ = ffi.CallFunction(&cif, fn, nil, []unsafe.Pointer{unsafe.Pointer(&p)})
 runtime.KeepAlive(buf)
 
+// ❌ BAD - a binding wrapper with a uintptr parameter. Writing the conversion
+// in the caller's argument list does not help: only calls to functions
+// implemented in assembly (or marked //go:uintptrescapes) keep a uintptr's
+// target in place, and MapMemory is an ordinary Go function. mapped stays on
+// the stack, the stack moves, and C writes the mapping into the old stack.
+func MapMemory(cif *types.CallInterface, fn unsafe.Pointer, ppData uintptr) {
+	_, _ = ffi.CallFunction(cif, fn, nil, []unsafe.Pointer{unsafe.Pointer(&ppData)})
+}
+var mapped unsafe.Pointer
+MapMemory(&cif, fn, uintptr(unsafe.Pointer(&mapped)))
+
+// ✅ GOOD - out-pointer (C type void **pp): keep &mapped in an
+// unsafe.Pointer slot and take the parameter as unsafe.Pointer.
+func MapMemory(cif *types.CallInterface, fn unsafe.Pointer, ppData unsafe.Pointer) {
+	_, _ = ffi.CallFunction(cif, fn, nil, []unsafe.Pointer{unsafe.Pointer(&ppData)})
+}
+var mapped unsafe.Pointer
+MapMemory(&cif, fn, unsafe.Pointer(&mapped))
+
 // ✅ If C keeps the pointer after the call returns, or a callback reads it
-// later, pin the memory (runtime.Pinner) or allocate it on the C side.
+// later, or the Go address must go into a uintptr-typed C struct field,
+// pin the memory (runtime.Pinner) or allocate it on the C side.
 ```
+
+goffi keeps memory reachable from `rvalue` and `avalue` through pointer-typed values alive and in place for the
+call (it is heap memory: `avalue` escapes). A `uintptr` breaks that chain wherever it appears between the address
+and `avalue`.
 
 C strings must be NUL-terminated (`"hello\x00"`); Go strings are not.
 

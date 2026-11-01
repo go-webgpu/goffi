@@ -23,5 +23,12 @@ func executeFunction(
 	// on Windows. The assembly trampoline's conditional (TESTQ/CBZ) skips the
 	// errno capture when errnoFn is 0, so this is safe on all platforms.
 	errnoFn := gosyscall.ErrnoFnAddr()
+	// The interface call makes rvalue and avalue escape ("leaking param" in
+	// -gcflags=-m), so everything reachable from them through pointer-typed
+	// values is heap memory that does not move while C uses it: the contract
+	// the CallFunctionContext documentation states. A change that lets the
+	// compiler see through this call (devirtualization, inlining Execute)
+	// must keep that escape, or the arch code would read stack addresses that
+	// a stack move invalidates.
 	return arch.Registry.Caller.Execute(cif, fn, rvalue, avalue, errnoFn)
 }

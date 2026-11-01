@@ -9,80 +9,12 @@ import (
 	"github.com/go-webgpu/goffi/types"
 )
 
-// --- isStructAllFloats ---
-
-func TestIsStructAllFloats(t *testing.T) {
-	tests := []struct {
-		name string
-		typ  *types.TypeDescriptor
-		want bool
-	}{
-		{
-			"empty members",
-			&types.TypeDescriptor{Kind: types.StructType},
-			false,
-		},
-		{
-			"single float",
-			&types.TypeDescriptor{Kind: types.StructType, Members: []*types.TypeDescriptor{
-				types.FloatTypeDescriptor,
-			}},
-			true,
-		},
-		{
-			"single double",
-			&types.TypeDescriptor{Kind: types.StructType, Members: []*types.TypeDescriptor{
-				types.DoubleTypeDescriptor,
-			}},
-			true,
-		},
-		{
-			"two floats",
-			&types.TypeDescriptor{Kind: types.StructType, Members: []*types.TypeDescriptor{
-				types.FloatTypeDescriptor,
-				types.FloatTypeDescriptor,
-			}},
-			true,
-		},
-		{
-			"float and int",
-			&types.TypeDescriptor{Kind: types.StructType, Members: []*types.TypeDescriptor{
-				types.FloatTypeDescriptor,
-				types.UInt32TypeDescriptor,
-			}},
-			false,
-		},
-		{
-			"all ints",
-			&types.TypeDescriptor{Kind: types.StructType, Members: []*types.TypeDescriptor{
-				types.UInt32TypeDescriptor,
-				types.UInt32TypeDescriptor,
-			}},
-			false,
-		},
-		{
-			"double and uint64",
-			&types.TypeDescriptor{Kind: types.StructType, Members: []*types.TypeDescriptor{
-				types.DoubleTypeDescriptor,
-				types.UInt64TypeDescriptor,
-			}},
-			false,
-		},
-		{
-			"pointer only",
-			&types.TypeDescriptor{Kind: types.StructType, Members: []*types.TypeDescriptor{
-				types.PointerTypeDescriptor,
-			}},
-			false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := isStructAllFloats(tt.typ)
-			if got != tt.want {
-				t.Errorf("isStructAllFloats() = %v, want %v", got, tt.want)
-			}
-		})
+// floatPairTypeAligned returns a {float32, float32} descriptor with its size
+// and alignment set, as PrepareCallInterface leaves a nested member.
+func floatPairTypeAligned() *types.TypeDescriptor {
+	return &types.TypeDescriptor{
+		Size: 8, Alignment: 4, Kind: types.StructType,
+		Members: []*types.TypeDescriptor{types.FloatTypeDescriptor, types.FloatTypeDescriptor},
 	}
 }
 
@@ -122,6 +54,26 @@ func TestClassifyEightbyte(t *testing.T) {
 		},
 	}
 
+	// {{float32, float32}, {float32, float32}}: nested members are classified
+	// by their offsets, so both eightbytes are SSE (psABI §3.2.3).
+	nestedFloatsType := &types.TypeDescriptor{
+		Size: 16, Alignment: 4, Kind: types.StructType,
+		Members: []*types.TypeDescriptor{floatPairTypeAligned(), floatPairTypeAligned()},
+	}
+	// {int64, {float32, float32}}: INTEGER, then a nested SSE eightbyte.
+	intThenNestedType := &types.TypeDescriptor{
+		Size: 16, Alignment: 8, Kind: types.StructType,
+		Members: []*types.TypeDescriptor{types.SInt64TypeDescriptor, floatPairTypeAligned()},
+	}
+	// {float32, {float32, int32}}: the nested int32 lands in the second eightbyte.
+	nestedMixedType := &types.TypeDescriptor{
+		Size: 12, Alignment: 4, Kind: types.StructType,
+		Members: []*types.TypeDescriptor{types.FloatTypeDescriptor, {
+			Size: 8, Alignment: 4, Kind: types.StructType,
+			Members: []*types.TypeDescriptor{types.FloatTypeDescriptor, types.SInt32TypeDescriptor},
+		}},
+	}
+
 	tests := []struct {
 		name     string
 		typ      *types.TypeDescriptor
@@ -129,6 +81,15 @@ func TestClassifyEightbyte(t *testing.T) {
 		endOff   uintptr
 		wantSSE  bool
 	}{
+		{"empty members", &types.TypeDescriptor{Kind: types.StructType}, 0, 8, false},
+		{"pointer only", &types.TypeDescriptor{Size: 8, Alignment: 8, Kind: types.StructType,
+			Members: []*types.TypeDescriptor{types.PointerTypeDescriptor}}, 0, 8, false},
+		{"nested floats [0,8)", nestedFloatsType, 0, 8, true},
+		{"nested floats [8,16)", nestedFloatsType, 8, 16, true},
+		{"int then nested floats [0,8)", intThenNestedType, 0, 8, false},
+		{"int then nested floats [8,16)", intThenNestedType, 8, 16, true},
+		{"nested mixed [0,8)", nestedMixedType, 0, 8, true},
+		{"nested mixed [8,12)", nestedMixedType, 8, 12, false},
 		{"int pair [0,8)", intPairType, 0, 8, false},
 		{"float pair [0,8)", floatPairType, 0, 8, true},
 		{"mixed float+int [0,8) INTEGER wins", mixedType, 0, 8, false},

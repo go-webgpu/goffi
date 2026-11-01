@@ -220,46 +220,56 @@ func TestCallbackStruct20B(t *testing.T) {
 	testCallbackStruct(t, frame, expected)
 }
 
-func TestIsStructAllFloats(t *testing.T) {
+// The classes of a struct's eightbytes (true = SSE), nested structs and arrays
+// included: psABI §3.2.3 classifies every scalar field by its offset, at any
+// depth, and INTEGER wins within an eightbyte.
+func TestCallbackStructClasses(t *testing.T) {
+	type pairF32 struct{ _, _ float32 } // only the layout matters
 	tests := []struct {
-		name     string
-		struct_  any
-		expected bool
+		name    string
+		struct_ any
+		n       int
+		sse     [2]bool
+		memory  bool
 	}{
-		{"empty", struct{}{}, false},
-		{"float32", struct {
-			a float32
-		}{}, true},
-		{"float64", struct {
-			a float64
-		}{}, true},
-		{"two floats", struct {
+		{"empty", struct{}{}, 0, [2]bool{}, false},
+		{"float32", struct{ a float32 }{}, 1, [2]bool{true}, false},
+		{"float64", struct{ a float64 }{}, 1, [2]bool{true}, false},
+		{"float32, float64", struct {
 			a float32
 			b float64
-		}{}, true},
-		{"mixed", struct {
+		}{}, 2, [2]bool{true, true}, false},
+		{"float32, int", struct {
 			a float32
 			b int
-		}{}, false},
+		}{}, 2, [2]bool{true, false}, false},
 		{"nested, float", struct {
 			a float32
 			b struct{ a float32 }
-		}{}, true},
+		}{}, 1, [2]bool{true}, false},
 		{"nested, mixed", struct {
 			a float32
 			b struct {
 				a float32
-				b int
+				b int32
 			}
-		}{}, false},
+		}{}, 2, [2]bool{true, false}, false},
+		{"two nested float pairs", struct{ a, b pairF32 }{}, 2, [2]bool{true, true}, false},
+		{"float array", struct{ a [4]float32 }{}, 2, [2]bool{true, true}, false},
+		{"int then nested floats", struct {
+			a int64
+			b pairF32
+		}{}, 2, [2]bool{false, true}, false},
+		{"over 16 bytes", struct{ a, b, c float64 }{}, 0, [2]bool{}, true},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			typ := reflect.ValueOf(test.struct_).Type()
-			isAllFLoats := isStructAllFloats(typ)
-			if isAllFLoats != test.expected {
-				t.Fatalf("expected %t, but is %t", test.expected, isAllFLoats)
+			sse, n, memory := callbackStructClasses(typ)
+			if n != test.n || sse != test.sse || memory != test.memory {
+				t.Fatalf("callbackStructClasses = (%v, %d, %t), want (%v, %d, %t)",
+					sse, n, memory, test.sse, test.n, test.memory)
 			}
 		})
 	}

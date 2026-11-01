@@ -917,11 +917,11 @@ func TestFloat32ArgEncoding(t *testing.T) {
 //
 // Regression test for TASK-020 / GAP-10.
 func TestOverflowDetection(t *testing.T) {
-	// Build a CIF with 20 pointer arguments — far beyond any platform's capacity.
-	// System V AMD64: 6 GP regs + 9 stack slots = 15 max GP args.
+	// Build a CIF with 16384 pointer arguments — beyond every platform's capacity.
+	// System V AMD64: 6 GP regs + stack words up to amd64.MaxStackBytes (8192 words).
 	// ARM64: 8 GP regs + 7 stack slots = 15 max GP args.
-	// Windows: syscall.SyscallN supports up to 15 args.
-	const tooMany = 20
+	// Windows: 4 register slots + 9 stack slots.
+	const tooMany = 1 << 14
 
 	argTypes := make([]*types.TypeDescriptor, tooMany)
 	for k := range argTypes {
@@ -938,9 +938,9 @@ func TestOverflowDetection(t *testing.T) {
 	cif := &types.CallInterface{}
 	err := PrepareCallInterface(cif, convention, types.VoidTypeDescriptor, argTypes)
 	if err == nil {
-		t.Error("PrepareCallInterface with 20 args should return error, got nil")
+		t.Errorf("PrepareCallInterface with %d args should return error, got nil", tooMany)
 	} else {
-		t.Logf("Correctly rejected 20 args: %v", err)
+		t.Logf("Correctly rejected %d args: %v", tooMany, err)
 	}
 }
 

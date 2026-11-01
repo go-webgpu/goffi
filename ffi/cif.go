@@ -268,11 +268,10 @@ func maxSSERegisters(convention types.CallingConvention) int {
 }
 
 // maxStackSlots returns the maximum number of additional stack argument slots
-// supported by the platform-specific syscall layer.
+// supported by the platform-specific syscall layer. Only architectures
+// without an arch.StackLayout use it: Windows amd64 (4 register slots + 9
+// stack slots, internal/arch/amd64/call_windows.go). System V amd64 and arm64
+// compute their exact stack size instead.
 func maxStackSlots(convention types.CallingConvention) int {
-	// Our syscall layer supports up to maxArgs (15) total args:
-	// Unix AMD64:  6 GP registers + 9 stack slots = 15
-	// Unix ARM64:  8 GP registers + 7 stack slots = 15
-	// Windows:     syscall.SyscallN supports up to 15 args natively
 	return 9
 }

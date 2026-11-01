@@ -340,3 +340,116 @@ struct three_f32 return_struct_3floats(float a, float b, float c) {
 
 struct f32_i32 { float a; int32_t b; };
 struct f32_i32 return_struct_float_int32(float a, int32_t b) { struct f32_i32 s = {a, b}; return s; }
+
+// Stack-argument layout (TASK-098). All targets are 64-bit, so uint64_t
+// stands in for pointers and size_t; C never dereferences these values.
+
+// {data, length}: webgpu.h's WGPUStringView, 16 bytes, two INTEGER eightbytes.
+struct sv { uint64_t data; uint64_t length; };
+
+// 96 bytes, the shape of webgpu.h's WGPUAdapterInfo. SysV amd64 copies it onto
+// the stack (12 words, MEMORY class); arm64 and Win64 pass a pointer to a copy.
+struct info96 {
+    uint64_t next;
+    struct sv vendor, architecture, device, description;
+    uint32_t backend, adapter_type, vendor_id, device_id, sub_min, sub_max;
+};
+static uint64_t info96_sum(const struct info96 *s) {
+    return s->next + 2 * s->vendor.data + 3 * s->vendor.length + 4 * s->architecture.data +
+           5 * s->architecture.length + 6 * s->device.data + 7 * s->device.length +
+           8 * s->description.data + 9 * s->description.length + 10 * (uint64_t)s->backend +
+           11 * (uint64_t)s->adapter_type + 12 * (uint64_t)s->vendor_id + 13 * (uint64_t)s->device_id +
+           14 * (uint64_t)s->sub_min + 15 * (uint64_t)s->sub_max;
+}
+uint64_t take_struct_96(struct info96 s) { return info96_sum(&s); }
+
+// 64 bytes, as webgpu.h's WGPUSurfaceCapabilities: 8 stack words on SysV amd64.
+struct words8 { uint64_t w[8]; };
+uint64_t take_struct_64(struct words8 s) {
+    uint64_t sum = 0;
+    for (int i = 0; i < 8; i++) sum += (uint64_t)(i + 1) * s.w[i];
+    return sum;
+}
+
+// 40 bytes, as webgpu.h's WGPUBufferMapCallbackInfo, after four integer
+// arguments: the shape of wgpuBufferMapAsync.
+struct cbinfo40 { uint64_t next; uint32_t mode; uint64_t callback, userdata1, userdata2; };
+uint64_t map_async_like(uint64_t buffer, uint32_t mode, uint64_t offset, uint64_t size,
+                        struct cbinfo40 info) {
+    return buffer + 2 * (uint64_t)mode + 3 * offset + 5 * size + 7 * info.next +
+           11 * (uint64_t)info.mode + 13 * info.callback + 17 * info.userdata1 + 19 * info.userdata2;
+}
+
+// Two 96-byte structs and scalars: 24 stack words on SysV amd64.
+uint64_t two_info96(int64_t a, struct info96 x, int64_t b, struct info96 y) {
+    return (uint64_t)a + 1000 * info96_sum(&x) + 7 * (uint64_t)b + 100000 * info96_sum(&y);
+}
+
+// A 16-byte argument that does not fit in the registers left goes to the stack
+// whole, and the registers stay free for later arguments (psABI §3.2.3; libffi
+// src/x86/ffi64.c). Five int64 leave R9; s needs two GPRs, so s goes on the
+// stack and last takes R9.
+int64_t split_s16_after_5i(int64_t r0, int64_t r1, int64_t r2, int64_t r3, int64_t r4,
+                           struct pair_i64 s, int64_t last) {
+    return r0 + 2 * r1 + 3 * r2 + 4 * r3 + 5 * r4 + 1000 * s.a + 100 * s.b + 100000 * last;
+}
+
+// The same for SSE: seven doubles leave XMM7; {double, double} goes on the
+// stack and last takes XMM7.
+double split_d2_after_7d(double d0, double d1, double d2, double d3, double d4, double d5,
+                         double d6, struct pair_f64 s, double last) {
+    return d0 + 2 * d1 + 3 * d2 + 4 * d3 + 5 * d4 + 6 * d5 + 7 * d6 + 1000 * s.a + 100 * s.b +
+           100000 * last;
+}
+
+// {int64, double} needs one GPR and one SSE register. Six int64 use every GPR,
+// so s goes on the stack whole and last takes XMM0.
+double split_mixed_after_6i(int64_t r0, int64_t r1, int64_t r2, int64_t r3, int64_t r4,
+                            int64_t r5, struct mixed_int_float s, double last) {
+    return (double)(r0 + 2 * r1 + 3 * r2 + 4 * r3 + 5 * r4 + 6 * r5) + 1000 * (double)s.a +
+           100 * s.b + 100000 * last;
+}
+
+// Callbacks with the same shapes: C calls the Go callback.
+int64_t cb_call_split_s16(int64_t (*f)(int64_t, int64_t, int64_t, int64_t, int64_t,
+                                       struct pair_i64, int64_t)) {
+    struct pair_i64 s = {.a = 42, .b = 7};
+    return f(1, 2, 3, 4, 5, s, 9);
+}
+double cb_call_split_d2(double (*f)(double, double, double, double, double, double, double,
+                                    struct pair_f64, double)) {
+    struct pair_f64 s = {.a = 42, .b = 7};
+    return f(1, 2, 3, 4, 5, 6, 7, s, 9);
+}
+uint64_t cb_call_info96(uint64_t (*f)(struct info96)) {
+    struct info96 s = {
+        .next = 1, .vendor = {2, 3}, .architecture = {4, 5}, .device = {6, 7},
+        .description = {8, 9}, .backend = 10, .adapter_type = 11, .vendor_id = 12,
+        .device_id = 13, .sub_min = 14, .sub_max = 15,
+    };
+    return f(s);
+}
+
+// Nested structs are classified by their scalar members (psABI §3.2.3): two
+// {float, float} pairs make two SSE eightbytes on SysV amd64 (XMM0, XMM1), a
+// four-float HFA on arm64, a pointer to a copy on Win64.
+struct quad_f32 { struct pair_f32 a, b; };
+float take_nested_f32x4(struct quad_f32 s) {
+    return s.a.x + 2 * s.a.y + 3 * s.b.x + 4 * s.b.y;
+}
+struct quad_f32 return_nested_f32x4(float a, float b, float c, float d) {
+    struct quad_f32 s = {{a, b}, {c, d}};
+    return s;
+}
+float cb_call_nested_f32x4(float (*f)(struct quad_f32)) {
+    struct quad_f32 s = {{1, 2}, {3, 4}};
+    return f(s);
+}
+
+// An out-pointer written after a callback into Go (the vkMapMemory shape: the
+// driver writes *ppData). The Go callback makes the goroutine stack move, so a
+// Go local passed as out must not be on that stack.
+void call_then_store(void (*cb)(void), int64_t *out, int64_t v) {
+    cb();
+    *out = v;
+}
