@@ -1,0 +1,35 @@
+# goffi
+
+> goffi is a pure Go foreign function interface: it calls C functions in shared libraries without cgo and without a C compiler (`CGO_ENABLED=0`). It loads libraries and resolves symbols (`LoadLibrary`, `GetSymbol`; dlopen/dlsym on Unix, LoadLibraryW on Windows). A call is described once as a call interface from type descriptors (`PrepareCallInterface`, `PrepareVariadicCallInterface`) and then called many times with no per-call allocation (`CallFunction`, `CallFunctionContext`). It passes and returns structs by value under the System V, Win64 and AAPCS64 ABIs, captures errno on every call, and supports C-to-Go callbacks (`NewCallback`). Targets: Linux, Windows, macOS and FreeBSD on amd64 and arm64; Android arm64 is an experimental preview. Requires Go 1.25 or newer. MIT licensed, pre-1.0 (v0.x). Built for the GoGPU WebGPU stack, but general purpose: any C library with a stable ABI.
+
+Things to know before writing code against it:
+
+- Each `avalue` element is a pointer to the argument value (`unsafe.Pointer(&x)`), not the value itself; the result goes to the `rvalue` pointer.
+- Go memory passed to C must stay reachable for the duration of the call: hold it as `unsafe.Pointer`, not `uintptr`. Pointers that C keeps after the call need `runtime.Pinner` or C-allocated memory.
+- Types are primitives, pointers and structs (`types.TypeDescriptor` with `Members`); no strings, slices or bitfields; struct layout is the natural C layout (`#pragma pack` is not honored).
+- Windows callbacks take and return pointer-sized integers only (`uintptr`, `int`, `int64`, …): no floats or structs.
+- Linux and FreeBSD with `CGO_ENABLED=1`: a binary that also contains other cgo code, or is linked externally, does not link yet (issue #72). goffi and purego in one `CGO_ENABLED=0` binary need `-tags nofakecgo` (issue #22).
+
+## Docs
+
+- [API reference: ffi](https://pkg.go.dev/github.com/go-webgpu/goffi/ffi): loading libraries, preparing and making calls, callbacks, errors
+- [API reference: types](https://pkg.go.dev/github.com/go-webgpu/goffi/types): type descriptors, calling conventions, `CallInterface`
+- [README](https://github.com/go-webgpu/goffi/blob/main/README.md): overview, examples, linking modes, known limitations, platform table
+- [Architecture](https://github.com/go-webgpu/goffi/blob/main/docs/ARCHITECTURE.md): call path, ABIs, callbacks, fakecgo
+- [Performance](https://github.com/go-webgpu/goffi/blob/main/docs/PERFORMANCE.md): benchmarks and when not to use goffi
+- [Android](https://github.com/go-webgpu/goffi/blob/main/docs/ANDROID.md): the preview's ABI and build notes
+- [CHANGELOG](https://github.com/go-webgpu/goffi/blob/main/CHANGELOG.md): what each release changed
+- [Security](https://github.com/go-webgpu/goffi/blob/main/SECURITY.md): memory-safety contract of FFI calls
+
+## Examples
+
+- [examples/simple](https://github.com/go-webgpu/goffi/tree/main/examples/simple): calling a C runtime function (`puts` / `printf`) on each OS
+- [examples/struct](https://github.com/go-webgpu/goffi/tree/main/examples/struct): passing and returning structs by value
+
+## Used by
+
+- [gogpu/wgpu](https://github.com/gogpu/wgpu): pure Go WebGPU implementation
+- [gogpu/gogpu](https://github.com/gogpu/gogpu): GPU application framework
+- [gogpu/systray](https://github.com/gogpu/systray): system tray library
+- [go-webgpu/webgpu](https://github.com/go-webgpu/webgpu): WebGPU bindings to wgpu-native
+- [GoGPU ecosystem](https://gogpu.dev/llms.txt): map of all modules
