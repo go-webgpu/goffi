@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`llms.txt`** ([llmstxt.org](https://llmstxt.org/) format): what goffi does, the rules that trip people up (pointer-to-value `avalue`, keeping Go memory alive, type limits, the cgo linking issue) and links to the API reference, docs and examples.
+
 ### Changed
 - **Contributors run the checks CI runs; `scripts/pre-release-check.sh` is gone.** It duplicated the CI jobs and had drifted from them. `CONTRIBUTING.md` lists the checks: format, lint on every target, tests and the race detector.
 - **`.gitignore` rules are anchored to the repository root.** Bare file names such as `INDEX.md` matched in every directory and could hide public files; scratch patterns (`test_*`, `QUICK_START*.md`, …) now apply to the root only. Binaries built in an example directory, profiles (`*.prof`) and coverage files (`coverage.*`) are ignored.

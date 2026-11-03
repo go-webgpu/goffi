@@ -489,6 +489,7 @@ go test -v ./ffi                       # verbose, auto-detects platform
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
 | [SECURITY.md](SECURITY.md) | Security policy |
 | [examples/](examples/) | Working code examples (`simple`, `struct`) |
+| [llms.txt](llms.txt) | Summary and links for LLM tools ([llmstxt.org](https://llmstxt.org/)) |
 
 ---
 
