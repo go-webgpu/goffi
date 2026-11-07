@@ -37,7 +37,7 @@ _, _ = ffi.CallFunction(cif, sym, unsafe.Pointer(&result), args)
 | **Type-safe** | Runtime validation | 5 typed error types with `errors.As()` support |
 | **Struct pass/return** | Full ABI | System V: INTEGER/SSE classification, ≤8B (RAX/XMM0), 9–16B (RAX/XMM × RAX/XMM), >16B (sret). Win64: 1/2/4/8B in RAX, other sizes via hidden pointer. arm64: HFA in S/D registers, ≤16B in X0–X1, >16B via X8 |
 | **Variadic** | `printf`/`sprintf` | `PrepareVariadicCallInterface` — Apple ARM64 stack-force included |
-| **errno** | Always captured | Thread-safe assembly-level capture — first pure-Go FFI on Linux |
+| **errno** | Always captured | Read in assembly right after the C call returns, before the goroutine can move to another thread |
 | **Context** | Timeouts | `CallFunctionContext(ctx, ...)` cancellation |
 | **Race detector** | `-race` compatible | `CGO_ENABLED=1 go test -race` runs in CI on every runner with a race detector |
 | **Tested** | ~90% coverage on amd64 | CI on Linux, Windows, macOS × amd64/arm64 (CGO=0 and CGO=1) and in FreeBSD 14/15 VMs |

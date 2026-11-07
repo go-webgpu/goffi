@@ -73,6 +73,7 @@ go.work.sum
 /.goda/
 /.goco/
 /.gode/
+/.mcp.json
 /reference/
 
 # Scratch files and experiments in the root
