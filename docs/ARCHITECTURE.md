@@ -188,7 +188,7 @@ Registers and stack words are assigned by the allocator the call path uses (`int
 
 Classification uses `reflect.Type` (not `types.TypeDescriptor`) since callback signatures are Go functions registered via `NewCallback()`.
 
-**Limitations**: callback struct args supported on AMD64 Unix only. ARM64 and Windows callbacks do not yet support struct arguments.
+**Limitations**: callback struct args supported on AMD64 Unix only. ARM64 and Windows callbacks do not yet support struct arguments; [CALLBACK_ABI.md](CALLBACK_ABI.md) lists what each platform accepts and what the arm64 implementation needs.
 
 ---
 

@@ -33,8 +33,9 @@ panic: ffi: unsupported callback argument type: struct
 
 The amd64 dispatcher classifies aggregates per the System V ABI — one eightbyte
 or two, INTEGER or SSE per eightbyte, MEMORY above 16 bytes — in
-`callbackWrap` (`ffi/callback.go`), with `classifyEightbyte` and
-`isStructAllFloats` doing the work. The arm64 dispatcher has no equivalent: it
+`callbackWrap` (`ffi/callback.go`), with `classifyEightbyte` classifying each
+eightbyte and the call path's allocator (`internal/arch/amd64/layout_sysv.go`)
+assigning registers and stack words. The arm64 dispatcher has no equivalent: it
 reads each argument from one D or X register slot, or one stack slot, and an
 aggregate does not fit that shape.
 
