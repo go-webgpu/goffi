@@ -482,6 +482,7 @@ go test -v ./ffi                       # verbose, auto-detects platform
 |----------|-------------|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Technical architecture: assembly, ABIs, callbacks, linking |
 | [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | Benchmarks, optimization strategies, Go 1.26 |
+| [docs/CALLBACK_ABI.md](docs/CALLBACK_ABI.md) | What callback signatures each platform accepts, and the arm64 struct gap |
 | [docs/ANDROID.md](docs/ANDROID.md) | Android ARM64 preview ABI + build notes |
 | [docs/ADR-001-userspace-elf-loader.md](docs/ADR-001-userspace-elf-loader.md) | Research: optional pure-Go `.so` loader |
 | [CHANGELOG.md](CHANGELOG.md) | Version history, migration guides |

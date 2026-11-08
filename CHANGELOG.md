@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **`llms.txt`** ([llmstxt.org](https://llmstxt.org/) format): what goffi does, the rules that trip people up (pointer-to-value `avalue`, keeping Go memory alive, type limits, the cgo linking issue) and links to the API reference, docs and examples.
+- **`docs/CALLBACK_ABI.md`: what `NewCallback` accepts on each platform** — integers, floats and (amd64 Unix) structs; `uintptr`-sized values only on Windows; why arm64 rejects struct arguments, what AAPCS64 needs for them and how to test an implementation; the pointer workaround (#84, by @unxed).
 
 ### Changed
 - **Contributors run the checks CI runs; `scripts/pre-release-check.sh` is gone.** It duplicated the CI jobs and had drifted from them. `CONTRIBUTING.md` lists the checks: format, lint on every target, tests and the race detector.
