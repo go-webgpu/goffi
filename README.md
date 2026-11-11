@@ -72,9 +72,9 @@ CGO_ENABLED=1 go build ./...
 CGO_ENABLED=0 go build -gcflags=github.com/go-webgpu/goffi/internal/fakecgo=-std ./...
 ```
 
-> **Known issue — Linux and FreeBSD, `CGO_ENABLED=1`:** a binary that contains goffi **and other cgo code** (any package with `import "C"`, including purego), or that is linked with `-linkmode=external`, `-buildmode=c-shared` or `c-archive`, currently fails to link with `unhandled relocation … (SDYNIMPORT …)` ([#72](https://github.com/go-webgpu/goffi/issues/72); the fix is discussed in [#104](https://github.com/go-webgpu/goffi/issues/104)). macOS and Windows are not affected. Workarounds are listed under [Known Limitations](#known-limitations).
+> **Known issue — FreeBSD, `CGO_ENABLED=1`:** a binary that contains goffi **and other cgo code** (any package with `import "C"`, including purego), or that is linked with `-linkmode=external`, `-buildmode=c-shared` or `c-archive`, currently fails to link with `unhandled relocation … (SDYNIMPORT …)` ([#72](https://github.com/go-webgpu/goffi/issues/72); the fix is discussed in [#104](https://github.com/go-webgpu/goffi/issues/104)). Linux, macOS and Windows are not affected. Workarounds are listed under [Known Limitations](#known-limitations).
 
-> **How?** goffi uses Go's `cgo_import_dynamic` for dynamic library loading. Under `CGO_ENABLED=0` the cgo runtime is supplied by `internal/fakecgo`; under `CGO_ENABLED=1` the standard `runtime/cgo` is linked in. Both modes share the same FFI fast path and ABIs.
+> **How?** goffi uses Go's `cgo_import_dynamic` for dynamic library loading. Under `CGO_ENABLED=0` the cgo runtime is supplied by `internal/fakecgo`; under `CGO_ENABLED=1` the standard `runtime/cgo` is linked in, and on Linux `dlopen`, `dlsym` and the errno accessor are reached through cgo, so external linking works. Both modes share the same FFI fast path and ABIs.
 
 ### Linking modes (Linux)
 
@@ -409,8 +409,8 @@ if err != nil {
 
 ## Known Limitations
 
-**Linux and FreeBSD: `CGO_ENABLED=1` together with other cgo code does not link** ([#72](https://github.com/go-webgpu/goffi/issues/72), fix discussed in [#104](https://github.com/go-webgpu/goffi/issues/104))
-- Affects binaries that also contain another `import "C"` package (purego, database drivers, …) or are linked with `-linkmode=external`, `-buildmode=c-shared` or `c-archive`. goffi alone with `CGO_ENABLED=1` links (internal linker). macOS and Windows are not affected.
+**FreeBSD: `CGO_ENABLED=1` together with other cgo code does not link** ([#72](https://github.com/go-webgpu/goffi/issues/72), fix discussed in [#104](https://github.com/go-webgpu/goffi/issues/104))
+- Affects binaries that also contain another `import "C"` package (purego, database drivers, …) or are linked with `-linkmode=external`, `-buildmode=c-shared` or `c-archive`. goffi alone with `CGO_ENABLED=1` links (internal linker). Linux, macOS and Windows are not affected.
 - goffi + a plain cgo package: add `-ldflags=-linkmode=internal`. This does not help with purego, c-shared or c-archive.
 - goffi + purego: build with `CGO_ENABLED=0 -tags nofakecgo` (see the purego entry below).
 
@@ -436,7 +436,7 @@ if err != nil {
   CGO_ENABLED=0 go build -tags nofakecgo ./...
   # FreeBSD: also -gcflags=github.com/ebitengine/purego/internal/fakecgo=-std
   ```
-- **Workaround B (macOS only for now):** Build with `CGO_ENABLED=1`. In cgo mode the real `runtime/cgo` supplies the symbols and both libraries' `fakecgo` packages are gated out by `//go:build !cgo`. On Linux and FreeBSD this currently fails to link ([#72](https://github.com/go-webgpu/goffi/issues/72), see above).
+- **Workaround B (macOS and Linux):** Build with `CGO_ENABLED=1`. In cgo mode the real `runtime/cgo` supplies the symbols and both libraries' `fakecgo` packages are gated out by `//go:build !cgo`. On FreeBSD this currently fails to link ([#72](https://github.com/go-webgpu/goffi/issues/72), see above).
 - **Workaround C (Recommended for complete integration):** Use [pureffi](https://github.com/unxed/pureffi).
   `pureffi` is a 1:1, drop-in API-compatible wrapper over `goffi` that acts as a transparent replacement for `purego` via Go's `replace` directive. It completely eliminates the need for compilation tags, resolves the duplicate symbol conflict, and natively fixes Apple Silicon variadic ABI stack-packing.
 
