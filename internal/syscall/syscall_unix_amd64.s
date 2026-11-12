@@ -85,8 +85,11 @@ copy_done:
 	MOVQ 40(R12), R8 // a5 -> R8
 	MOVQ 48(R12), R9 // a6 -> R9
 
-	// For vararg functions: AL = number of float args in XMM registers (set 0 = safe default)
-	XORL AX, AX
+	// AL is an upper bound on the vector registers a variadic callee reads
+	// arguments from. 0 tells it XMM0-XMM7 hold none, so it reads garbage for
+	// a variadic double. 8 is always correct; a callee that is not variadic
+	// ignores AL.
+	MOVL $8, AX
 
 	// Load function pointer and call (offset 0)
 	MOVQ 0(R12), R10

@@ -393,10 +393,12 @@ A new CIF must be prepared for each unique combination of variadic argument type
 **System V AMD64 (Linux, macOS Intel, FreeBSD) and AAPCS64 (Linux, FreeBSD):**  
 Variadic arguments go in the same registers as fixed arguments, up to the register count limit. `PrepareVariadicCallInterface` on these platforms is functionally identical to `PrepareCallInterface` — `FixedArgCount` is stored in `CallInterface` but the argument marshalling loop is unchanged.
 
+On System V AMD64 a variadic callee also reads AL, an upper bound on the number of vector registers that hold arguments, to decide whether to save XMM0–XMM7. goffi's trampoline sets AL to 8 on every call, which covers any number of float or double arguments; callees that are not variadic ignore it.
+
 **Windows (AMD64/ARM64):**  
 Integer variadic arguments use the same registers as fixed ones (RCX, RDX, R8, R9 on AMD64; X0–X7 on ARM64). `PrepareVariadicCallInterface` behaves identically to `PrepareCallInterface`.
 
-The end-to-end tests (`ffi/variadic_e2e_test.go`, `cmd/variadic-test`) cover integer variadic arguments.
+The end-to-end tests (`ffi/variadic_e2e_test.go`, `cmd/variadic-test`) cover integer and double variadic arguments.
 
 **Apple ARM64 (macOS/iOS, `GOOS=darwin`, `GOARCH=arm64`):**  
 Apple's AAPCS64 extension mandates that **variadic arguments must be passed on the stack**, even when GP or FP registers are still available. This differs from the standard AAPCS64 used on Linux ARM64, where variadic args may be placed in X1-X7.
