@@ -139,6 +139,21 @@ int64_t variadic_two_fixed(int64_t a, int64_t b, ...) {
     return a + b + extra;
 }
 
+// Variadic: sum N double values. On System V amd64 the caller must set AL to
+// (an upper bound of) the number of vector registers used; a callee that
+// reads AL = 0 does not save XMM0-XMM7 and va_arg returns garbage.
+// Prototype: double sum_variadic_doubles(int64_t count, ...)
+double sum_variadic_doubles(int64_t count, ...) {
+    va_list ap;
+    va_start(ap, count);
+    double sum = 0;
+    for (int64_t i = 0; i < count; i++) {
+        sum += va_arg(ap, double);
+    }
+    va_end(ap);
+    return sum;
+}
+
 // C-to-Go callbacks with floating-point arguments and return values (#93).
 // The C compiler is the ground truth for the calling convention: these
 // callers place float/double arguments and read float/double results exactly

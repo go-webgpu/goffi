@@ -187,3 +187,39 @@ func TestVariadic_ErrorValidation(t *testing.T) {
 		}
 	})
 }
+
+// TestVariadic_SumDoubles passes double variadic arguments, which on System V
+// amd64 travel in XMM registers that the callee saves only when AL says they
+// are in use.
+func TestVariadic_SumDoubles(t *testing.T) {
+	requireStructLib(t)
+
+	sym, err := GetSymbol(structTestLib, "sum_variadic_doubles")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	argTypes := []*types.TypeDescriptor{types.SInt64TypeDescriptor}
+	vals := []float64{1.25, -7.5, 0.125}
+	for range vals {
+		argTypes = append(argTypes, types.DoubleTypeDescriptor)
+	}
+	var cif types.CallInterface
+	if err := PrepareVariadicCallInterface(&cif, types.DefaultCall, 1, types.DoubleTypeDescriptor, argTypes); err != nil {
+		t.Fatal(err)
+	}
+
+	count := int64(len(vals))
+	avalue := []unsafe.Pointer{unsafe.Pointer(&count)}
+	for i := range vals {
+		avalue = append(avalue, unsafe.Pointer(&vals[i]))
+	}
+	var result float64
+	if _, err := CallFunction(&cif, sym, unsafe.Pointer(&result), avalue); err != nil {
+		t.Fatal(err)
+	}
+
+	if want := 1.25 - 7.5 + 0.125; result != want {
+		t.Errorf("sum_variadic_doubles(3, 1.25, -7.5, 0.125) = %v, want %v", result, want)
+	}
+}
