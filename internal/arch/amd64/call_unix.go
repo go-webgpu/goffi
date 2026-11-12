@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"unsafe"
 
+	"github.com/go-webgpu/goffi/internal/jit"
 	gosyscall "github.com/go-webgpu/goffi/internal/syscall"
 	"github.com/go-webgpu/goffi/types"
 )
@@ -33,6 +34,12 @@ func (i *Implementation) Execute(
 	avalue []unsafe.Pointer,
 	errnoFn uintptr,
 ) (cerrno uintptr, err error) {
+	if cif.Bridge != nil {
+		if cerrno, ok := jit.Call((*jit.Code)(cif.Bridge), fn, rvalue, avalue, errnoFn); ok {
+			return cerrno, nil
+		}
+	}
+
 	// The stack area is sized before any value is placed, so an argument list
 	// that does not fit is an error, never a write past the area. A
 	// CallInterface filled in by hand reaches this point without the check in

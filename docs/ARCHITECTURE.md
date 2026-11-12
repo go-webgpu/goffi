@@ -114,6 +114,16 @@ TEXT syscallN(SB), NOSPLIT|NOFRAME, $0
 // HFA (Homogeneous Floating-point Aggregate) support
 ```
 
+### Call bridges
+
+On linux and darwin (amd64 and arm64) and on windows/amd64, `PrepareCallInterface` also compiles a call bridge when every argument and the result are scalars (integers, floats, doubles, pointers, or a void result). A bridge is machine code for that one signature. It loads each argument from `avalue` straight into its register or stack slot, calls the function, stores the result and captures errno. `Execute` enters it through `runtime.cgocall` and skips the argument packing and the layer 3 wrapper.
+
+The generators (`internal/arch/amd64/jit_sysv.go`, `jit_windows.go`, `internal/arch/arm64/jit.go`) place arguments with the same layout code as the generic path and extend narrow integers the same way. `TestBridgeMatchesExecute` checks this by calling an assembly probe through both paths with random signatures and comparing every argument register and stack word.
+
+`internal/jit` owns the memory. Bridges are written into a chunk that stays writable until the first call through one of them, then becomes read-execute and is never writable again. Identical code is shared. On arm64 the instruction cache is flushed before the chunk is sealed. On Windows the chunk's unwind information is registered with `RtlAddFunctionTable`.
+
+The generic path still handles struct arguments and results, a `CallInterface` filled in by hand, a nil argument pointer, and any platform that refuses executable memory. Setting `GOFFI_JIT=0` in the environment turns bridges off.
+
 ---
 
 ## Calling Conventions

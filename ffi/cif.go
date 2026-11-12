@@ -36,6 +36,7 @@ func prepareCallInterfaceCore(
 	}
 
 	cif.Convention = convention
+	cif.Bridge = nil
 	cif.ArgCount = argCount
 	cif.ArgTypes = argTypes
 	cif.ReturnType = returnType
@@ -98,6 +99,9 @@ func preparePlatformSpecific(cif *types.CallInterface) error {
 		cif.StackBytes = 32
 	}
 
+	if c, ok := arch.Registry.Caller.(arch.Compiler); ok {
+		cif.Bridge = c.Compile(cif)
+	}
 	return nil
 }
 
