@@ -7,6 +7,8 @@ import (
 	"syscall"
 	"unsafe"
 
+	"github.com/go-webgpu/goffi/internal/jit"
+	gosyscall "github.com/go-webgpu/goffi/internal/syscall"
 	"github.com/go-webgpu/goffi/types"
 )
 
@@ -38,9 +40,16 @@ func CallFunctionNoCallback(
 			return 0, &InvalidCallInterfaceError{Field: "avalue", Reason: "nil argument pointer", Index: i}
 		}
 	}
+	rv := noescape(rvalue)
+	av := unsafe.Slice((*unsafe.Pointer)(noescape(unsafe.Pointer(unsafe.SliceData(avalue)))), len(avalue))
 	cgoNoCallback(true)
-	cerrno, err := executeFunction(call, fn, noescape(rvalue),
-		unsafe.Slice((*unsafe.Pointer)(noescape(unsafe.Pointer(unsafe.SliceData(avalue)))), len(avalue)))
+	if call.Bridge != nil {
+		if cerrno, ok := jit.Run((*jit.Code)(call.Bridge), fn, rv, av, gosyscall.ErrnoFnAddr()); ok {
+			cgoNoCallback(false)
+			return syscall.Errno(cerrno), nil
+		}
+	}
+	cerrno, err := executeFunction(call, fn, rv, av)
 	cgoNoCallback(false)
 	return syscall.Errno(cerrno), err
 }

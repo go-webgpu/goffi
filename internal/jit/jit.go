@@ -126,6 +126,11 @@ func Call(c *Code, fn, rvalue unsafe.Pointer, avalue []unsafe.Pointer, errnoFn u
 			return 0, false
 		}
 	}
+	return Run(c, fn, rvalue, avalue, errnoFn)
+}
+
+// Run is Call for an avalue the caller has checked holds no nil pointer.
+func Run(c *Code, fn, rvalue unsafe.Pointer, avalue []unsafe.Pointer, errnoFn uintptr) (uintptr, bool) {
 	switch c.chunk.state.Load() {
 	case sealed:
 	case open:
