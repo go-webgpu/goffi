@@ -74,7 +74,7 @@ CGO_ENABLED=0 go build -gcflags=github.com/go-webgpu/goffi/internal/fakecgo=-std
 
 > **Known issue — FreeBSD, `CGO_ENABLED=1`:** a binary that contains goffi **and other cgo code** (any package with `import "C"`, including purego), or that is linked with `-linkmode=external`, `-buildmode=c-shared` or `c-archive`, currently fails to link with `unhandled relocation … (SDYNIMPORT …)` ([#72](https://github.com/go-webgpu/goffi/issues/72); the fix is discussed in [#104](https://github.com/go-webgpu/goffi/issues/104)). Linux, macOS and Windows are not affected. Workarounds are listed under [Known Limitations](#known-limitations).
 
-> **How?** goffi uses Go's `cgo_import_dynamic` for dynamic library loading. Under `CGO_ENABLED=0` the cgo runtime is supplied by `internal/fakecgo`; under `CGO_ENABLED=1` the standard `runtime/cgo` is linked in, and on Linux `dlopen`, `dlsym` and the errno accessor are reached through cgo, so external linking works. Both modes share the same FFI fast path and ABIs.
+> **How?** goffi uses Go's `cgo_import_dynamic` for dynamic library loading. Under `CGO_ENABLED=0` the cgo runtime is supplied by `internal/fakecgo`; under `CGO_ENABLED=1` the standard `runtime/cgo` is linked in, and on Linux `dlopen`, `dlsym` and the errno accessor are reached through cgo, so external linking works. That makes goffi itself a cgo package, so a Linux `CGO_ENABLED=1` build links with the external linker by default, even when goffi is its only cgo code. Both modes share the same FFI fast path and ABIs.
 
 ### Linking modes (Linux)
 

@@ -90,8 +90,9 @@ func Dlsym(handle uintptr, name string) (uintptr, error) {
 	return uintptr(result.value), nil
 }
 
-// Dlclose intentionally retains process-lifetime mappings, matching the
-// no-cgo implementation's RTLD_NODELETE policy.
+// Dlclose returns nil and leaves the library loaded, as the no-cgo
+// implementations do: unloading is not implemented yet on Linux, and on
+// Android ffi.LoadLibrary opens every library with RTLD_NODELETE.
 func Dlclose(uintptr) error { return nil }
 
 func takeDlerror(msg *C.char) string {
