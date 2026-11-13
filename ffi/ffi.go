@@ -314,15 +314,32 @@ func CallFunctionContext(
 		return 0, ctxErr
 	}
 
+	call, rvalue, err := checkCall(cif, fn, rvalue, avalue)
+	if err != nil {
+		return 0, err
+	}
+	cerrno, err := executeFunction(call, fn, rvalue, avalue)
+	return syscall.Errno(cerrno), err
+}
+
+// checkCall validates a call and returns the CallInterface to execute it with
+// and the result memory, which is allocated when a struct is returned through
+// a hidden pointer and the caller passed none.
+func checkCall(
+	cif *types.CallInterface,
+	fn unsafe.Pointer,
+	rvalue unsafe.Pointer,
+	avalue []unsafe.Pointer,
+) (*types.CallInterface, unsafe.Pointer, error) {
 	if cif == nil {
-		return 0, &InvalidCallInterfaceError{
+		return nil, nil, &InvalidCallInterfaceError{
 			Field:  "cif",
 			Reason: "must not be nil",
 			Index:  -1,
 		}
 	}
 	if fn == nil {
-		return 0, &InvalidCallInterfaceError{
+		return nil, nil, &InvalidCallInterfaceError{
 			Field:  "fn",
 			Reason: "function pointer must not be nil",
 			Index:  -1,
@@ -332,7 +349,7 @@ func CallFunctionContext(
 	// would leave its register or stack slot holding whatever was there before
 	// the call; an extra one means the caller and the cif disagree.
 	if len(avalue) != len(cif.ArgTypes) {
-		return 0, &InvalidCallInterfaceError{
+		return nil, nil, &InvalidCallInterfaceError{
 			Field:  "avalue",
 			Reason: fmt.Sprintf("%d values for %d argument types", len(avalue), len(cif.ArgTypes)),
 			Index:  -1,
@@ -341,7 +358,7 @@ func CallFunctionContext(
 
 	call, err := callInterfaceForCall(cif)
 	if err != nil {
-		return 0, err
+		return nil, nil, err
 	}
 	// A struct returned through a hidden result pointer is written by the
 	// callee itself, so it needs memory even when the caller discards the
@@ -349,9 +366,7 @@ func CallFunctionContext(
 	if rvalue == nil && call.Flags&types.ReturnViaPointer != 0 {
 		rvalue = unsafe.Pointer(unsafe.SliceData(make([]byte, call.ReturnType.Size)))
 	}
-
-	cerrno, err := executeFunction(call, fn, rvalue, avalue)
-	return syscall.Errno(cerrno), err
+	return call, rvalue, nil
 }
 
 // CallFunction executes a C function call without context support.

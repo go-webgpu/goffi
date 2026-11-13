@@ -39,6 +39,7 @@ _, _ = ffi.CallFunction(cif, sym, unsafe.Pointer(&result), args)
 | **Variadic** | `printf`/`sprintf` | `PrepareVariadicCallInterface` — Apple ARM64 stack-force included |
 | **errno** | Always captured | Read in assembly right after the C call returns, before the goroutine can move to another thread |
 | **Context** | Timeouts | `CallFunctionContext(ctx, ...)` cancellation |
+| **No-callback calls** | 0 allocs/op | `CallFunctionNoCallback` for C functions that do not call back into Go (cgo's `#cgo nocallback`): argument values stay on the stack |
 | **Race detector** | `-race` compatible | `CGO_ENABLED=1 go test -race` runs in CI on every runner with a race detector |
 | **Tested** | ~90% coverage on amd64 | CI on Linux, Windows, macOS × amd64/arm64 (CGO=0 and CGO=1) and in FreeBSD 14/15 VMs |
 
