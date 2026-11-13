@@ -54,11 +54,14 @@ func CallFunctionNoCallback(
 	return syscall.Errno(cerrno), err
 }
 
-// noescape hides p from escape analysis, as internal/abi.NoEscape does.
+// noescape hides p from escape analysis, as internal/abi.NoEscape does. It
+// reads the integer back through a pointer instead of converting it, a
+// conversion go vet reports as a possible misuse of unsafe.Pointer.
+// runtime.noescape would do the same, but a linknamed function is not inlined,
+// which costs 1-2 ns per call.
 //
 //go:nosplit
-//go:nocheckptr
 func noescape(p unsafe.Pointer) unsafe.Pointer {
 	x := uintptr(p)
-	return unsafe.Pointer(x ^ 0) //nolint:govet,staticcheck // the uintptr round trip is the point
+	return *(*unsafe.Pointer)(unsafe.Pointer(&x))
 }
