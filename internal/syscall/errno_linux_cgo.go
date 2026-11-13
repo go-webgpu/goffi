@@ -7,12 +7,12 @@ package syscall
 
 import "github.com/go-webgpu/goffi/internal/dl"
 
-// errnoFnAddr is the errno accessor's address, resolved through cgo once:
+// errnoFnAddr is the errno accessor's address, taken through cgo once:
 // Bionic's __errno on Android, __errno_location on glibc and musl.
 var errnoFnAddr = dl.ErrnoAddr()
 
-// ErrnoFnAddr returns the errno accessor's address. A zero result means that
-// the platform did not expose the accessor; syscallN then skips capture.
+// ErrnoFnAddr returns the errno accessor's address. It is never zero here: the
+// accessor is linked in, so a C library without it fails the link.
 func ErrnoFnAddr() uintptr {
 	return errnoFnAddr
 }
