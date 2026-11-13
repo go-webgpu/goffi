@@ -26,16 +26,16 @@ ffi/float_return_windows_amd64_test.go
 ffi/struct_e2e_test.go
 internal/arch/arm64/fakecgo_test.go
 internal/dl/dl_android.go
-internal/dl/dl_android_cgo.go
 internal/dl/dl_android_nocgo.go
 internal/dl/dl_android_nocgo_arm64.s
+internal/dl/dl_linux_cgo.go
 internal/fakecgo/android_abi_test.go
 internal/fakecgo/android_dl.go
 internal/fakecgo/android_dl_stubs_arm64.s
 internal/fakecgo/libcgo_android.go
 internal/syscall/cgo.go
 internal/syscall/errno_android.go
-internal/syscall/errno_android_cgo.go
+internal/syscall/errno_linux_cgo.go
 '
 
 apache='SPDX-License-Identifier: Apache-2.0'

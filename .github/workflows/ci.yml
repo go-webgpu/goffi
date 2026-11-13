@@ -389,6 +389,24 @@ jobs:
         shell: bash
         run: go test -race -count=1 ./...
 
+      # With CGO_ENABLED=1 the linker picks internal or external linking
+      # depending on what else the program contains: goffi's tests on their
+      # own link internally, while any other cgo package, c-shared or
+      # c-archive forces external linking (#72). Run the suite in both modes so
+      # neither can break unnoticed. windows-11-arm has no arm64 C toolchain
+      # for external linking. Both modes run even if the first one fails.
+      - name: Run tests with external and internal linking (CGO_ENABLED=1)
+        if: matrix.cgo == '1' && matrix.os != 'windows-11-arm'
+        shell: bash
+        run: |
+          failed=""
+          go test -count=1 -ldflags=-linkmode=external ./... || failed="$failed external"
+          go test -count=1 -ldflags=-linkmode=internal ./... || failed="$failed internal"
+          if [ -n "$failed" ]; then
+            echo "FAIL (-linkmode):$failed"
+            exit 1
+          fi
+
       # As a normal user TestSetuidEtc can only check that syscall.Set*id
       # fails with EPERM instead of panicking. As root it checks that every
       # thread of the process got the new credentials (glibc setxid
@@ -468,6 +486,93 @@ jobs:
         if: matrix.cgo == '1' && matrix.os != 'windows-11-arm'
         shell: bash
         run: go test -race -count=1 ./...
+
+      - name: Run tests with external and internal linking (CGO_ENABLED=1)
+        if: matrix.cgo == '1' && matrix.os != 'windows-11-arm' # see the test job
+        shell: bash
+        run: |
+          failed=""
+          go test -count=1 -ldflags=-linkmode=external ./... || failed="$failed external"
+          go test -count=1 -ldflags=-linkmode=internal ./... || failed="$failed internal"
+          if [ -n "$failed" ]; then
+            echo "FAIL (-linkmode):$failed"
+            exit 1
+          fi
+
+  # goffi in one program with other code that calls C (#72): purego and an
+  # ordinary cgo package, in every link mode (scripts/run-linktest.sh).
+  # testdata/linktest is its own module, so purego never enters goffi's
+  # go.mod. Windows has no dynamic-import stubs and is not affected.
+  link-compat:
+    name: Link compat - ${{ matrix.os }} - Go ${{ matrix.go }}
+    runs-on: ${{ matrix.os }}
+    needs: [lint, formatting]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-15-intel]
+        go: ['1.25', 'stable']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+          cache: true
+          cache-dependency-path: testdata/linktest/go.sum
+
+      - name: Run linktest
+        run: sh scripts/run-linktest.sh
+
+  # The Linux runners have glibc 2.36 or newer. Up to 2.35, <dlfcn.h> keeps
+  # GNU names such as RTLD_DEFAULT behind _GNU_SOURCE, which gcc does not
+  # define, so a cgo file can build on the runners and fail on an older
+  # distribution. Build the cgo loader with gcc against Ubuntu 22.04's
+  # glibc 2.35, in every link mode.
+  test-glibc-2-35:
+    name: Test - glibc 2.35 (ubuntu:22.04, gcc, cgo=1)
+    runs-on: ubuntu-latest
+    needs: [lint, formatting]
+    container: ubuntu:22.04
+    env:
+      CGO_ENABLED: '1'
+      GOFFI_REQUIRE_TESTLIB: '1' # see the test job
+    steps:
+      - name: Install gcc
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates git gcc libc6-dev
+          ldd --version | head -1
+          gcc --version | head -1
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Run tests
+        run: go test -count=1 ./...
+
+      - name: Run tests with external and internal linking
+        shell: bash
+        run: |
+          failed=""
+          go test -count=1 -ldflags=-linkmode=external ./... || failed="$failed external"
+          go test -count=1 -ldflags=-linkmode=internal ./... || failed="$failed internal"
+          if [ -n "$failed" ]; then
+            echo "FAIL (-linkmode):$failed"
+            exit 1
+          fi
+
+      - name: Run linktest
+        run: sh scripts/run-linktest.sh
 
   # FreeBSD has no GitHub-hosted runner, so it runs in a VM. The cross-compile
   # job proves FreeBSD builds; this job runs the tests there: the call path,
@@ -731,7 +836,7 @@ jobs:
     name: CI Success
     # android-cross is deliberately absent: Android is a preview platform
     # (see the note above the android-cross job).
-    needs: [lint, lint-targets, formatting, cross-compile, test, test-go-stable, test-freebsd, benchmarks, quality-gate, elf-linking]
+    needs: [lint, lint-targets, formatting, cross-compile, test, test-go-stable, test-glibc-2-35, test-freebsd, benchmarks, quality-gate, elf-linking]
     runs-on: ubuntu-latest
     if: success()
     steps:
@@ -744,6 +849,7 @@ jobs:
           echo "✅ Tests: PASSED (CGO_ENABLED=0 and CGO_ENABLED=1)"
           echo "   - Linux AMD64 + ARM64, Windows AMD64 + ARM64, macOS ARM64 + AMD64"
           echo "   - Go 1.25 (go.mod minimum) and Go stable"
+          echo "   - Linux AMD64 against glibc 2.35 with gcc (ubuntu:22.04)"
           echo "✅ FreeBSD: PASSED (tests in FreeBSD 14 and 15 VMs, amd64)"
           echo "✅ ELF Linking: PASSED (default dynamic + goffi_static)"
           echo "✅ Benchmarks: PASSED"
