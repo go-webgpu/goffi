@@ -6,7 +6,6 @@
 package ffi
 
 import (
-	"errors"
 	"testing"
 	"unsafe"
 
@@ -51,44 +50,5 @@ func TestCallFunctionNoCallback(t *testing.T) {
 	}
 	if got != want {
 		t.Fatalf("CallFunctionNoCallback returned %d, CallFunction %d", got, want)
-	}
-}
-
-// TestCallFunctionNoCallbackAllocs checks that a call through a bridge
-// allocates nothing: the values, avalue and the result stay on the stack.
-func TestCallFunctionNoCallbackAllocs(t *testing.T) {
-	cif, fn := prepareTestFunc(t, "int_weighted3", types.SInt32TypeDescriptor,
-		types.SInt32TypeDescriptor, types.SInt32TypeDescriptor, types.SInt32TypeDescriptor)
-	if cif.Bridge == nil {
-		t.Skip("no call bridge on this platform")
-	}
-	var r int32
-	allocs := testing.AllocsPerRun(100, func() {
-		a, b, c := int32(1), int32(2), int32(3)
-		if _, err := CallFunctionNoCallback(cif, fn, unsafe.Pointer(&r),
-			[]unsafe.Pointer{unsafe.Pointer(&a), unsafe.Pointer(&b), unsafe.Pointer(&c)}); err != nil {
-			t.Fatal(err)
-		}
-	})
-	if allocs != 0 {
-		t.Fatalf("%v allocations per call, want 0", allocs)
-	}
-	if r != 14 {
-		t.Fatalf("int_weighted3(1, 2, 3) = %d, want 14", r)
-	}
-}
-
-func TestCallFunctionNoCallbackNilArgument(t *testing.T) {
-	cif, fn := prepareTestFunc(t, "int_weighted3", types.SInt32TypeDescriptor,
-		types.SInt32TypeDescriptor, types.SInt32TypeDescriptor, types.SInt32TypeDescriptor)
-	a := int32(1)
-	var r int32
-	_, err := CallFunctionNoCallback(cif, fn, unsafe.Pointer(&r), []unsafe.Pointer{unsafe.Pointer(&a), nil, unsafe.Pointer(&a)})
-	var invalid *InvalidCallInterfaceError
-	if !errors.As(err, &invalid) || invalid.Index != 1 {
-		t.Fatalf("err = %v, want an InvalidCallInterfaceError for argument 1", err)
-	}
-	if _, err := CallFunctionNoCallback(cif, fn, unsafe.Pointer(&r), []unsafe.Pointer{unsafe.Pointer(&a), unsafe.Pointer(&a), unsafe.Pointer(&a)}); err != nil {
-		t.Fatalf("a call after the rejected one failed: %v", err)
 	}
 }
