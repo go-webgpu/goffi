@@ -112,6 +112,21 @@ func sysvClasses(t *types.TypeDescriptor) (sse [2]bool, n int, memory bool) {
 	}
 }
 
+// placeScalar is place for a type that is not a struct. Such an argument is one
+// eightbyte: an SSE register for float and double, an integer register
+// otherwise, or one stack word once that class has run out. reg is -1 when the
+// argument is on the stack, at word.
+func (a *SysVAllocator) placeScalar(t *types.TypeDescriptor) (reg int, sse bool, word int) {
+	sse = t.Kind == types.FloatType || t.Kind == types.DoubleType
+	switch {
+	case sse && a.sse < sysvSSEs:
+		return a.SSE(), true, 0
+	case !sse && a.gpr < sysvGPRs:
+		return a.GPR(), false, 0
+	}
+	return -1, sse, a.Stack(8, t.Alignment)
+}
+
 // place assigns t its registers or stack words.
 func (a *SysVAllocator) place(t *types.TypeDescriptor) sysvPlacement {
 	sse, n, memory := sysvClasses(t)
@@ -162,7 +177,11 @@ func sysvStackBytes(cif *types.CallInterface) uintptr {
 		a.GPR()
 	}
 	for _, t := range cif.ArgTypes {
-		a.place(t)
+		if t.Kind == types.StructType {
+			a.place(t)
+		} else {
+			a.placeScalar(t)
+		}
 	}
 	return a.StackBytes()
 }

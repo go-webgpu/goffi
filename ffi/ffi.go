@@ -202,11 +202,10 @@ func PrepareVariadicCallInterface(
 	if nfixedargs > len(argTypes) {
 		return errors.New("goffi: nfixedargs exceeds total argument count")
 	}
-	if err := PrepareCallInterface(cif, convention, returnType, argTypes); err != nil {
-		return err
-	}
+	// Set before preparing: the platform checks and the call bridge
+	// depend on where the variadic arguments start.
 	cif.FixedArgCount = nfixedargs
-	return nil
+	return PrepareCallInterface(cif, convention, returnType, argTypes)
 }
 
 // CallFunctionContext executes a C function call with context support.
