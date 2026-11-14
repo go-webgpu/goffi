@@ -45,7 +45,8 @@ func (i *Implementation) Execute(
 	if n := first + len(cif.ArgTypes); n > maxWindowsSlots {
 		return 0, fmt.Errorf("goffi: %d argument slots exceed the Windows call path limit of %d", n, maxWindowsSlots)
 	}
-	args := make([]uintptr, first+len(cif.ArgTypes))
+	var slots [maxWindowsSlots]uintptr
+	args := slots[:first+len(cif.ArgTypes)]
 	if sret {
 		args[0] = uintptr(rvalue)
 	}
