@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"unsafe"
 
+	"github.com/go-webgpu/goffi/internal/jit"
 	gosyscall "github.com/go-webgpu/goffi/internal/syscall"
 	"github.com/go-webgpu/goffi/types"
 )
@@ -37,6 +38,12 @@ func (i *Implementation) Execute(
 	avalue []unsafe.Pointer,
 	errnoFn uintptr,
 ) (cerrno uintptr, err error) {
+	if cif.Bridge != nil {
+		if cerrno, ok := jit.Call((*jit.Code)(cif.Bridge), fn, rvalue, avalue, errnoFn); ok {
+			return cerrno, nil
+		}
+	}
+
 	// ffi.CallFunctionContext has checked that avalue holds a value for every
 	// argument type.
 	locs, stackBytes, err := layoutArgs(cif, runtime.GOOS)

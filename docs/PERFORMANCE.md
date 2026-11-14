@@ -214,6 +214,21 @@ result := libm.Call("sin", x)  // ~100ns + C sin (~10ns) = 110ns
 result := math.Sin(x)  // ~10-20ns (similar to C!)
 ```
 
+### 5. Use CallFunctionNoCallback for Functions That Do Not Call Back
+
+`CallFunction` moves the argument values to the heap, because a C function that calls back into Go can move the goroutine stack while C still uses it. Most C functions never call back. For those, `CallFunctionNoCallback` makes the same promise as cgo's `#cgo nocallback` and `#cgo noescape`: the function does not call back into Go and keeps no pointer to Go memory after it returns. The argument values, the `avalue` slice and the result can then stay on the stack, and the call allocates nothing:
+
+```go
+func Add(a, b int32) int32 {
+    var r int32
+    ffi.CallFunctionNoCallback(&addCif, addFn, unsafe.Pointer(&r),
+        []unsafe.Pointer{unsafe.Pointer(&a), unsafe.Pointer(&b)})
+    return r
+}
+```
+
+If the function calls back anyway, the runtime stops the program with "function marked with #cgo nocallback called back into Go".
+
 ---
 
 ## Real-World Performance Examples

@@ -27,6 +27,13 @@ type StackLayout interface {
 	StackArgBytes(cif *types.CallInterface) (need, limit uintptr, err error)
 }
 
+// Compiler is implemented by architectures that compile call bridges.
+// Compile returns machine code for cif's signature that the architecture's
+// Execute calls through, or nil when cif needs the generic call path.
+type Compiler interface {
+	Compile(cif *types.CallInterface) unsafe.Pointer
+}
+
 // ArgumentClassification contains argument passing information.
 type ArgumentClassification struct {
 	GPRCount int

@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"unsafe"
 
+	"github.com/go-webgpu/goffi/internal/jit"
 	gosyscall "github.com/go-webgpu/goffi/internal/syscall"
 	"github.com/go-webgpu/goffi/types"
 )
@@ -33,6 +34,12 @@ func (i *Implementation) Execute(
 	avalue []unsafe.Pointer,
 	errnoFn uintptr,
 ) (cerrno uintptr, err error) {
+	if cif.Bridge != nil {
+		if cerrno, ok := jit.Call((*jit.Code)(cif.Bridge), fn, rvalue, avalue, errnoFn); ok {
+			return cerrno, nil
+		}
+	}
+
 	// The stack area is sized before any value is placed, so an argument list
 	// that does not fit is an error, never a write past the area. A
 	// CallInterface filled in by hand reaches this point without the check in
@@ -70,36 +77,36 @@ func (i *Implementation) Execute(
 	// argument type.
 	for idx, argType := range cif.ArgTypes {
 		val := avalue[idx]
-		p := alloc.place(argType)
 
-		if argType.Kind == types.StructType {
-			if p.onStack {
-				sz := argType.Size
-				for off := uintptr(0); off < sz; off += 8 {
-					stack[p.word+int(off/8)] = loadWord(unsafe.Add(val, off), min(8, sz-off))
-				}
-				continue
-			}
-			for k := range p.n {
-				off := uintptr(k) * 8
-				w := loadWord(unsafe.Add(val, off), min(8, argType.Size-off))
-				if p.sse[k] {
-					setSSE(p.reg[k], w)
-				} else {
-					gpr[p.reg[k]] = w
-				}
+		if argType.Kind != types.StructType {
+			w := scalarWord(argType, val)
+			switch reg, sse, word := alloc.placeScalar(argType); {
+			case reg < 0:
+				stack[word] = w
+			case sse:
+				setSSE(reg, w)
+			default:
+				gpr[reg] = w
 			}
 			continue
 		}
 
-		w := scalarWord(argType, val)
-		switch {
-		case p.onStack:
-			stack[p.word] = w
-		case p.sse[0]:
-			setSSE(p.reg[0], w)
-		default:
-			gpr[p.reg[0]] = w
+		p := alloc.place(argType)
+		if p.onStack {
+			sz := argType.Size
+			for off := uintptr(0); off < sz; off += 8 {
+				stack[p.word+int(off/8)] = loadWord(unsafe.Add(val, off), min(8, sz-off))
+			}
+			continue
+		}
+		for k := range p.n {
+			off := uintptr(k) * 8
+			w := loadWord(unsafe.Add(val, off), min(8, argType.Size-off))
+			if p.sse[k] {
+				setSSE(p.reg[k], w)
+			} else {
+				gpr[p.reg[k]] = w
+			}
 		}
 	}
 

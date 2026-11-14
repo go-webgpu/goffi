@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"unsafe"
 
+	"github.com/go-webgpu/goffi/internal/jit"
 	"github.com/go-webgpu/goffi/types"
 )
 
@@ -25,6 +26,12 @@ func (i *Implementation) Execute(
 	avalue []unsafe.Pointer,
 	errnoFn uintptr,
 ) (cerrno uintptr, err error) {
+	if cif.Bridge != nil {
+		if cerrno, ok := jit.Call((*jit.Code)(cif.Bridge), fn, rvalue, avalue, errnoFn); ok {
+			return cerrno, nil
+		}
+	}
+
 	// Win64 ABI: arguments are passed in numbered slots.
 	// First 4 args: RCX, RDX, R8, R9 (integer) or XMM0-XMM3 (float).
 	// Args 5+: on the stack.
@@ -45,7 +52,8 @@ func (i *Implementation) Execute(
 	if n := first + len(cif.ArgTypes); n > maxWindowsSlots {
 		return 0, fmt.Errorf("goffi: %d argument slots exceed the Windows call path limit of %d", n, maxWindowsSlots)
 	}
-	args := make([]uintptr, first+len(cif.ArgTypes))
+	var slots [maxWindowsSlots]uintptr
+	args := slots[:first+len(cif.ArgTypes)]
 	if sret {
 		args[0] = uintptr(rvalue)
 	}

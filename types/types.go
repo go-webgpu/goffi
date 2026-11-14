@@ -8,6 +8,7 @@ package types
 import (
 	"errors"
 	"runtime"
+	"unsafe"
 )
 
 // RuntimeEnvironment returns current runtime OS and architecture
@@ -121,6 +122,14 @@ type CallInterface struct {
 	Flags         int     // Return flags.
 	StackBytes    uintptr // Required stack space.
 	FixedArgCount int     // 0 = non-variadic; >0 = number of fixed args before '...'
+
+	// Bridge is machine code PrepareCallInterface compiled for this
+	// signature on platforms that support it, nil otherwise. CallFunction
+	// calls through it instead of placing the arguments on every call. It
+	// depends only on ArgTypes, ReturnType and FixedArgCount, which must not
+	// change after preparation. A CallInterface filled in by hand leaves it
+	// nil. Setting GOFFI_JIT=0 in the environment turns bridges off.
+	Bridge unsafe.Pointer
 }
 
 // Return flags constants
